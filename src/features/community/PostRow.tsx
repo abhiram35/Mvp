@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Avatar, Text } from '../../components/ui';
 import { COMMUNITY_KIND_LABELS, type CommunityPostSummary, type Game } from '../../lib/types';
 import { fontSize, makeStyles, spacing, useTheme } from '../../theme';
-import { useGgState } from './api';
+import { useGgState, wasEdited } from './api';
 import { compactCount, plural, timeAgo } from './format';
 import { KindTag, SolvedTag } from './Tags';
 
@@ -25,7 +25,7 @@ export const PostRow = memo(function PostRow({
   const { post, author, is_solved } = item;
   const gg = useGgState('post', post.id, { has_gg: item.has_gg, gg_count: post.gg_count });
   const name = author.display_name || author.username || 'Player';
-  const ago = timeAgo(post.created_at, now);
+  const ago = timeAgo(post.created_at, now) + (wasEdited(post) ? ' · edited' : '');
   const preview = post.body.replace(/\s+/g, ' ').trim();
 
   const a11y = [

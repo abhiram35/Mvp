@@ -149,7 +149,7 @@ export interface Report {
 }
 
 
-// ── Community (blog / forum) ────────────────────────────────────────────────
+// ── Community (takes and questions) ────────────────────────────────────────────────
 
 /** table: community_posts — opinions ("take") and help questions ("question") */
 export interface CommunityPost {

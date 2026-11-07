@@ -523,7 +523,10 @@ export function useCommunityReplies(postId: UUID | undefined, onChange?: () => v
         setError(null);
       } catch (e) {
         if (gen !== generation.current) return;
-        if (!silent) setError(messageOf(e));
+        if (isNotFoundError(e)) {
+          setItems([]);
+          setError(null);
+        } else if (!silent) setError(communityErrorMessage(e));
       } finally {
         if (gen === generation.current) setLoading(false);
       }

@@ -1,9 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Alert, Pressable, StyleSheet } from 'react-native';
 import { Notch, Text } from '../../components/ui';
-import { errorMessage } from '../../lib/supabase';
 import { fontSize, makeStyles, spacing, useTheme } from '../../theme';
-import { toggleGg, useGgState, type GgState, type GgTarget } from './api';
+import { communityErrorMessage, isOwnGgError, toggleGg, useGgState, type GgState, type GgTarget } from './api';
 import { compactCount } from './format';
 
 /**

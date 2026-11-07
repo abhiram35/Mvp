@@ -372,3 +372,190 @@ export const COMMUNITY_KIND_LABELS: Record<CommunityPostKind, string> = {
   take: 'Take',
   question: 'Question',
 };
+
+// ═════════════════════════════════════════════════════════════════════════════
+// Phase 2: notifications, teammate ratings + XP, moderation, telemetry.
+// Backend: supabase/migrations/0008_engagement.sql, 0009_safety_telemetry.sql,
+// supabase/functions/send-push. Spec: docs/PHASE2.md
+// ═════════════════════════════════════════════════════════════════════════════
+
+export type NotificationType =
+  | 'lfg_request' // someone asked to join your lobby
+  | 'lfg_accepted' // your join request was accepted
+  | 'message' // new chat message (DM or squad chat)
+  | 'friend_request'
+  | 'friend_accepted'
+  | 'community_reply' // reply on your post
+  | 'community_solution' // your reply was marked as the solution
+  | 'rating_received' // a teammate rated you (positive tags only)
+  | 'moderation'; // a moderator acted on your content or account
+
+/** Where tapping a notification goes. `params` are Expo Router params. */
+export interface NotificationRoute {
+  pathname: '/lfg/[id]' | '/chat/[id]' | '/friends' | '/community/[id]' | '/user/[id]' | '/notifications';
+  params?: Record<string, string>;
+}
+
+/** table: notifications — created ONLY by server triggers. Recipient can read and set read_at. */
+export interface AppNotification {
+  id: UUID;
+  recipient_id: UUID;
+  type: NotificationType;
+  title: string; // ≤ 80 chars, e.g. "Rhea wants to join your lobby"
+  body: string | null; // ≤ 160 chars
+  data: { route: NotificationRoute; actor_id?: UUID } & Record<string, unknown>;
+  read_at: ISODate | null;
+  created_at: ISODate;
+}
+
+/** table: push_tokens — PK token. Owner upserts/deletes their own rows. */
+export interface PushToken {
+  token: string; // Expo push token "ExponentPushToken[...]"
+  profile_id: UUID;
+  platform: 'ios' | 'android';
+  created_at: ISODate;
+  updated_at: ISODate;
+}
+
+// ── Teammate ratings + XP ───────────────────────────────────────────────────
+/** Public praise tags plus the private "toxic" flag (never shown on profiles; feeds moderation). */
+export type RatingTag = 'good_comms' | 'chill' | 'clutch' | 'shotcaller' | 'toxic';
+export const PUBLIC_RATING_TAGS = ['good_comms', 'chill', 'clutch', 'shotcaller'] as const;
+export type PublicRatingTag = (typeof PUBLIC_RATING_TAGS)[number];
+
+export const RATING_TAG_LABELS: Record<RatingTag, string> = {
+  good_comms: 'Good comms',
+  chill: 'Chill',
+  clutch: 'Clutch',
+  shotcaller: 'Shotcaller',
+  toxic: 'Toxic',
+};
+
+/** table: teammate_ratings — unique (rater_id, ratee_id, lfg_post_id). Insert via rate_teammate RPC only. */
+export interface TeammateRating {
+  id: UUID;
+  rater_id: UUID;
+  ratee_id: UUID;
+  lfg_post_id: UUID;
+  tags: RatingTag[]; // 1–4 tags; 'toxic' cannot be combined with praise tags
+  created_at: ISODate;
+}
+
+/** Public reputation of a player (get_player_stats). Toxic counts are never exposed. */
+export interface PlayerStats {
+  profile_id: UUID;
+  xp: number;
+  level: number; // floor(sqrt(xp / 50)) + 1
+  xp_into_level: number; // xp earned since the start of the current level
+  xp_for_next: number; // xp needed from the start of this level to the next
+  squads_joined: number; // accepted into someone's lobby + own lobbies that filled at least one slot
+  lobbies_hosted: number;
+  ratings_received: number; // number of teammates who rated this player (any tags)
+  positive_ratings: number; // ratings with at least one praise tag
+  tag_counts: Record<PublicRatingTag, number>;
+  solutions: number; // community replies marked as the answer
+}
+
+/** Compact reputation for cards (squad finder, lobby rows). */
+export interface ReputationSummary {
+  level: number;
+  ratings_received: number;
+  top_tags: PublicRatingTag[]; // up to 2, most received first
+}
+
+/** Squad finder results now include reputation and rank good teammates higher. */
+export interface SquadmateMatch {
+  reputation?: ReputationSummary;
+}
+
+/** One teammate the caller can rate for a lobby (list_rateable_teammates). */
+export interface RateableTeammate {
+  profile: Pick<Profile, 'id' | 'username' | 'display_name' | 'avatar_url'>;
+  already_rated: boolean;
+  my_tags: RatingTag[]; // empty if not rated yet
+}
+
+// ── Moderation ──────────────────────────────────────────────────────────────
+export type ModerationAction = 'dismiss' | 'remove_content' | 'ban_user';
+
+/** Row returned by list_reports (moderators only). */
+export interface ReportQueueItem {
+  report: Report;
+  reporter: Pick<Profile, 'id' | 'username' | 'display_name'>;
+  /** The reported person (author of the content, or the profile itself). */
+  target_user: Pick<Profile, 'id' | 'username' | 'display_name' | 'avatar_url'> | null;
+  /** Short text preview of the reported content (null if it was already deleted). */
+  target_preview: string | null;
+  /** How many open reports exist against target_user in total. */
+  open_reports_against_user: number;
+  /** Times this user was flagged toxic by distinct teammates in the last 30 days. */
+  toxic_flags_30d: number;
+}
+
+/** Ban status for the signed-in player (get_my_status). */
+export interface MyStatus {
+  banned_until: ISODate | null; // non-null and in the future = cannot post, message, host or reply
+  is_moderator: boolean;
+}
+
+// ── Telemetry ───────────────────────────────────────────────────────────────
+/** table: app_events — client may insert only these names; the server logs the rest itself. */
+export type ClientEventName = 'app_open' | 'theme_changed' | 'onboarding_completed';
+
+/** table: app_errors — crash / error reports. Insert-only for clients (signed in or not). */
+export interface AppErrorReport {
+  message: string; // ≤ 500
+  stack: string | null; // ≤ 4000
+  context: Record<string, unknown> | null; // screen, action, etc.
+  app_version: string | null;
+  platform: 'ios' | 'android' | 'web';
+  is_fatal: boolean;
+}
+
+/** Beta metrics for the owner/moderators (get_beta_metrics). */
+export interface BetaMetrics {
+  days: number;
+  total_players: number;
+  new_players: number;
+  daily_active: { day: string; players: number }[]; // last `days` days, oldest first
+  lobbies_created: number;
+  join_requests: number;
+  squads_formed: number; // accepted requests
+  messages_sent: number;
+  community_posts: number;
+  ratings_given: number;
+  day1_retention: number | null; // share 0–1 of players who signed up ≥1 day ago and came back the next day
+  day7_retention: number | null;
+  errors_last_24h: number;
+}
+
+export interface RpcFunctions {
+  // ── Notifications ──
+  /** Unread count for the bell badge. */
+  count_unread_notifications: { args: Record<string, never>; returns: number };
+  /** Mark one (p_id) or all (p_id null) notifications read. */
+  mark_notifications_read: { args: { p_id: UUID | null }; returns: null };
+
+  // ── Ratings + XP ──
+  /** Teammates from a lobby the caller can rate (both were in its squad chat). Empty if not eligible. */
+  list_rateable_teammates: { args: { p_lfg_post_id: UUID }; returns: RateableTeammate[] };
+  /** Rate or re-rate a teammate for a lobby. Allowed only if both were in the lobby's squad, from the moment
+   *  the squad chat exists until 7 days after the lobby was created. Returns the ratee's updated public stats. */
+  rate_teammate: { args: { p_lfg_post_id: UUID; p_ratee_id: UUID; p_tags: RatingTag[] }; returns: PlayerStats };
+  /** Public stats for any player (zeros if none yet). */
+  get_player_stats: { args: { p_profile_id: UUID }; returns: PlayerStats };
+
+  // ── Moderation ──
+  get_my_status: { args: Record<string, never>; returns: MyStatus };
+  /** Moderators only. p_status null = open. Newest first. */
+  list_reports: { args: { p_status: Report['status'] | null; p_limit?: number; p_offset?: number }; returns: ReportQueueItem[] };
+  /** Moderators only. remove_content deletes the reported row (message/post/reply/lfg post); ban_user sets banned_until
+   *  = now() + p_ban_days (1–365) on the target user; both mark the report 'actioned' and notify the target. dismiss marks 'reviewed'. */
+  resolve_report: { args: { p_report_id: UUID; p_action: ModerationAction; p_ban_days?: number | null }; returns: null };
+  /** Moderators only. Lift a ban early. */
+  unban_user: { args: { p_profile_id: UUID }; returns: null };
+
+  // ── Telemetry ──
+  /** Moderators only. */
+  get_beta_metrics: { args: { p_days?: number }; returns: BetaMetrics };
+}

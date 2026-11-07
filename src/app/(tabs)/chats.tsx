@@ -105,7 +105,7 @@ function ConversationRow({ item }: { item: ConversationSummary }) {
       onPress={() => router.push({ pathname: '/chat/[id]', params: { id: item.conversation_id } })}
       style={({ pressed }) => [s.row, pressed && { backgroundColor: t.colors.surfaceRaised }]}
     >
-      <Avatar uri={item.avatar_url} name={item.title} size={AVATAR} highlight={item.is_group} />
+      <Avatar uri={item.avatar_url} name={item.title} size={AVATAR} highlight={item.is_group} icon={item.is_group && !item.avatar_url ? 'people' : undefined} />
       <View style={s.rowBody}>
         <View style={s.rowTop}>
           <Text style={s.title} numberOfLines={1}>

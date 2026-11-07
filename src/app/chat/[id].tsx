@@ -204,7 +204,7 @@ function GroupHeader({ title, memberCount }: { title: string; memberCount: numbe
   const styles = useStyles();
   return (
     <View style={styles.headerTitle} accessible accessibilityLabel={`${title}, ${memberCount} members`}>
-      <Avatar name={title} size={32} highlight />
+      <Avatar name={title} size={32} highlight icon="people" />
       <View style={{ marginLeft: spacing.sm, flexShrink: 1 }}>
         <Text style={styles.headerName} numberOfLines={1}>{title}</Text>
         <Text variant="caption" numberOfLines={1}>{memberCount} {memberCount === 1 ? 'member' : 'members'}</Text>

@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Avatar, Card, Chip, ChipRow, PanelFrame, Stat, Text } from '../../components/ui';
 import { PLAY_STYLE_LABELS, PLAY_TIME_LABELS, REGION_LABELS, type Profile } from '../../lib/types';
-import { makeStyles, spacing } from '../../theme';
+import { makeStyles, spacing, useTheme } from '../../theme';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -31,12 +31,13 @@ export function ProfileHeader({
   children?: ReactNode;
 }) {
   const s = useStyles();
+  const t = useTheme();
   const since = memberSince(profile.created_at);
   return (
     <View style={s.wrap}>
       <Card tone="panel" style={s.band}>
         <View style={s.top}>
-          <Avatar uri={profile.avatar_url} name={profile.display_name} size={76} highlight={own} />
+          <Avatar uri={profile.avatar_url} name={profile.display_name} size={76} highlight={own} backdrop={t.colors.panel} />
           <View style={s.names}>
             <Text variant="display" style={s.name} numberOfLines={2} accessibilityRole="header">
               {profile.display_name}

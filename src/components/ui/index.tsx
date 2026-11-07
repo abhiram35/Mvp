@@ -330,7 +330,23 @@ export function PanelFrame() {
 
 // ── Avatar ──────────────────────────────────────────────────────────────────
 /** Protocol / Defuse: square with a cut corner. Ronin: round with a gold ring. */
-export function Avatar({ uri, name, size = 44, highlight }: { uri?: string | null; name?: string | null; size?: number; highlight?: boolean }) {
+export function Avatar({
+  uri,
+  name,
+  size = 44,
+  highlight,
+  icon,
+  backdrop,
+}: {
+  uri?: string | null;
+  name?: string | null;
+  size?: number;
+  highlight?: boolean;
+  /** Show an icon instead of initials (e.g. 'people' for group chats). */
+  icon?: IconName;
+  /** Colour behind the avatar, so the Protocol notch blends in (pass t.colors.panel on dark panels). */
+  backdrop?: string;
+}) {
   const t = useTheme();
   const initials = (name ?? '?').trim().slice(0, 2).toUpperCase();
   const round = t.id === 'ronin';
@@ -349,10 +365,12 @@ export function Avatar({ uri, name, size = 44, highlight }: { uri?: string | nul
     <View style={box}>
       {uri ? (
         <Image source={{ uri }} style={{ width: size, height: size }} accessibilityIgnoresInvertColors />
+      ) : icon ? (
+        <Ionicons name={icon} size={size * 0.5} color={highlight ? t.colors.onPrimary : t.colors.text} />
       ) : (
         <RNText style={{ color: highlight ? t.colors.onPrimary : t.colors.text, fontFamily: t.fonts.heading, fontSize: size * 0.4 }}>{initials}</RNText>
       )}
-      {!round ? <Notch corner="bottomRight" color={t.colors.bg} size={Math.round(size * 0.25)} /> : null}
+      {!round ? <Notch corner="bottomRight" color={backdrop ?? t.colors.bg} size={Math.round(size * 0.25)} /> : null}
     </View>
   );
 }

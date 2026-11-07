@@ -215,6 +215,27 @@ export interface GgToggleResult {
   gg_count: number;
 }
 
+// ── Custom AI themes (docs/CUSTOM_THEMES.md) ────────────────────────────────
+/** A saved custom_themes row as the app selects it. Only the generate-theme Edge Function inserts rows;
+ *  the owner may rename (name only) or delete. `spec` is untrusted JSON — run it through
+ *  validateSpec() from src/theme/custom.ts before use. The player's prompt is never selected. */
+export interface CustomTheme {
+  id: UUID;
+  name: string; // 2–24 chars
+  spec: unknown;
+  created_at: ISODate;
+}
+
+/** get_theme_quota(): 2 successful generations per IST calendar month, max 6 saved themes. */
+export interface ThemeQuota {
+  used: number;
+  limit: number; // 2
+  remaining: number;
+  resets_at: ISODate; // next 1st of the month, 00:00 IST
+  saved: number;
+  saved_limit: number; // 6
+}
+
 // ── Database functions (Supabase RPC) ───────────────────────────────────────
 // Call with: supabase.rpc('<name>', { ...args })
 
@@ -280,6 +301,10 @@ export interface RpcFunctions {
 
   /** Post author marks a reply on their QUESTION as the solution (p_reply_id), or clears it (null). */
   set_solution: { args: { p_post_id: UUID; p_reply_id: UUID | null }; returns: null };
+
+  // ── Custom themes ──
+  /** The caller's AI theme quota for the current IST month and saved-theme count. */
+  get_theme_quota: { args: Record<string, never>; returns: ThemeQuota };
 }
 
 export interface SquadmateMatch {

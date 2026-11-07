@@ -1,5 +1,5 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- SquadUp 0005 – seed games (safe to re-run)
+-- GG 0005 – seed games (safe to re-run)
 -- ranks are ordered lowest → highest; empty array = no ranked ladder.
 -- ─────────────────────────────────────────────────────────────────────────────
 

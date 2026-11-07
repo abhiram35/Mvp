@@ -1,5 +1,5 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- SquadUp 0003 – RPC functions (see RpcFunctions in src/lib/types.ts) + triggers
+-- GG 0003 – RPC functions (see RpcFunctions in src/lib/types.ts) + triggers
 -- All RPCs are SECURITY DEFINER with a fixed search_path, check auth.uid(),
 -- and validate permissions themselves (arguments are never trusted).
 -- Expired LFG posts are not closed by a job: the app filters expires_at > now().

@@ -91,7 +91,7 @@ export default function SignInScreen() {
         <Button title="Sign in" icon="log-in-outline" onPress={signIn} loading={loading} />
 
         <View style={styles.footer}>
-          <Text muted>New to SquadUp? </Text>
+          <Text muted>New to GG? </Text>
           <Link href="/(auth)/sign-up" asChild>
             <Pressable accessibilityRole="link" accessibilityLabel="Create an account" hitSlop={12} style={styles.linkTarget}>
               <Text style={{ color: colors.primary, fontWeight: font.weight.semibold }}>Create an account</Text>

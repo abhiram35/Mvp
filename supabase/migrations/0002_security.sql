@@ -1,5 +1,5 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- SquadUp 0002 – row level security, privileges and helper functions
+-- GG 0002 – row level security, privileges and helper functions
 -- Every table has RLS on. Users are the `authenticated` role; `anon` gets nothing.
 -- Column-level privileges stop users from changing columns that only server
 -- functions may set (e.g. lfg_posts.conversation_id).

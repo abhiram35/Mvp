@@ -1,5 +1,5 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- SquadUp 0004 – realtime + avatar storage
+-- GG 0004 – realtime + avatar storage
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- ── Realtime: broadcast changes on these tables (RLS still applies) ─────────

@@ -1,17 +1,17 @@
 {
   "expo": {
-    "name": "SquadUp",
-    "slug": "squadup",
+    "name": "GG",
+    "slug": "gg",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0B0D12",
+        "backgroundColor": "#111A22",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -26,11 +26,12 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "SquadUp needs access to your photos so you can set a profile picture."
+          "photosPermission": "GG needs access to your photos so you can set a profile picture."
         }
-      ]
+      ],
+      "expo-font"
     ],
-    "scheme": "squadup",
+    "scheme": "gg",
     "experiments": {
       "typedRoutes": true
     }

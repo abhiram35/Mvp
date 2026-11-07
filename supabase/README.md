@@ -1,4 +1,4 @@
-# SquadUp backend (Supabase)
+# GG backend (Supabase)
 
 Everything the app needs lives in `migrations/`. Run the files **in order**:
 
@@ -14,7 +14,7 @@ All files are safe to run again. Re-running them will not create duplicates.
 
 ## 1. Create a free Supabase project
 1. Go to <https://supabase.com>, sign up, then click **New project**.
-2. Pick a name (e.g. `squadup`), set a strong database password (save it somewhere), and choose the region closest to your players. For India that's **Mumbai (ap-south-1)**.
+2. Pick a name (e.g. `gg`), set a strong database password (save it somewhere), and choose the region closest to your players. For India that's **Mumbai (ap-south-1)**.
 3. Wait about 2 minutes while the project is created.
 
 ## 2. Run the migrations
@@ -37,7 +37,7 @@ To check it worked, open **Table Editor**. You should see tables like `profiles`
 1. **Authentication → Sign In / Providers → Email**: make sure it is **enabled**. Keep **Confirm email** on for real users. You can turn it off while testing.
 2. **Authentication → URL Configuration**:
    - **Site URL**: your app's URL. During development `exp://localhost:8081` is fine.
-   - **Redirect URLs**: add `squadup://**` and `exp://**`. Password-reset and confirmation links will open the app.
+   - **Redirect URLs**: add `gg://**` and `exp://**`. Password-reset and confirmation links will open the app.
 
 ## 4. Connect the app
 1. **Project Settings → API** (or **Data API / API Keys**): copy the **Project URL** and the **anon / publishable** key.

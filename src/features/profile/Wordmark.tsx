@@ -3,10 +3,10 @@ import { StyleSheet, View } from 'react-native';
 import { Text } from '../../components/ui';
 import { colors, font, radius, spacing } from '../../theme';
 
-/** Big "SquadUp" brand mark used on the auth screens. */
+/** Big "GG" brand mark used on the auth screens. */
 export function Wordmark({ compact }: { compact?: boolean }) {
   return (
-    <View style={styles.wrap} accessible accessibilityRole="header" accessibilityLabel="SquadUp. Find your squad. No toxicity.">
+    <View style={styles.wrap} accessible accessibilityRole="header" accessibilityLabel="GG. Find your squad. No toxicity.">
       <View style={styles.badge}>
         <Ionicons name="game-controller" size={compact ? 26 : 34} color={colors.onPrimary} />
       </View>

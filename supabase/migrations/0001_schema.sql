@@ -1,5 +1,5 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- SquadUp 0001 – schema
+-- GG 0001 – schema
 -- Implements the tables in src/lib/types.ts exactly (names, columns, enum values).
 -- Enumerations are stored as text with CHECK constraints.
 -- ─────────────────────────────────────────────────────────────────────────────

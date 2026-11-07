@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// SquadUp data contract.
+// GG data contract.
 // This file is the single source of truth shared by the backend (Supabase SQL in
 // supabase/migrations) and the app. Table and column names here MUST match the
 // SQL exactly. If you need a change, change it here AND in the SQL.

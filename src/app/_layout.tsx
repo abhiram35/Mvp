@@ -4,10 +4,12 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { EmptyState, LoadingState, Screen } from '../components/ui';
 import { isSupabaseConfigured } from '../lib/supabase';
 import { AuthProvider, useAuth } from '../providers/AuthProvider';
-import { colors } from '../theme';
+import { ThemeProvider, useTheme, useThemeSwitcher } from '../theme';
 
 function RootNavigator() {
   const { initializing, session, profile } = useAuth();
+  const t = useTheme();
+  const { ready: themeReady } = useThemeSwitcher();
 
   if (!isSupabaseConfigured) {
     return (
@@ -21,7 +23,7 @@ function RootNavigator() {
     );
   }
 
-  if (initializing) {
+  if (initializing || !themeReady) {
     return (
       <Screen>
         <LoadingState />
@@ -38,10 +40,11 @@ function RootNavigator() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: colors.bg },
-        headerTintColor: colors.text,
+        headerStyle: { backgroundColor: t.colors.bg },
+        headerTintColor: t.colors.text,
+        headerTitleStyle: { fontFamily: t.fonts.heading, fontSize: 20 },
         headerShadowVisible: false,
-        contentStyle: { backgroundColor: colors.bg },
+        contentStyle: { backgroundColor: t.colors.bg },
       }}
     >
       {/* Signed out: sign in / sign up (owned by the Auth & Profile agent) */}
@@ -65,6 +68,8 @@ function RootNavigator() {
         <Stack.Screen name="settings/edit-profile" options={{ title: 'Edit profile' }} />
         <Stack.Screen name="settings/blocked" options={{ title: 'Blocked players' }} />
         <Stack.Screen name="report" options={{ title: 'Report', presentation: 'modal' }} />
+        {/* Theme picker */}
+        <Stack.Screen name="settings/theme" options={{ title: 'Theme' }} />
         {/* Chat & Friends agent */}
         <Stack.Screen name="chat/[id]" options={{ title: 'Chat' }} />
         <Stack.Screen name="friends" options={{ title: 'Friends' }} />
@@ -73,13 +78,20 @@ function RootNavigator() {
   );
 }
 
+function ThemedStatusBar() {
+  const t = useTheme();
+  return <StatusBar style={t.dark ? 'light' : 'dark'} />;
+}
+
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <StatusBar style="light" />
-        <RootNavigator />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <ThemedStatusBar />
+          <RootNavigator />
+        </AuthProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

@@ -11,6 +11,8 @@ Everything the app needs lives in `migrations/`. Run the files **in order**:
 | `0005_seed_games.sql` | The list of games (BGMI, Free Fire MAX, Valorant, …) |
 | `0006_community.sql` | Community (blog / forum): takes, questions, replies, GGs, solutions, plus their server functions |
 | `0007_custom_themes.sql` | Custom AI themes: saved themes, generation log, monthly quota (`get_theme_quota`) |
+| `0008_engagement.sql` | Notifications (inbox + push), teammate ratings, XP / levels, reputation in squad finder |
+| `0009_safety_telemetry.sql` | Moderators + bans, profanity filter, report queue, product events, crash reports, beta metrics |
 
 All files are safe to run again. Re-running them will not create duplicates.
 
@@ -23,7 +25,7 @@ All files are safe to run again. Re-running them will not create duplicates.
 **Option A: SQL Editor (easiest)**
 1. In the dashboard open **SQL Editor → New query**.
 2. Open `migrations/0001_schema.sql`, copy the whole file, paste it, and click **Run**.
-3. Do the same for `0002`, `0003`, `0004`, `0005`, `0006` and `0007`, in that order.
+3. Do the same for `0002`, `0003`, `0004`, `0005`, `0006`, `0007`, `0008` and `0009`, in that order.
 
 **Option B: Supabase CLI**
 ```bash
@@ -53,6 +55,9 @@ To check it worked, open **Table Editor**. You should see tables like `profiles`
 > Never put the **service_role** key in the app or in `.env` for the app. It bypasses all security.
 
 ## 5. Moderation: seeing and acting on reports
+> Since `0009` there is an in-app **Moderation** screen (see [Moderation](#8-moderation) below). The dashboard steps
+> here still work as a fallback.
+
 Users can create reports, but they can never read them. Only you can, from the dashboard (the dashboard bypasses RLS).
 
 1. **Table Editor → reports**. Sort by `created_at` and filter `status = open`.
@@ -127,6 +132,78 @@ cost too but don't use up the player's quota, so each player is also limited to 
 If every attempt fails with `not_configured`, the `ANTHROPIC_API_KEY` secret is missing. `upstream_401` means the
 key is wrong; `upstream_400` with a valid key usually means the `THEME_MODEL` name is wrong.
 
+## 7. Push notifications
+The inbox (bell icon) works as soon as `0008` is run. Phone push notifications need three more things: the
+`send-push` Edge Function, a shared secret, and two Vault secrets that tell the database where the function is.
+
+1. Install and link the Supabase CLI (see step 6.3) if you haven't yet.
+2. Make a random secret (any long random string). In a terminal:
+   ```bash
+   openssl rand -hex 32
+   ```
+   Copy the output. Below it is called `<secret>`.
+3. Save it for the function and deploy the function. `--no-verify-jwt` is required, because the database calls the
+   function without a user login; the secret protects it instead.
+   ```bash
+   supabase secrets set PUSH_SHARED_SECRET=<secret>
+   supabase functions deploy send-push --no-verify-jwt
+   ```
+4. Tell the database where the function is. In **SQL Editor** run (replace `<ref>` with your project ref and
+   `<secret>` with the same secret):
+   ```sql
+   select vault.create_secret('https://<ref>.functions.supabase.co/send-push', 'send_push_url');
+   select vault.create_secret('<secret>', 'send_push_secret');
+   ```
+   To change one later: **Project Settings → Vault** (or `select vault.update_secret(id, 'new value')`).
+   If the secrets are missing, nothing breaks: the inbox still fills, only phone pushes are skipped.
+5. **Android** push also needs Firebase (FCM) credentials uploaded to Expo/EAS. Follow Expo's guide:
+   <https://docs.expo.dev/push-notifications/push-notifications-setup/> (section "Android: FCM credentials").
+   iOS push credentials are created for you by `eas build` (paid Apple developer account required).
+6. Remote push does **not** work in Expo Go on Android. Test it with an EAS build (development or preview).
+
+**Checking it works.** Send yourself a friend request from a second account. Then:
+- **Table Editor → notifications** should have a row.
+- **Edge Functions → send-push → Logs** shows each call (`{ sent, removed }`). `401` means the two secrets don't match.
+- `select * from net._http_response order by created desc limit 5;` shows the database's HTTP calls.
+
+Chat messages push at most once per conversation per minute; newer messages update the same inbox row.
+Optional: if you turned on Expo's "Enhanced push security", also `supabase secrets set EXPO_ACCESS_TOKEN=...`.
+
+## 8. Moderation
+1. Make yourself a moderator (SQL Editor, use your own username):
+   ```sql
+   insert into moderators(profile_id) select id from profiles where username = 'yourname';
+   ```
+   Restart the app. **Me → Moderation** appears.
+2. Reports show up under **Open**. For each one you can **Dismiss**, **Remove content** (deletes the message / lobby /
+   post / reply; for a profile it clears the bio and photo) or **Ban** for 1, 7 or 30 days. The player gets a
+   notification. Banned players can still read and browse, but cannot post, message, host, join, reply, add friends
+   or rate.
+3. Lift a ban early from the app, or in SQL: `update profiles set banned_until = null where username = 'name';`
+4. If a player is flagged "toxic" by 3 different teammates within 30 days, a report is filed automatically
+   ("Auto: flagged toxic by 3+ teammates in 30 days").
+5. The profanity filter masks abuse automatically ("f***"). Add a word:
+   `insert into gg_blocked_words (word) values ('newword');` (lowercase; leetspeak and plurals are handled).
+   Only new or edited text is masked.
+
+To remove a moderator: `delete from moderators where profile_id = (select id from profiles where username = 'name');`
+
+## 9. Beta metrics
+As a moderator, open the in-app metrics screen, or run in SQL Editor:
+```sql
+select get_beta_metrics(14);
+```
+You get total and new players, daily active players (India time), lobbies, join requests,
+squads formed, messages, community posts, ratings, day-1 / day-7 retention and errors in the last 24 hours. Raw data:
+**Table Editor → app_events** and **app_errors** (crash reports with stack traces).
+
+## 10. Email codes (sign-up and password reset without links)
+The app asks for the 6-digit code from the email, so the emails must contain it.
+1. **Authentication → Emails → Templates** (older dashboards: **Email Templates**).
+2. **Confirm signup**: add a line such as `Your GG code is {{ .Token }}`.
+3. **Reset password** (sometimes "Reset Password" / "Recovery"): add `Your GG reset code is {{ .Token }}`.
+4. Save both. You can keep the links in the emails too; the app only needs the code.
+
 ## Notes for developers
 - Expired LFG posts are not closed automatically. The app should query
   `.gt('expires_at', new Date().toISOString())` together with `status = 'open'`.
@@ -146,3 +223,16 @@ key is wrong; `upstream_400` with a valid key usually means the `THEME_MODEL` na
   `theme_quota_for` are service-role only (used by the function; they also stop two parallel generations).
 - `supabase/functions` is Deno code with its own `deno.json`; the app's root `tsconfig.json` excludes it.
   Pure theme logic (validation, contrast repair, denylists) is in `functions/_shared/themeSpec.ts` with no imports.
+- Phase 2 (`0008`, `0009`): notifications are created only by server triggers; the app selects its own rows and may
+  update `read_at` only (or call `mark_notifications_read`). Register devices with
+  `rpc('register_push_token', { p_token, p_platform })` (reassigns the token to the caller); owners can also
+  select/insert/update/delete their own `push_tokens` rows directly.
+- `rate_teammate`, `get_player_stats`, `get_my_status`, `get_beta_metrics` return one jsonb object;
+  `list_rateable_teammates` and `list_reports` return `setof jsonb`; `count_unread_notifications` returns an integer;
+  `mark_notifications_read`, `resolve_report`, `unban_user`, `register_push_token` return null.
+  `find_squadmates` rows now also carry `reputation: { level, ratings_received, top_tags }`.
+- XP lives in `player_stats` (server only). It is event-based: deleting a lobby does not take back XP; un-GGs,
+  re-ratings and changed solutions do. `select rebuild_player_stats();` recomputes everything from the tables.
+- `app_events` / `app_errors` are insert-only for clients (no `.select()`). `profiles.banned_until` cannot be written
+  by users. `reports.target_user_id` is filled by the server.
+

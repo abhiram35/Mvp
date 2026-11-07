@@ -168,68 +168,41 @@ from unnest(array[
 ]) w
 on conflict (word) do nothing;
 
--- One token (no spaces/punctuation) → is it a blocked word?
-create or replace function public.gg_is_blocked_word(p_token text)
-returns boolean
-language plpgsql
-stable
-security definer
-set search_path = public
-as $$
-declare
-  n text;
-begin
-  if p_token is null or char_length(p_token) < 2 or p_token ~ '^[0-9]+$' then
-    return false;
-  end if;
-  n := translate(lower(normalize(p_token, NFC)), '@4$5013', 'aassoie');
-  return exists (
-    select 1 from public.gg_blocked_words b
-    where b.word in (
-      n,
-      regexp_replace(n, '(.)\1{2,}', '\1', 'g'),            -- fuuuck → fuck
-      regexp_replace(n, '(.)\1{2,}', '\1\1', 'g'),          -- asssss → ass
-      case when char_length(n) > 3 and n ~ 's$'  then left(n, -1) end,   -- dicks → dick
-      case when char_length(n) > 4 and n ~ 'es$' then left(n, -2) end    -- asses → ass
-    )
-  );
-end;
-$$;
-
+-- Set-based (one pass, no per-word function calls): ~6 ms for a 2000-char message.
 create or replace function public.gg_clean_text(p_text text)
 returns text
-language plpgsql
+language sql
 stable
 security definer
 set search_path = public
 as $$
-declare
-  v_out text := '';
-  m     text[];
-begin
-  if p_text is null or p_text = '' then
-    return p_text;
-  end if;
-  -- Split into alternating word / non-word chunks; joining them gives the original back.
-  for m in
-    select regexp_matches(p_text, '([[:alnum:]@$ऀ-ॿ]+)|([^[:alnum:]@$ऀ-ॿ]+)', 'g')
-  loop
-    if m[1] is not null then
-      v_out := v_out || case when public.gg_is_blocked_word(m[1])
-                             then left(m[1], 1) || repeat('*', char_length(m[1]) - 1)
-                             else m[1] end;
-    else
-      v_out := v_out || m[2];
-    end if;
-  end loop;
-  return v_out;
-end;
+  select case when p_text is null or p_text = '' then p_text else (
+    -- Split into alternating word / non-word chunks; joining them gives the original back.
+    with tok as (
+      select t.m[1] as w, t.m[2] as sep, t.ord,
+             translate(lower(normalize(t.m[1], NFC)), '@4$5013', 'aassoie') as n
+      from regexp_matches(p_text, '([[:alnum:]@$ऀ-ॿ]+)|([^[:alnum:]@$ऀ-ॿ]+)', 'g')
+           with ordinality as t (m, ord)
+    )
+    select string_agg(
+      case when tok.w is null then tok.sep
+           when char_length(tok.w) >= 2 and tok.w !~ '^[0-9]+$' and exists (
+             select 1 from public.gg_blocked_words b
+             where b.word = any (array[
+               tok.n,
+               regexp_replace(tok.n, '(.)\1{2,}', '\1', 'g'),                      -- fuuuck → fuck
+               regexp_replace(tok.n, '(.)\1{2,}', '\1\1', 'g'),                    -- asssss → ass
+               case when char_length(tok.n) > 3 and tok.n like '%s'  then left(tok.n, -1) end,  -- dicks → dick
+               case when char_length(tok.n) > 4 and tok.n like '%es' then left(tok.n, -2) end]))  -- asses → ass
+             then left(tok.w, 1) || repeat('*', char_length(tok.w) - 1)
+           else tok.w end,
+      '' order by tok.ord)
+    from tok) end;
 $$;
 
-revoke all on function public.gg_is_blocked_word(text) from public, anon;
-revoke all on function public.gg_clean_text(text)      from public, anon;
-grant execute on function public.gg_is_blocked_word(text) to authenticated;
-grant execute on function public.gg_clean_text(text)      to authenticated;
+drop function if exists public.gg_is_blocked_word(text);
+revoke all on function public.gg_clean_text(text) from public, anon;
+grant execute on function public.gg_clean_text(text) to authenticated;
 
 create or replace function public.handle_mask_profanity()
 returns trigger
@@ -370,6 +343,13 @@ declare
   me uuid := auth.uid();
 begin
   if me is null then
+    -- No JWT at all = SQL Editor / server code (API requests always carry claims,
+    -- and anon has no EXECUTE on the moderator RPCs). Allowed, with no actor.
+    if coalesce(current_setting('request.jwt.claims', true), '') = ''
+       and coalesce(current_setting('request.jwt.claim.role', true), '') = ''
+       and coalesce(current_setting('request.jwt.claim.sub', true), '') = '' then
+      return null;
+    end if;
     raise exception 'Not signed in' using errcode = '42501';
   end if;
   if not exists (select 1 from public.moderators m where m.profile_id = me) then

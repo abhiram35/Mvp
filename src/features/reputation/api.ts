@@ -160,7 +160,7 @@ export function usePlayerStats(profileId: string | null | undefined) {
         setEntry({ id: profileId, stats: normaliseStats(data, profileId) });
         setError(null);
       } catch (e) {
-        if (id === reqId.current && !silent) setError(messageOf(e) || "Couldn't load stats.");
+        if (id === reqId.current) setError(messageOf(e) || "Couldn't load stats.");
       } finally {
         if (id === reqId.current) setLoading(false);
       }
@@ -169,7 +169,8 @@ export function usePlayerStats(profileId: string | null | undefined) {
   );
 
   useEffect(() => {
-    void load();
+    // Silent: `loading` is derived (true until stats for this profile arrive).
+    void load(true);
   }, [load]);
 
   const first = useRef(true);

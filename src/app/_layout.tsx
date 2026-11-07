@@ -3,8 +3,19 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { EmptyState, LoadingState, Screen } from '../components/ui';
 import { isSupabaseConfigured } from '../lib/supabase';
+import { NotificationsBridge } from '../features/notifications/NotificationsBridge';
+import { GGErrorBoundary, installGlobalErrorHandlers, useAppOpenTracking } from '../features/telemetry';
 import { AuthProvider, useAuth } from '../providers/AuthProvider';
 import { ThemeProvider, useTheme, useThemeSwitcher } from '../theme';
+
+// Capture crashes and unhandled errors into Supabase (app_errors) from the very start.
+installGlobalErrorHandlers();
+
+/** Logs app_open for beta metrics (at most every 30 minutes, only when signed in). */
+function AppOpenTracker() {
+  useAppOpenTracking();
+  return null;
+}
 
 function RootNavigator() {
   const { initializing, session, profile } = useAuth();
@@ -93,11 +104,15 @@ function ThemedStatusBar() {
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
+      <AppOpenTracker />
       <ThemeProvider>
-        <AuthProvider>
-          <ThemedStatusBar />
-          <RootNavigator />
-        </AuthProvider>
+        <GGErrorBoundary name="root">
+          <AuthProvider>
+            <ThemedStatusBar />
+            <NotificationsBridge />
+            <RootNavigator />
+          </AuthProvider>
+        </GGErrorBoundary>
       </ThemeProvider>
     </SafeAreaProvider>
   );

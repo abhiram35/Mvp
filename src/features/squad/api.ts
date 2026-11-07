@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import type { PlayStyle, Profile, ProfileGame, Region, SquadmateMatch } from '../../lib/types';
+import type { PlayStyle, Profile, ProfileGame, Region, ReputationSummary, SquadmateMatch } from '../../lib/types';
 
 function isObject(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -43,6 +43,7 @@ function normaliseOne(raw: unknown): SquadmateMatch | null {
     game,
     match_score: Number.isFinite(score) ? Math.max(0, Math.min(100, Math.round(score))) : 0,
     shared_languages: shared,
+    reputation: (asObject(row.reputation) as ReputationSummary | null) ?? undefined,
   };
 }
 

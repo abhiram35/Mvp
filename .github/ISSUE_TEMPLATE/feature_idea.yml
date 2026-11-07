@@ -1,0 +1,28 @@
+name: Feature idea
+description: Suggest something new or a better way to do something
+labels: [idea]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does it solve?
+      description: Who is it for, and what is hard or annoying today?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your idea
+      description: How it could work. Sketches or screenshots of other apps welcome.
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Community safety
+      options:
+        - label: I thought about how this could be abused (spam, harassment) and how GG would prevent it.
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?

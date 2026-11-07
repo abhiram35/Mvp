@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Button, Screen, SegmentBar, Text } from '../components/ui';
 import { createProfile } from '../features/profile/api';
+import { logOnboardingCompleted } from '../features/telemetry';
 import {
   emptyForm,
   hasErrors,
@@ -92,6 +93,7 @@ export default function OnboardingScreen() {
     setSubmitError(null);
     try {
       await createProfile(userId, values);
+      logOnboardingCompleted();
       await refreshProfile(); // root layout guard now moves us into the app
     } catch (err) {
       setSubmitError(errorMessage(err));

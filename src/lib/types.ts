@@ -535,6 +535,8 @@ export interface RpcFunctions {
   count_unread_notifications: { args: Record<string, never>; returns: number };
   /** Mark one (p_id) or all (p_id null) notifications read. */
   mark_notifications_read: { args: { p_id: UUID | null }; returns: null };
+  /** Upsert this device's Expo push token for the caller (reassigns it if another account had it). */
+  register_push_token: { args: { p_token: string; p_platform: 'ios' | 'android' }; returns: null };
 
   // ── Ratings + XP ──
   /** Teammates from a lobby the caller can rate (both were in its squad chat). Empty if not eligible. */

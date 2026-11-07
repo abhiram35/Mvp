@@ -87,9 +87,8 @@ export async function registerForPush(userId: string, { askPermission = true }: 
     if (!token) return null;
 
     const platform: 'ios' | 'android' = Platform.OS === 'ios' ? 'ios' : 'android';
-    const { error } = await supabase
-      .from('push_tokens')
-      .upsert({ token, profile_id: userId, platform, updated_at: new Date().toISOString() }, { onConflict: 'token' });
+    // RPC so a token from a phone shared by two accounts moves to whoever signed in last.
+    const { error } = await supabase.rpc('register_push_token', { p_token: token, p_platform: platform });
     if (error) return null;
 
     currentToken = token;

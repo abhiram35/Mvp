@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFonts } from 'expo-font';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { logThemeChanged } from '../features/telemetry/events';
 import type { CustomTheme } from '../lib/types';
 import { customThemeId, specToAppTheme, validateSpec } from './custom';
 import { DEFAULT_THEME, THEMES, THEME_FONTS, isBuiltInThemeId, isCustomThemeId, type AppTheme, type ThemeId } from './themes';
@@ -72,6 +73,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const setThemeId = useCallback((id: ThemeId) => {
     setSavedId(id);
     AsyncStorage.setItem(STORAGE_KEY, id).catch(() => undefined);
+    logThemeChanged(id);
   }, []);
 
   const loadFor = useCallback(async (uid: string) => {

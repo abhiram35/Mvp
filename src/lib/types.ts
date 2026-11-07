@@ -252,8 +252,8 @@ export interface RpcFunctions {
   is_username_available: { args: { p_username: string }; returns: boolean };
 
   // ── Community ──
-  /** Feed. Excludes posts by users blocked in EITHER direction (server-side). Pagination: pass the last row's
-   *  cursor value (last_activity_at for 'hot'/'unanswered' ordering ties are fine; created_at for 'new') as p_before. */
+  /** Feed. Excludes posts by users blocked in EITHER direction (server-side). Pagination: offset paging with
+   *  p_limit / p_offset. Returns setof jsonb, so supabase-js gives an array of CommunityPostSummary objects. */
   list_community_posts: {
     args: {
       p_sort: CommunitySort; // hot = score by GGs + replies decayed by age; new = newest; unanswered = questions with 0 replies, newest first

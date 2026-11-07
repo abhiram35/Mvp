@@ -137,6 +137,44 @@ drop policy if exists push_tokens_delete_own on public.push_tokens;
 create policy push_tokens_delete_own on public.push_tokens
   for delete to authenticated using (profile_id = auth.uid());
 
+-- ── register_push_token(p_token, p_platform) → void ─────────────────────────
+-- What the app calls after getting its Expo token. Upserts on token and
+-- reassigns it to the caller (a second account on the same phone takes over).
+create or replace function public.register_push_token(p_token text, p_platform text)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+begin
+  if me is null then
+    raise exception 'Not signed in' using errcode = '42501';
+  end if;
+  if p_platform is null or p_platform not in ('ios','android') then
+    raise exception 'Unknown platform' using errcode = '22023';
+  end if;
+  if p_token is null or char_length(p_token) > 200
+     or not (p_token like 'ExponentPushToken[%]' or p_token like 'ExpoPushToken[%]') then
+    raise exception 'Invalid push token' using errcode = '22023';
+  end if;
+  if not exists (select 1 from public.profiles where id = me) then
+    raise exception 'Finish setting up your profile first' using errcode = '42501';
+  end if;
+
+  insert into public.push_tokens (token, profile_id, platform)
+  values (p_token, me, p_platform)
+  on conflict (token) do update
+    set profile_id = excluded.profile_id,
+        platform   = excluded.platform,
+        updated_at = now();
+end;
+$$;
+revoke all on function public.register_push_token(text, text) from public, anon;
+grant execute on function public.register_push_token(text, text) to authenticated;
+
 -- ── Push dispatch (pg_net → send-push) ──────────────────────────────────────
 -- Queues one HTTP call. pg_net sends it after the transaction commits.
 -- Silently does nothing if Vault / pg_net / the secrets are missing.

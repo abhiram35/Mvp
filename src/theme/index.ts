@@ -4,8 +4,20 @@
 // ACTIVE theme — read them with useTheme() or makeStyles(). Spacing and font
 // sizes are shared by every theme and can be imported directly.
 
-export { ThemeProvider, makeStyles, useTheme, useThemeSwitcher } from './ThemeProvider';
-export { THEMES, THEME_ORDER, DEFAULT_THEME, type AppTheme, type ThemeId } from './themes';
+export { ThemeProvider, makeStyles, makeThemedStyles, useCustomThemes, useTheme, useThemeSwitcher } from './ThemeProvider';
+export {
+  THEMES,
+  THEME_ORDER,
+  DEFAULT_THEME,
+  isBuiltInThemeId,
+  isCustomThemeId,
+  type AppTheme,
+  type BuiltInThemeId,
+  type PanelStyle,
+  type TextureId,
+  type ThemeId,
+} from './themes';
+export { customRowId, customThemeId, specToAppTheme, validateSpec, SPEC_LIMITS, type ThemeSpec } from './custom';
 
 export const spacing = {
   xs: 4,

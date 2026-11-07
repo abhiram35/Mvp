@@ -20,8 +20,8 @@ import {
   type ViewStyle,
 } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
-import Svg, { Circle, Path, Polygon } from 'react-native-svg';
-import { fontSize, spacing, useTheme, type AppTheme } from '../../theme';
+import Svg, { Circle, Defs, Ellipse, G, Path, Pattern, Polygon, Rect } from 'react-native-svg';
+import { fontSize, spacing, useTheme, type AppTheme, type TextureId } from '../../theme';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -91,6 +91,7 @@ export function Screen({
   const inner = [padded && { paddingHorizontal: spacing.lg }, style];
   return (
     <SafeAreaView edges={edges} style={{ flex: 1, backgroundColor: t.colors.bg }}>
+      <ScreenTexture />
       {scroll ? (
         <ScrollView contentContainerStyle={[inner, { paddingBottom: spacing.xxl }]} keyboardShouldPersistTaps="handled">
           {children}
@@ -302,11 +303,18 @@ export function Card({
   return <View style={[base, style]}>{children}</View>;
 }
 
-/** Corner brackets (Protocol / Defuse) or a thin gold frame (Ronin) drawn over a media panel. Put it last inside the panel. */
-export function PanelFrame() {
-  const t = useTheme();
-  if (t.id === 'ronin') {
-    return <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderWidth: 1, borderColor: t.colors.accent, opacity: 0.5, margin: 8 }]} />;
+/**
+ * Media panel decoration, per the theme's `panelStyle`: corner brackets (Protocol / Defuse),
+ * a thin accent frame (Ronin), or nothing. Put it last inside the panel. `theme` overrides the
+ * active theme (theme previews).
+ */
+export function PanelFrame({ theme }: { theme?: AppTheme } = {}) {
+  const active = useTheme();
+  const t = theme ?? active;
+  const style = t.panelStyle ?? 'bracket';
+  if (style === 'plain') return null;
+  if (style === 'frame') {
+    return <View pointerEvents="none" style={[StyleSheet.absoluteFill, { borderWidth: 1, borderColor: t.colors.accent, opacity: 0.5, margin: 8, borderRadius: Math.max(0, t.radius.lg - 4) }]} />;
   }
   const c = t.colors.primary;
   const L = 18;
@@ -328,8 +336,150 @@ export function PanelFrame() {
   );
 }
 
+// ── Screen texture ──────────────────────────────────────────────────────────
+type TextureTile = { w: number; h: number; draw: (c: string) => ReactNode };
+
+/** One small repeating tile per texture id. Kept to a handful of shapes so they stay cheap. */
+const TEXTURE_TILES: Record<Exclude<TextureId, 'none'>, TextureTile> = {
+  grain: {
+    w: 12,
+    h: 12,
+    draw: (c) => (
+      <G fill={c}>
+        <Circle cx={2} cy={3} r={0.7} />
+        <Circle cx={8} cy={9} r={0.6} />
+        <Circle cx={10} cy={2} r={0.5} />
+        <Circle cx={5} cy={7} r={0.5} />
+      </G>
+    ),
+  },
+  scanlines: { w: 4, h: 4, draw: (c) => <Rect x={0} y={0} width={4} height={1} fill={c} /> },
+  frost: {
+    w: 36,
+    h: 36,
+    draw: (c) => (
+      <G stroke={c} strokeWidth={1} strokeLinecap="round" fill="none">
+        <Path d="M8 3v10M3 8h10M4.5 4.5l7 7M11.5 4.5l-7 7" />
+        <Path d="M26 22v6M23 25h6" />
+      </G>
+    ),
+  },
+  ash: {
+    w: 40,
+    h: 40,
+    draw: (c) => (
+      <G fill={c}>
+        <Circle cx={4} cy={6} r={1.2} />
+        <Circle cx={19} cy={3} r={0.6} />
+        <Circle cx={31} cy={14} r={1} />
+        <Circle cx={11} cy={24} r={0.7} />
+        <Circle cx={26} cy={33} r={1.4} />
+        <Circle cx={37} cy={29} r={0.5} />
+      </G>
+    ),
+  },
+  rust: {
+    w: 64,
+    h: 64,
+    draw: (c) => (
+      <G fill={c}>
+        <Ellipse cx={14} cy={16} rx={10} ry={7} />
+        <Ellipse cx={46} cy={44} rx={8} ry={11} opacity={0.6} />
+        <Circle cx={50} cy={12} r={3} opacity={0.8} />
+        <Circle cx={18} cy={50} r={2} />
+      </G>
+    ),
+  },
+  moss: {
+    w: 56,
+    h: 56,
+    draw: (c) => (
+      <G fill={c}>
+        <Circle cx={12} cy={14} r={9} opacity={0.5} />
+        <Circle cx={18} cy={20} r={5} />
+        <Circle cx={42} cy={40} r={11} opacity={0.4} />
+        <Circle cx={38} cy={44} r={4} />
+      </G>
+    ),
+  },
+  stone: {
+    w: 60,
+    h: 60,
+    draw: (c) => (
+      <G stroke={c} strokeWidth={1} fill="none">
+        <Polygon points="2,4 22,2 28,18 14,28 0,20" />
+        <Polygon points="32,6 56,10 58,30 40,34 30,22" />
+        <Polygon points="6,36 26,34 32,54 12,58" />
+        <Polygon points="38,40 58,42 56,58 40,56" />
+      </G>
+    ),
+  },
+  paper: {
+    w: 40,
+    h: 40,
+    draw: (c) => (
+      <G stroke={c} strokeWidth={0.6} strokeLinecap="round">
+        <Path d="M3 8l9 2M22 4l8 -1M14 22l10 3M30 30l7 -2M5 33l6 1" />
+      </G>
+    ),
+  },
+  hex: {
+    w: 30,
+    h: 51.96,
+    draw: (c) => <Path d="M15 0L30 8.66V25.98L15 34.64L0 25.98V8.66ZM15 34.64V51.96" stroke={c} strokeWidth={1} fill="none" />,
+  },
+  circuit: {
+    w: 48,
+    h: 48,
+    draw: (c) => (
+      <G stroke={c} strokeWidth={1} fill="none">
+        <Path d="M0 12H16L22 18V48M30 0V10L36 16H48" />
+        <Circle cx={22} cy={30} r={2} fill={c} />
+        <Circle cx={36} cy={16} r={2} fill={c} />
+      </G>
+    ),
+  },
+  waves: {
+    w: 40,
+    h: 16,
+    draw: (c) => <Path d="M0 8Q10 2 20 8T40 8" stroke={c} strokeWidth={1} fill="none" />,
+  },
+};
+
+/**
+ * The theme's background texture as a faint full-size SVG pattern. Sits behind content
+ * (Screen renders it first) and never takes touches. Renders nothing for 'none'.
+ * `theme` overrides the active theme (previews); opacity is capped at 0.06.
+ */
+export function ScreenTexture({ theme, opacity = 0.05 }: { theme?: AppTheme; opacity?: number }) {
+  const active = useTheme();
+  const t = theme ?? active;
+  const id = t.texture ?? 'none';
+  if (id === 'none') return null;
+  const tile = TEXTURE_TILES[id];
+  // Unique per texture + colour: on web, pattern ids are document-global.
+  const patternId = `gg-tex-${id}-${t.colors.text.replace(/[^0-9a-zA-Z]/g, '')}`;
+  return (
+    <View
+      pointerEvents="none"
+      style={[StyleSheet.absoluteFill, { opacity: Math.min(opacity, 0.06) }]}
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants"
+    >
+      <Svg width="100%" height="100%">
+        <Defs>
+          <Pattern id={patternId} patternUnits="userSpaceOnUse" x={0} y={0} width={tile.w} height={tile.h}>
+            {tile.draw(t.colors.text)}
+          </Pattern>
+        </Defs>
+        <Rect x={0} y={0} width="100%" height="100%" fill={`url(#${patternId})`} />
+      </Svg>
+    </View>
+  );
+}
+
 // ── Avatar ──────────────────────────────────────────────────────────────────
-/** Protocol / Defuse: square with a cut corner. Ronin: round with a gold ring. */
+/** Protocol / Defuse: square with a cut corner. Ronin (and round custom themes): round with an accent ring. */
 export function Avatar({
   uri,
   name,
@@ -349,7 +499,7 @@ export function Avatar({
 }) {
   const t = useTheme();
   const initials = (name ?? '?').trim().slice(0, 2).toUpperCase();
-  const round = t.id === 'ronin';
+  const round = !!t.shape.round;
   const box: ViewStyle = {
     width: size,
     height: size,
@@ -440,7 +590,7 @@ export function LiveDot({ label }: { label?: string }) {
   const t = useTheme();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-      <View style={{ width: 8, height: 8, borderRadius: t.id === 'ronin' ? 4 : 0, backgroundColor: t.colors.accent }} />
+      <View style={{ width: 8, height: 8, borderRadius: t.shape.round ? 4 : 0, backgroundColor: t.colors.accent }} />
       {label ? <Text variant="label">{label}</Text> : null}
     </View>
   );

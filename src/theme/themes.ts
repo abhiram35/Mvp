@@ -2,7 +2,15 @@
 // Every screen reads the active theme through useTheme() / makeStyles() — never
 // hard-code a colour, font family or radius.
 
-export type ThemeId = 'protocol' | 'defuse' | 'ronin';
+export type BuiltInThemeId = 'protocol' | 'defuse' | 'ronin';
+/** Built-in themes, or a player's AI-generated theme (`custom:<custom_themes.id>`). */
+export type ThemeId = BuiltInThemeId | `custom:${string}`;
+
+/** How media panels are decorated: corner brackets, a thin accent frame, or nothing. */
+export type PanelStyle = 'bracket' | 'frame' | 'plain';
+/** Subtle full-screen background pattern drawn behind content (see ScreenTexture). */
+export type TextureId =
+  | 'none' | 'grain' | 'scanlines' | 'frost' | 'ash' | 'rust' | 'moss' | 'stone' | 'paper' | 'hex' | 'circuit' | 'waves';
 
 export interface AppTheme {
   id: ThemeId;
@@ -44,7 +52,13 @@ export interface AppTheme {
     /** Headings and buttons in capitals (shooter UIs) or as written. */
     headingUppercase: boolean;
     headingLetterSpacing: number;
+    /** Round avatars / dots (Ronin, and custom themes with radius ≥ 8). Defaults to false. */
+    round?: boolean;
   };
+  /** Media panel decoration. Defaults to 'bracket'. */
+  panelStyle?: PanelStyle;
+  /** Background texture behind screens. Defaults to 'none'. */
+  texture?: TextureId;
   /** Theme-flavoured words. Screens use these instead of hard-coded copy. */
   words: {
     gg: string; // what a like is called: "GGs" / "honours"
@@ -55,7 +69,7 @@ export interface AppTheme {
   };
 }
 
-export const THEMES: Record<ThemeId, AppTheme> = {
+export const THEMES: Record<BuiltInThemeId, AppTheme> = {
   protocol: {
     id: 'protocol',
     name: 'Protocol',
@@ -89,6 +103,8 @@ export const THEMES: Record<ThemeId, AppTheme> = {
     },
     radius: { sm: 2, md: 2, lg: 2, pill: 2 },
     shape: { cut: 12, headingUppercase: true, headingLetterSpacing: 1.5 },
+    panelStyle: 'bracket',
+    texture: 'none',
     words: { gg: 'GGs', squad: 'squad', squadUp: 'Squad up', lobbies: 'Lobbies', community: 'Community' },
   },
   defuse: {
@@ -124,6 +140,8 @@ export const THEMES: Record<ThemeId, AppTheme> = {
     },
     radius: { sm: 0, md: 0, lg: 0, pill: 0 },
     shape: { cut: 0, headingUppercase: true, headingLetterSpacing: 1 },
+    panelStyle: 'bracket',
+    texture: 'grain',
     words: { gg: 'GGs', squad: 'squad', squadUp: 'Squad up', lobbies: 'Lobbies', community: 'Community' },
   },
   ronin: {
@@ -159,16 +177,27 @@ export const THEMES: Record<ThemeId, AppTheme> = {
       bodyBold: 'ZenKakuGothicNew_700Bold',
     },
     radius: { sm: 3, md: 4, lg: 6, pill: 999 },
-    shape: { cut: 0, headingUppercase: false, headingLetterSpacing: 0.5 },
+    shape: { cut: 0, headingUppercase: false, headingLetterSpacing: 0.5, round: true },
+    panelStyle: 'frame',
+    texture: 'none',
     words: { gg: 'honours', squad: 'clan', squadUp: 'Join clan', lobbies: 'Dojo', community: 'Scrolls' },
   },
 };
 
-export const THEME_ORDER: ThemeId[] = ['protocol', 'defuse', 'ronin'];
-export const DEFAULT_THEME: ThemeId = 'protocol';
+export const THEME_ORDER: BuiltInThemeId[] = ['protocol', 'defuse', 'ronin'];
+export const DEFAULT_THEME: BuiltInThemeId = 'protocol';
 
-/** Every font file the three themes use, keyed by the family name above.
- *  Ronin's fonts are Latin-only subsets in assets/fonts (the full Japanese files are ~24 MB). */
+export function isBuiltInThemeId(id: string): id is BuiltInThemeId {
+  return Object.prototype.hasOwnProperty.call(THEMES, id);
+}
+
+export function isCustomThemeId(id: string): id is `custom:${string}` {
+  return id.startsWith('custom:') && id.length > 'custom:'.length;
+}
+
+/** Every font file the built-in themes and the custom-theme font ids use, keyed by family name.
+ *  Files in assets/fonts are Latin-only subsets made with pyftsubset (Ronin's full Japanese files are
+ *  ~24 MB; Rajdhani, IBM Plex Sans, Oswald, Black Ops One and Special Elite ship extra scripts). */
 export const THEME_FONTS = {
   BigShouldersDisplay_900Black: require('@expo-google-fonts/big-shoulders-display/BigShouldersDisplay_900Black.ttf'),
   BigShouldersDisplay_700Bold: require('@expo-google-fonts/big-shoulders-display/BigShouldersDisplay_700Bold.ttf'),
@@ -185,4 +214,23 @@ export const THEME_FONTS = {
   ZenKakuGothicNew_400Regular: require('../../assets/fonts/ZenKakuGothicNew_400Regular.ttf'),
   ZenKakuGothicNew_500Medium: require('../../assets/fonts/ZenKakuGothicNew_500Medium.ttf'),
   ZenKakuGothicNew_700Bold: require('../../assets/fonts/ZenKakuGothicNew_700Bold.ttf'),
+  // ── Custom-theme fonts (see src/theme/custom.ts → FONT_FAMILIES) ──
+  Cinzel_800ExtraBold: require('@expo-google-fonts/cinzel/800ExtraBold/Cinzel_800ExtraBold.ttf'),
+  Cinzel_700Bold: require('@expo-google-fonts/cinzel/700Bold/Cinzel_700Bold.ttf'),
+  BebasNeue_400Regular: require('@expo-google-fonts/bebas-neue/400Regular/BebasNeue_400Regular.ttf'),
+  Oswald_700Bold: require('../../assets/fonts/Oswald_700Bold.ttf'),
+  Oswald_600SemiBold: require('../../assets/fonts/Oswald_600SemiBold.ttf'),
+  Orbitron_800ExtraBold: require('@expo-google-fonts/orbitron/800ExtraBold/Orbitron_800ExtraBold.ttf'),
+  Orbitron_700Bold: require('@expo-google-fonts/orbitron/700Bold/Orbitron_700Bold.ttf'),
+  BlackOpsOne_400Regular: require('../../assets/fonts/BlackOpsOne_400Regular.ttf'),
+  SpecialElite_400Regular: require('../../assets/fonts/SpecialElite_400Regular.ttf'),
+  Rajdhani_700Bold: require('../../assets/fonts/Rajdhani_700Bold.ttf'),
+  Rajdhani_600SemiBold: require('../../assets/fonts/Rajdhani_600SemiBold.ttf'),
+  MetalMania_400Regular: require('@expo-google-fonts/metal-mania/400Regular/MetalMania_400Regular.ttf'),
+  Creepster_400Regular: require('@expo-google-fonts/creepster/400Regular/Creepster_400Regular.ttf'),
+  AtkinsonHyperlegible_400Regular: require('@expo-google-fonts/atkinson-hyperlegible/400Regular/AtkinsonHyperlegible_400Regular.ttf'),
+  AtkinsonHyperlegible_700Bold: require('@expo-google-fonts/atkinson-hyperlegible/700Bold/AtkinsonHyperlegible_700Bold.ttf'),
+  IBMPlexSans_400Regular: require('../../assets/fonts/IBMPlexSans_400Regular.ttf'),
+  IBMPlexSans_500Medium: require('../../assets/fonts/IBMPlexSans_500Medium.ttf'),
+  IBMPlexSans_600SemiBold: require('../../assets/fonts/IBMPlexSans_600SemiBold.ttf'),
 } as const;

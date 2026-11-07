@@ -4,6 +4,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { DEFAULT_THEME, THEMES, THEME_FONTS, type AppTheme, type ThemeId } from './themes';
 
 const STORAGE_KEY = 'gg.theme';
+/** Show the app with system fonts if the theme fonts haven't loaded by then. */
+const FONT_TIMEOUT_MS = 6000;
 
 interface ThemeState {
   theme: AppTheme;
@@ -19,11 +21,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [fontsLoaded, fontError] = useFonts(THEME_FONTS);
   const [themeId, setThemeIdState] = useState<ThemeId>(DEFAULT_THEME);
   const [choiceLoaded, setChoiceLoaded] = useState(false);
+  const [fontsTimedOut, setFontsTimedOut] = useState(false);
+
+  useEffect(() => {
+    const id = setTimeout(() => setFontsTimedOut(true), FONT_TIMEOUT_MS);
+    return () => clearTimeout(id);
+  }, []);
 
   useEffect(() => {
     AsyncStorage.getItem(STORAGE_KEY)
       .then((saved) => {
-        if (saved && saved in THEMES) setThemeIdState(saved as ThemeId);
+        if (saved && Object.prototype.hasOwnProperty.call(THEMES, saved)) setThemeIdState(saved as ThemeId);
       })
       .catch(() => undefined)
       .finally(() => setChoiceLoaded(true));
@@ -34,13 +42,20 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     AsyncStorage.setItem(STORAGE_KEY, id).catch(() => undefined);
   }, []);
 
-  // If a font fails to load we still show the app (system font fallback) rather than hang.
-  const ready = (fontsLoaded || !!fontError) && choiceLoaded;
+  // If a font fails (or takes too long) to load we still show the app with the system
+  // font rather than hang on the loading screen.
+  const ready = (fontsLoaded || !!fontError || fontsTimedOut) && choiceLoaded;
 
   const value = useMemo<ThemeState>(
     () => ({ theme: THEMES[themeId], themeId, setThemeId, ready }),
-    [themeId, setThemeId, ready],
+    // fontsLoaded: re-render everything once late fonts arrive after a timeout.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [themeId, setThemeId, ready, fontsLoaded],
   );
+
+  // Paint nothing until the saved choice is known (a few ms), so a Defuse / Ronin
+  // player never sees a flash of the default light theme.
+  if (!choiceLoaded) return null;
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }

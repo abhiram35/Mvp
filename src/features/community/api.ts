@@ -171,9 +171,13 @@ export function isOwnGgError(e: unknown): boolean {
 export function communityErrorMessage(e: unknown): string {
   switch (errorCode(e)) {
     case 'P0002':
+    case '23503': // foreign key: the post / reply was deleted meanwhile
       return 'This was deleted or is no longer available.';
     case '42501':
-      return 'Only the author can choose the answer.';
+      // Also the code for RLS refusals (e.g. replying across a block), not just set_solution.
+      return /row-level security|permission denied/i.test(messageOf(e))
+        ? "You can't do that on this post."
+        : messageOf(e);
     default:
       return messageOf(e);
   }

@@ -110,7 +110,7 @@ export const THEMES: Record<ThemeId, AppTheme> = {
       accent: '#8FBF5A',
       info: '#7F9CCB',
       warning: '#D9A23A',
-      danger: '#E35B4B',
+      danger: '#E8655A', // 4.5:1 on surface for error text
       overlay: 'rgba(10,11,10,0.72)',
       panel: '#141614',
       onPanel: '#E9E4D4',
@@ -139,8 +139,9 @@ export const THEMES: Record<ThemeId, AppTheme> = {
       text: '#EAE1CF',
       textMuted: '#B8AD98',
       textFaint: '#8F8574',
-      primary: '#A3241D',
-      primaryPressed: '#861C16',
+      // Lifted from #A3241D so red text, links and ghost buttons reach 3:1 on the black bg.
+      primary: '#C0302A',
+      primaryPressed: '#A3241D',
       onPrimary: '#F4EDE0',
       accent: '#C7A363',
       info: '#C7A363',

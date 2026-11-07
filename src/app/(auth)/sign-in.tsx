@@ -1,6 +1,6 @@
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Button, Screen, Text, TextField } from '../../components/ui';
 import { AuthHero } from '../../features/profile/AuthHero';
 import { errorMessage, supabase } from '../../lib/supabase';
@@ -15,7 +15,6 @@ export default function SignInScreen() {
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({});
   const [loading, setLoading] = useState(false);
-  const [resetting, setResetting] = useState(false);
 
   const signIn = async () => {
     const e: typeof errors = {};
@@ -31,17 +30,10 @@ export default function SignInScreen() {
     if (error) setErrors({ form: errorMessage(error) });
   };
 
-  const forgotPassword = async () => {
+  // Reset by 6-digit code (no deep links needed). Pre-fills the email if one is typed.
+  const forgotPassword = () => {
     const trimmed = email.trim();
-    if (!EMAIL_RE.test(trimmed)) {
-      setErrors({ email: 'Enter your email above, then tap "Forgot password?"' });
-      return;
-    }
-    setResetting(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(trimmed);
-    setResetting(false);
-    if (error) Alert.alert("Couldn't send reset email", errorMessage(error));
-    else Alert.alert('Check your email', `If an account exists for ${trimmed}, we sent a link to reset your password.`);
+    router.push({ pathname: '/(auth)/reset-password', params: EMAIL_RE.test(trimmed) ? { email: trimmed } : {} });
   };
 
   return (
@@ -77,13 +69,12 @@ export default function SignInScreen() {
 
         <Pressable
           onPress={forgotPassword}
-          disabled={resetting}
           accessibilityRole="button"
-          accessibilityLabel="Forgot password? Send a reset email"
+          accessibilityLabel="Forgot password? Reset it with a code"
           style={styles.forgot}
           hitSlop={8}
         >
-          <Text variant="strong" style={{ color: t.colors.primary }}>{resetting ? 'Sending…' : 'Forgot password?'}</Text>
+          <Text variant="strong" style={{ color: t.colors.primary }}>Forgot password?</Text>
         </Pressable>
 
         {errors.form ? (

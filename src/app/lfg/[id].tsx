@@ -17,6 +17,7 @@ import {
   type LfgRequestWithRequester,
 } from '../../features/lfg/api';
 import { expiresIn, isExpired, LFG_LIMITS, regionLabel, timeAgo } from '../../features/lfg/format';
+import { RateSquadButton } from '../../features/reputation/RateSquadButton';
 import { useBlockedIds } from '../../features/safety/blocks';
 import { openDm, openReport } from '../../lib/actions';
 import { errorMessage } from '../../lib/supabase';
@@ -173,12 +174,15 @@ function RequesterPanel({
         ) : null}
         {request.status === 'accepted' ? (
           post.conversation_id ? (
-            <Button
-              title={`Open ${t.words.squad} chat`}
-              icon="chatbubbles-outline"
-              onPress={() => openChat(post.conversation_id!)}
-              style={{ marginTop: spacing.md }}
-            />
+            <>
+              <Button
+                title={`Open ${t.words.squad} chat`}
+                icon="chatbubbles-outline"
+                onPress={() => openChat(post.conversation_id!)}
+                style={{ marginTop: spacing.md }}
+              />
+              <RateSquadButton lfgPostId={post.id} style={{ marginTop: spacing.sm }} />
+            </>
           ) : (
             <Text variant="caption" style={{ marginTop: spacing.sm }}>
               You're in! The {t.words.squad} chat will appear here shortly.
@@ -365,12 +369,15 @@ function AuthorPanel({ post, joinable, onChanged }: { post: LfgPostWithAuthor; j
   return (
     <>
       {post.conversation_id ? (
-        <Button
-          title={`Open ${t.words.squad} chat`}
-          icon="chatbubbles-outline"
-          onPress={() => openChat(post.conversation_id!)}
-          style={{ marginTop: spacing.lg }}
-        />
+        <>
+          <Button
+            title={`Open ${t.words.squad} chat`}
+            icon="chatbubbles-outline"
+            onPress={() => openChat(post.conversation_id!)}
+            style={{ marginTop: spacing.lg }}
+          />
+          <RateSquadButton lfgPostId={post.id} style={{ marginTop: spacing.sm }} />
+        </>
       ) : null}
 
       <Section

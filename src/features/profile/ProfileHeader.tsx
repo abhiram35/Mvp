@@ -2,6 +2,8 @@ import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Avatar, Card, Chip, ChipRow, PanelFrame, Stat, Text } from '../../components/ui';
 import { PLAY_STYLE_LABELS, PLAY_TIME_LABELS, REGION_LABELS, type Profile } from '../../lib/types';
+import { usePlayerStats } from '../reputation/api';
+import { formatCount, PanelLevel, ReputationDetails } from '../reputation/PlayerCard';
 import { makeStyles, spacing, useTheme } from '../../theme';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -15,7 +17,8 @@ function memberSince(iso: string): string | null {
 
 /**
  * The player card: a dark media band with avatar, big name, @username and region,
- * then real stats (games, member since), bio and preference chips.
+ * level + XP bar, then real stats (games, member since, solutions), teammate rating and
+ * praise badges, bio and preference chips.
  */
 export function ProfileHeader({
   profile,
@@ -33,6 +36,7 @@ export function ProfileHeader({
   const s = useStyles();
   const t = useTheme();
   const since = memberSince(profile.created_at);
+  const { stats } = usePlayerStats(profile.id);
   return (
     <View style={s.wrap}>
       <Card tone="panel" style={s.band}>
@@ -47,13 +51,17 @@ export function ProfileHeader({
             </Text>
           </View>
         </View>
+        <PanelLevel stats={stats} />
         <PanelFrame />
       </Card>
 
       <View style={s.stats}>
         <Stat value={String(gamesCount)} label={gamesCount === 1 ? 'Game' : 'Games'} highlight />
         {since ? <Stat value={since} label="Member since" /> : null}
+        {stats ? <Stat value={formatCount(stats.solutions)} label={stats.solutions === 1 ? 'Solution' : 'Solutions'} /> : null}
       </View>
+
+      <ReputationDetails stats={stats} />
 
       {children ? <View style={{ marginTop: spacing.lg }}>{children}</View> : null}
 
@@ -85,7 +93,9 @@ const useStyles = makeStyles((t) =>
     meta: { color: t.colors.onPanel, opacity: 0.8, marginTop: spacing.xs },
     stats: {
       flexDirection: 'row',
-      gap: spacing.xxl,
+      flexWrap: 'wrap',
+      columnGap: spacing.xxl,
+      rowGap: spacing.sm,
       paddingVertical: spacing.md,
       paddingHorizontal: spacing.xs,
       borderBottomWidth: StyleSheet.hairlineWidth,

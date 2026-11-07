@@ -8,6 +8,7 @@ import { useLfgPosts, useNewLfgPostsCount } from '../../features/lfg/api';
 import { hostCta, REGIONS, regionLabel } from '../../features/lfg/format';
 import { GameChipScroller, HorizontalChips } from '../../features/lfg/HorizontalChips';
 import { LfgPostCard } from '../../features/lfg/LfgPostCard';
+import { NotificationBell } from '../../features/notifications/NotificationBell';
 import { useBlockedIds } from '../../features/safety/blocks';
 import { LANGUAGES, type LfgPostWithAuthor, type Region } from '../../lib/types';
 import { useUserId } from '../../providers/AuthProvider';
@@ -106,7 +107,12 @@ export default function LfgBoardScreen() {
         <ScreenHeader
           title={t.words.lobbies}
           subtitle="Open lobbies you can join now"
-          right={<Button title="Host" icon="add" size="sm" onPress={() => router.push('/lfg/new')} style={styles.hostButton} accessibilityLabel={hostCta(t.words)} />}
+          right={
+            <View style={styles.headerActions}>
+              <NotificationBell />
+              <Button title="Host" icon="add" size="sm" onPress={() => router.push('/lfg/new')} style={styles.hostButton} accessibilityLabel={hostCta(t.words)} />
+            </View>
+          }
         />
       </View>
 
@@ -163,6 +169,7 @@ const useStyles = makeStyles((t) =>
   StyleSheet.create({
     header: { paddingHorizontal: spacing.lg },
     hostButton: { minHeight: 44 },
+    headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
     filters: {
       paddingLeft: spacing.lg,
       paddingBottom: spacing.sm,

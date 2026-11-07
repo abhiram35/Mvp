@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import * as Clipboard from 'expo-clipboard';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -24,6 +24,8 @@ import { MessageBubble } from '../../features/chat/MessageBubble';
 import { useConversation, type MemberProfile } from '../../features/chat/useConversation';
 import { useMessages, type ChatMessage } from '../../features/chat/useMessages';
 import { useBlockedIds } from '../../features/safety/blocks';
+import { ActionMenu } from '../../features/community/ActionMenu';
+import { RateSquadSheet } from '../../features/reputation/RateSquadSheet';
 
 export default function ChatScreen() {
   const params = useLocalSearchParams<{ id: string }>();
@@ -41,6 +43,9 @@ export default function ChatScreen() {
     useMessages(conversationId, myId, membersById);
 
   const isGroup = conversation?.is_group ?? false;
+  const lfgPostId = conversation?.lfg_post_id ?? null;
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [rateOpen, setRateOpen] = useState(false);
   const partnerBlocked = !!partner && blockedIds.has(partner.id);
 
   const visible = useMemo(() => messages.filter((m) => !blockedIds.has(m.sender_id)), [messages, blockedIds]);
@@ -85,6 +90,20 @@ export default function ChatScreen() {
             : isGroup
               ? () => <GroupHeader title={conversation?.title ?? groupFallback} memberCount={members.length} />
               : undefined,
+        // Squad chats (from a lobby) get a menu with "Rate your squad".
+        headerRight: lfgPostId
+          ? () => (
+              <Pressable
+                onPress={() => setMenuOpen(true)}
+                accessibilityRole="button"
+                accessibilityLabel={`${groupFallback} options`}
+                hitSlop={8}
+                style={({ pressed }) => [styles.menuButton, pressed && { backgroundColor: t.colors.surfaceRaised }]}
+              >
+                <Ionicons name="ellipsis-horizontal" size={22} color={t.colors.text} />
+              </Pressable>
+            )
+          : undefined,
       }}
     />
   );
@@ -175,6 +194,17 @@ export default function ChatScreen() {
           <Composer onSend={handleSend} />
         )}
       </KeyboardAvoidingView>
+      {lfgPostId ? (
+        <>
+          <ActionMenu
+            visible={menuOpen}
+            title={conversation.title ?? groupFallback}
+            onClose={() => setMenuOpen(false)}
+            actions={[{ label: `Rate your ${t.words.squad}`, icon: 'star-outline', onPress: () => setRateOpen(true) }]}
+          />
+          <RateSquadSheet visible={rateOpen} lfgPostId={lfgPostId} onClose={() => setRateOpen(false)} />
+        </>
+      ) : null}
     </Screen>
   );
 }
@@ -232,6 +262,7 @@ const useStyles = makeStyles((t) =>
     },
     blockedText: { flex: 1, marginLeft: spacing.sm, color: t.colors.textMuted, lineHeight: 20 },
     headerTitle: { flexDirection: 'row', alignItems: 'center', minHeight: 44, maxWidth: 260 },
+    menuButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: t.radius.md },
     headerName: { ...textStyle(t, 'heading'), fontSize: fontSize.lg, lineHeight: 22 },
   }),
 );

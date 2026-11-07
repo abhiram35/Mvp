@@ -4,6 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { Avatar, Button, Card, Chip, ChipRow, Text } from '../../components/ui';
 import { PLAY_STYLE_LABELS, REGION_LABELS, type SquadmateMatch } from '../../lib/types';
 import { fontSize, makeStyles, spacing, useTheme } from '../../theme';
+import { ReputationBadges } from '../reputation/PlayerCard';
 
 /** Player card in the Duo finder: identity, big match %, shared languages, actions. */
 export const SquadmateCard = memo(function SquadmateCard({
@@ -28,7 +29,7 @@ export const SquadmateCard = memo(function SquadmateCard({
       <Pressable
         onPress={onPress}
         accessibilityRole="button"
-        accessibilityLabel={`${name}, ${match_score}% match${rankRole ? `, ${rankRole}` : ''}. View profile.`}
+        accessibilityLabel={`${name}, ${match_score}% match${rankRole ? `, ${rankRole}` : ''}${match.reputation ? `, level ${match.reputation.level}` : ''}. View profile.`}
         style={({ pressed }) => [pressed && { opacity: 0.8 }]}
       >
         <View style={s.topRow}>
@@ -45,6 +46,7 @@ export const SquadmateCard = memo(function SquadmateCard({
                 {rankRole}
               </Text>
             ) : null}
+            <ReputationBadges reputation={match.reputation} />
           </View>
           <View style={s.score} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
             <Text style={s.scoreValue}>{match_score}%</Text>

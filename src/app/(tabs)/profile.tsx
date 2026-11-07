@@ -2,6 +2,9 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
 import { Button, EmptyState, ErrorState, LoadingState, Screen, ScreenHeader, Text } from '../../components/ui';
+import { unregisterPush } from '../../features/notifications/push';
+import { BannedBanner } from '../../features/moderation/BannedBanner';
+import { useMyStatus } from '../../features/moderation/useMyStatus';
 import { ActionRow } from '../../features/profile/ActionRow';
 import { ProfileGamesList } from '../../features/profile/ProfileGamesList';
 import { ProfileHeader } from '../../features/profile/ProfileHeader';
@@ -17,7 +20,21 @@ export default function MyProfileScreen() {
   const userId = useUserId();
   const { signOut } = useAuth();
   const { profile, games, loading, error, reload } = useProfile(userId);
+  const { isModerator } = useMyStatus();
   const [deleting, setDeleting] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+
+  const doSignOut = async () => {
+    setSigningOut(true);
+    try {
+      // Delete this phone's push token while we still have a session (RLS). Never block sign-out on it.
+      await Promise.race([unregisterPush(), new Promise((resolve) => setTimeout(resolve, 4000))]);
+    } catch {
+      // ignore
+    } finally {
+      await signOut();
+    }
+  };
 
   // Pick up edits made on the edit-profile screen.
   useFocusEffect(
@@ -29,7 +46,7 @@ export default function MyProfileScreen() {
   const confirmSignOut = () =>
     Alert.alert('Sign out?', undefined, [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: () => void signOut() },
+      { text: 'Sign out', style: 'destructive', onPress: () => void doSignOut() },
     ]);
 
   const deleteAccount = async () => {
@@ -47,7 +64,7 @@ export default function MyProfileScreen() {
       Alert.alert("Couldn't delete account", errorMessage(rpcError));
       return;
     }
-    await signOut();
+    await doSignOut();
   };
 
   const confirmDelete = () =>
@@ -88,7 +105,7 @@ export default function MyProfileScreen() {
         <EmptyState
           icon="person-outline"
           title="Profile not found"
-          action={<Button title="Sign out" variant="secondary" onPress={() => void signOut()} />}
+          action={<Button title="Sign out" variant="secondary" loading={signingOut} onPress={() => void doSignOut()} />}
         />
       </Screen>
     );
@@ -97,6 +114,8 @@ export default function MyProfileScreen() {
   return (
     <Screen scroll>
       <ScreenHeader title="Profile" />
+      {/* Hidden when the tabs layout already shows it above every tab. */}
+      <BannedBanner />
       <ProfileHeader profile={profile} gamesCount={games.length} own>
         <Button title="Edit profile" icon="create-outline" variant="secondary" onPress={() => router.push('/settings/edit-profile')} />
       </ProfileHeader>
@@ -107,14 +126,16 @@ export default function MyProfileScreen() {
 
       <Text variant="heading" style={styles.groupTitle}>Settings</Text>
       <View style={styles.group}>
+        <ActionRow icon="notifications-outline" label="Notifications" onPress={() => router.push('/notifications')} />
         <ActionRow icon="color-palette-outline" label="Theme" value={t.name} onPress={() => router.push('/settings/theme')} />
         <ActionRow icon="people-outline" label="Friends" onPress={() => router.push('/friends')} />
         <ActionRow icon="ban-outline" label="Blocked players" onPress={() => router.push('/settings/blocked')} />
-        <ActionRow icon="shield-checkmark-outline" label="Community guidelines" onPress={showCommunityGuidelines} last />
+        <ActionRow icon="shield-checkmark-outline" label="Community guidelines" onPress={showCommunityGuidelines} last={!isModerator} />
+        {isModerator ? <ActionRow icon="hammer-outline" label="Moderation" onPress={() => router.push('/moderation')} last /> : null}
       </View>
 
       <View style={[styles.group, { marginTop: spacing.xl }]}>
-        <ActionRow icon="log-out-outline" label="Sign out" onPress={confirmSignOut} />
+        <ActionRow icon="log-out-outline" label={signingOut ? 'Signing out…' : 'Sign out'} disabled={signingOut} onPress={confirmSignOut} />
         <ActionRow icon="trash-outline" label={deleting ? 'Deleting…' : 'Delete account'} danger disabled={deleting} onPress={confirmDelete} last />
       </View>
     </Screen>

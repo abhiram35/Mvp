@@ -20,6 +20,7 @@
 // Secrets: ANTHROPIC_API_KEY (required), THEME_MODEL (optional).
 // SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY are injected by Supabase.
 
+// deno-lint-ignore no-import-prefix -- Supabase's documented style for Edge Functions
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import { corsHeaders, json } from '../_shared/cors.ts';
 import { THEME_SYSTEM_PROMPT } from '../_shared/themePrompt.ts';

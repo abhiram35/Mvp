@@ -10,6 +10,7 @@ Everything the app needs lives in `migrations/`. Run the files **in order**:
 | `0004_realtime_storage.sql` | Live updates for chat/requests/friends + the `avatars` image bucket |
 | `0005_seed_games.sql` | The list of games (BGMI, Free Fire MAX, Valorant, …) |
 | `0006_community.sql` | Community (blog / forum): takes, questions, replies, GGs, solutions, plus their server functions |
+| `0007_custom_themes.sql` | Custom AI themes: saved themes, generation log, monthly quota (`get_theme_quota`) |
 
 All files are safe to run again. Re-running them will not create duplicates.
 
@@ -22,7 +23,7 @@ All files are safe to run again. Re-running them will not create duplicates.
 **Option A: SQL Editor (easiest)**
 1. In the dashboard open **SQL Editor → New query**.
 2. Open `migrations/0001_schema.sql`, copy the whole file, paste it, and click **Run**.
-3. Do the same for `0002`, `0003`, `0004`, `0005` and `0006`, in that order.
+3. Do the same for `0002`, `0003`, `0004`, `0005`, `0006` and `0007`, in that order.
 
 **Option B: Supabase CLI**
 ```bash
@@ -80,6 +81,52 @@ from reports r join profiles p on p.id = r.reporter_id
 where r.status = 'open' order by r.created_at desc;
 ```
 
+## 6. Custom AI themes
+Players can type a vibe ("cold Norse war, blood and gold") and an AI designs a theme for them. This runs in a
+small server program called an **Edge Function** (`functions/generate-theme`). It holds your AI key, so the app
+never sees it. You need to deploy it once.
+
+1. Run `migrations/0007_custom_themes.sql` (see step 2) if you haven't yet.
+2. Get an AI key: go to <https://console.anthropic.com>, sign up, add a little credit under **Billing**, then
+   **API Keys → Create key**. Copy it (it starts with `sk-ant-`).
+3. Install the Supabase CLI and connect it to your project (in a terminal, from the project folder):
+   ```bash
+   npm i -g supabase            # or: brew install supabase/tap/supabase
+   supabase login               # opens the browser
+   supabase link --project-ref <your-project-ref>   # the ref is in your project URL: https://<ref>.supabase.co
+   ```
+4. Save the key as a secret (it is stored on Supabase, not in the app):
+   ```bash
+   supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+   # optional: pick another model (default claude-sonnet-5-5)
+   supabase secrets set THEME_MODEL=claude-sonnet-5-5
+   ```
+5. Deploy the function:
+   ```bash
+   supabase functions deploy generate-theme
+   ```
+   Run this again whenever files in `supabase/functions` change.
+6. Try it in the app: **Profile → Theme → Create with AI**.
+
+**Cost.** Each generation is one AI call and costs a little API money (a few cents at most; check current prices on the console's pricing page). Failed attempts
+cost too but don't use up the player's quota, so each player is also limited to 10 failed attempts per 24 hours.
+
+**Limits.** Each player gets **2 themes per month** (the month resets at 00:00 India time on the 1st) and can keep
+**6 saved themes**. Deleting a theme does not give a generation back. To change the numbers, edit the one function
+`theme_limit` at the top of `migrations/0007_custom_themes.sql` (`'monthly' then 2`, `'saved' then 6`,
+`'failed_per_day' then 10`) and run that file again. No function redeploy is needed.
+
+**Seeing what happened.** In **Table Editor**:
+- `theme_generations`: one row per attempt. `status` is `succeeded`, `failed` (AI error, timeout, unreadable
+  colours) or `rejected` (bad prompt or brand names in the result). `error` is a short code like `upstream_429`,
+  `timeout`, `contrast:text`, `denylisted:words.squadUp`, `prompt_denylist`.
+- `custom_themes`: saved themes, with the player's prompt (private, only you and the player can see it) and the
+  full `spec`.
+- Function logs: **Edge Functions → generate-theme → Logs**.
+
+If every attempt fails with `not_configured`, the `ANTHROPIC_API_KEY` secret is missing. `upstream_401` means the
+key is wrong; `upstream_400` with a valid key usually means the `THEME_MODEL` name is wrong.
+
 ## Notes for developers
 - Expired LFG posts are not closed automatically. The app should query
   `.gt('expires_at', new Date().toISOString())` together with `status = 'open'`.
@@ -91,3 +138,11 @@ where r.status = 'open' order by r.created_at desc;
 - Community posts and replies by someone you blocked (or who blocked you) are hidden everywhere, including direct table selects and realtime; replying across a block is rejected. `community_replies` is in the realtime publication.
 - `updated_at` on community posts/replies changes only when the text (or game) is edited, so `updated_at > created_at` means "edited".
 - `delete_my_account` deletes the user's DMs, then the auth user. Everything else cascades. The app removes the avatar file through the Storage API first, because Supabase doesn't allow deleting storage objects with SQL.
+- Custom themes: the app never inserts into `custom_themes` or `theme_generations`; it calls
+  `supabase.functions.invoke('generate-theme', { body: { prompt } })`. Players can select, rename (`name` only)
+  and delete their own themes, and read their own `theme_generations`. `get_theme_quota()` returns
+  `{ used, limit, remaining, resets_at, saved, saved_limit }` (`resets_at` is UTC ISO, e.g.
+  `2026-11-30T18:30:00Z` = 1 Dec 00:00 IST). `begin_theme_generation` / `finish_theme_generation` /
+  `theme_quota_for` are service-role only (used by the function; they also stop two parallel generations).
+- `supabase/functions` is Deno code with its own `deno.json`; the app's root `tsconfig.json` excludes it.
+  Pure theme logic (validation, contrast repair, denylists) is in `functions/_shared/themeSpec.ts` with no imports.

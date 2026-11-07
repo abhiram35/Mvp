@@ -287,6 +287,7 @@ export function findDenylisted(text: string, list: string[]): string | null {
 
 /** Trim, drop control chars, collapse whitespace. */
 export function cleanText(s: string): string {
+  // deno-lint-ignore no-control-regex
   return s.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 

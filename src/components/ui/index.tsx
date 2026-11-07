@@ -191,7 +191,7 @@ export function Button({
           overflow: 'hidden',
         },
         variant === 'primary' && { backgroundColor: pressed ? c.primaryPressed : c.primary },
-        variant === 'danger' && { backgroundColor: pressed ? c.primaryPressed : c.danger },
+        variant === 'danger' && { backgroundColor: c.danger, opacity: pressed ? 0.8 : 1 },
         variant === 'secondary' && { backgroundColor: pressed ? c.surfaceRaised : 'transparent', borderWidth: 1, borderColor: c.border },
         variant === 'ghost' && { backgroundColor: pressed ? c.surfaceRaised : 'transparent' },
         isDisabled && { opacity: 0.5 },

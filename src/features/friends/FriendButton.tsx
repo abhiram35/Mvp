@@ -4,7 +4,7 @@ import { Button } from '../../components/ui';
 import { errorMessage, supabase } from '../../lib/supabase';
 import type { Friendship } from '../../lib/types';
 import { useUserId } from '../../providers/AuthProvider';
-import { colors, spacing } from '../../theme';
+import { spacing, useTheme } from '../../theme';
 import {
   acceptFriendRequest,
   deleteFriendship,
@@ -16,6 +16,7 @@ import {
 /** Add friend / Requested / Accept + Decline / Friends ✓ — and performs the action. */
 export function FriendButton({ profileId }: { profileId: string }) {
   const myId = useUserId();
+  const t = useTheme();
   const [friendship, setFriendship] = useState<Friendship | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -80,8 +81,8 @@ export function FriendButton({ profileId }: { profileId: string }) {
 
   if (loading) {
     return (
-      <View style={{ minHeight: 36, justifyContent: 'center', paddingHorizontal: spacing.lg }}>
-        <ActivityIndicator color={colors.primary} />
+      <View style={{ minHeight: 38, justifyContent: 'center', paddingHorizontal: spacing.lg }}>
+        <ActivityIndicator color={t.colors.primary} />
       </View>
     );
   }
@@ -105,7 +106,8 @@ export function FriendButton({ profileId }: { profileId: string }) {
       <Button
         size="sm"
         variant="secondary"
-        title="Friends ✓"
+        title="Friends"
+        icon="checkmark"
         loading={busy}
         onPress={() =>
           Alert.alert('Remove friend?', 'You can always add them again later.', [

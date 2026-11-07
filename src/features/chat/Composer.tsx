@@ -1,12 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
-import { Text } from '../../components/ui';
-import { colors, font, radius, spacing } from '../../theme';
+import { Notch, Text } from '../../components/ui';
+import { fontSize, makeStyles, spacing, useTheme } from '../../theme';
 import { MAX_MESSAGE_LENGTH } from './useMessages';
 
 /** Multiline message box + send button. `onSend` should throw on failure (text is restored). */
 export function Composer({ onSend }: { onSend: (text: string) => Promise<void> }) {
+  const t = useTheme();
+  const styles = useStyles();
   const [text, setText] = useState('');
   const [sending, setSending] = useState(false);
   const trimmed = text.trim();
@@ -31,7 +33,7 @@ export function Composer({ onSend }: { onSend: (text: string) => Promise<void> }
   return (
     <View style={styles.container}>
       {nearLimit ? (
-        <Text variant="caption" style={[styles.counter, text.length > MAX_MESSAGE_LENGTH && { color: colors.danger }]}>
+        <Text variant="caption" style={[styles.counter, text.length > MAX_MESSAGE_LENGTH && { color: t.colors.danger }]}>
           {text.length}/{MAX_MESSAGE_LENGTH}
         </Text>
       ) : null}
@@ -40,7 +42,9 @@ export function Composer({ onSend }: { onSend: (text: string) => Promise<void> }
           value={text}
           onChangeText={setText}
           placeholder="Message"
-          placeholderTextColor={colors.textFaint}
+          placeholderTextColor={t.colors.textFaint}
+          selectionColor={t.colors.primary}
+          cursorColor={t.colors.primary}
           multiline
           maxLength={MAX_MESSAGE_LENGTH}
           style={styles.input}
@@ -55,44 +59,55 @@ export function Composer({ onSend }: { onSend: (text: string) => Promise<void> }
           onPress={() => void submit()}
           style={({ pressed }) => [
             styles.send,
-            { backgroundColor: canSend ? (pressed ? colors.primaryPressed : colors.primary) : colors.surfaceRaised },
+            { backgroundColor: canSend ? (pressed ? t.colors.primaryPressed : t.colors.primary) : t.colors.surfaceRaised },
           ]}
         >
           {sending ? (
-            <ActivityIndicator color={colors.onPrimary} />
+            <ActivityIndicator color={t.colors.onPrimary} />
           ) : (
-            <Ionicons name="send" size={18} color={canSend ? colors.onPrimary : colors.textFaint} />
+            <Ionicons name="send" size={18} color={canSend ? t.colors.onPrimary : t.colors.textFaint} />
           )}
+          {canSend || sending ? <Notch corner="topRight" color={t.colors.bg} size={8} /> : null}
         </Pressable>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.border,
-    backgroundColor: colors.bg,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-  },
-  row: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm },
-  input: {
-    flex: 1,
-    minHeight: 44,
-    maxHeight: 140,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.lg,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.md,
-    color: colors.text,
-    fontSize: font.size.md,
-    textAlignVertical: 'top',
-  },
-  send: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  counter: { textAlign: 'right', marginBottom: spacing.xs },
-});
+const useStyles = makeStyles((t) =>
+  StyleSheet.create({
+    container: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: t.colors.border,
+      backgroundColor: t.colors.bg,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+    },
+    row: { flexDirection: 'row', alignItems: 'flex-end', gap: spacing.sm },
+    input: {
+      flex: 1,
+      minHeight: 44,
+      maxHeight: 140,
+      backgroundColor: t.colors.surface,
+      borderWidth: 1,
+      borderColor: t.colors.border,
+      borderRadius: t.radius.md,
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.md,
+      paddingBottom: spacing.md,
+      color: t.colors.text,
+      fontFamily: t.fonts.body,
+      fontSize: fontSize.md,
+      textAlignVertical: 'top',
+    },
+    send: {
+      width: 44,
+      height: 44,
+      borderRadius: t.radius.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+    },
+    counter: { textAlign: 'right', marginBottom: spacing.xs },
+  }),
+);

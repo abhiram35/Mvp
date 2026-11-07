@@ -6,13 +6,15 @@ import { openDm } from '../lib/actions';
 import { errorMessage } from '../lib/supabase';
 import { acceptFriendRequest, deleteFriendship } from '../features/friends/api';
 import { useFriendships, type FriendshipWithProfile } from '../features/friends/hooks';
-import { colors, font, radius, spacing } from '../theme';
+import { fontSize, makeStyles, spacing, useTheme } from '../theme';
 
 type Segment = 'friends' | 'requests' | 'sent';
 
 export default function FriendsScreen() {
   // One shared load for all three tabs.
   const { myId, items, loading, error, reload } = useFriendships();
+  const t = useTheme();
+  const styles = useStyles();
   const [segment, setSegment] = useState<Segment>('friends');
   const [refreshing, setRefreshing] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -104,8 +106,8 @@ export default function FriendsScreen() {
       <EmptyState
         icon="people-outline"
         title="No friends yet"
-        message="Find players in Find Squad and add them as friends."
-        action={<Button title="Find a squad" icon="people" onPress={() => router.push('/(tabs)/squad')} />}
+        message={`Find players in the ${t.words.squad} finder and add them as friends.`}
+        action={<Button title={`Find a ${t.words.squad}`} icon="people" onPress={() => router.push('/(tabs)/squad')} />}
       />
     ) : segment === 'requests' ? (
       <EmptyState icon="mail-open-outline" title="No friend requests" message="When someone adds you, it shows up here." />
@@ -145,8 +147,9 @@ export default function FriendsScreen() {
                 await reload();
                 setRefreshing(false);
               }}
-              tintColor={colors.primary}
-              colors={[colors.primary]}
+              tintColor={t.colors.primary}
+              colors={[t.colors.primary]}
+              progressBackgroundColor={t.colors.surface}
             />
           }
         />
@@ -156,44 +159,60 @@ export default function FriendsScreen() {
 }
 
 function SegmentButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  const t = useTheme();
+  const styles = useStyles();
   return (
     <Pressable
       accessibilityRole="tab"
       accessibilityLabel={label}
       accessibilityState={{ selected: active }}
       onPress={onPress}
-      style={[styles.segment, active && styles.segmentActive]}
+      style={({ pressed }) => [styles.segment, pressed && { backgroundColor: t.colors.surfaceRaised }]}
     >
-      <Text style={[styles.segmentText, { color: active ? colors.onPrimary : colors.textMuted }]} numberOfLines={1}>
+      <Text style={[styles.segmentText, { color: active ? t.colors.text : t.colors.textMuted }]} numberOfLines={1}>
         {label}
       </Text>
+      <View style={[styles.segmentBar, active && { backgroundColor: t.colors.primary }]} />
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
-  segments: {
-    flexDirection: 'row',
-    margin: spacing.lg,
-    padding: spacing.xs,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  segment: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm },
-  segmentActive: { backgroundColor: colors.primary },
-  segmentText: { fontSize: font.size.sm, fontWeight: font.weight.semibold },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    gap: spacing.sm,
-  },
-  person: { flex: 1, flexDirection: 'row', alignItems: 'center', minHeight: 44 },
-  names: { flex: 1, marginLeft: spacing.md },
-  name: { fontSize: font.size.md, fontWeight: font.weight.semibold },
-  actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  separator: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginLeft: spacing.lg + 44 + spacing.md },
-});
+const useStyles = makeStyles((t) =>
+  StyleSheet.create({
+    segments: {
+      flexDirection: 'row',
+      marginHorizontal: spacing.lg,
+      marginTop: spacing.sm,
+      marginBottom: spacing.xs,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: t.colors.border,
+    },
+    segment: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'flex-end' },
+    segmentText: {
+      fontFamily: t.fonts.heading,
+      fontSize: fontSize.md,
+      letterSpacing: t.shape.headingLetterSpacing,
+      textTransform: t.shape.headingUppercase ? 'uppercase' : 'none',
+      paddingBottom: spacing.sm,
+    },
+    // Selected segment: 2px primary bar sitting on the hairline rule.
+    segmentBar: { alignSelf: 'stretch', height: 2, marginBottom: -StyleSheet.hairlineWidth, backgroundColor: 'transparent' },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      gap: spacing.sm,
+    },
+    person: { flex: 1, flexDirection: 'row', alignItems: 'center', minHeight: 44 },
+    names: { flex: 1, marginLeft: spacing.md },
+    name: { fontFamily: t.fonts.bodyBold, fontSize: fontSize.md, color: t.colors.text },
+    actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
+    separator: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: t.colors.border,
+      marginLeft: spacing.lg + 44 + spacing.md,
+      marginRight: spacing.lg,
+    },
+  }),
+);

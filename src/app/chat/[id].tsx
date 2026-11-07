@@ -13,11 +13,11 @@ import {
   View,
   type AlertButton,
 } from 'react-native';
-import { Avatar, EmptyState, ErrorState, LoadingState, Screen, Text } from '../../components/ui';
+import { Avatar, EmptyState, ErrorState, LoadingState, Screen, Text, textStyle } from '../../components/ui';
 import { openReport } from '../../lib/actions';
 import { errorMessage } from '../../lib/supabase';
 import { useUserId } from '../../providers/AuthProvider';
-import { colors, font, radius, spacing } from '../../theme';
+import { fontSize, makeStyles, spacing, useTheme } from '../../theme';
 import { Composer } from '../../features/chat/Composer';
 import { bubbleLayout } from '../../features/chat/layout';
 import { MessageBubble } from '../../features/chat/MessageBubble';
@@ -31,6 +31,9 @@ export default function ChatScreen() {
   const myId = useUserId();
   const headerHeight = useHeaderHeight();
   const { blockedIds } = useBlockedIds();
+  const t = useTheme();
+  const styles = useStyles();
+  const groupFallback = `${t.words.squad.charAt(0).toUpperCase()}${t.words.squad.slice(1)} chat`;
 
   const { conversation, members, membersById, partner, loading: convLoading, error: convError, reload: reloadConv } =
     useConversation(conversationId, myId);
@@ -75,12 +78,12 @@ export default function ChatScreen() {
   const header = (
     <Stack.Screen
       options={{
-        title: isGroup ? (conversation?.title ?? 'Squad chat') : (partner?.display_name ?? 'Chat'),
+        title: isGroup ? (conversation?.title ?? groupFallback) : (partner?.display_name ?? 'Chat'),
         headerTitle:
           !isGroup && partner
             ? () => <DmHeader partner={partner} />
             : isGroup
-              ? () => <GroupHeader title={conversation?.title ?? 'Squad chat'} memberCount={members.length} />
+              ? () => <GroupHeader title={conversation?.title ?? groupFallback} memberCount={members.length} />
               : undefined,
       }}
     />
@@ -142,7 +145,7 @@ export default function ChatScreen() {
             ListFooterComponent={
               loadingOlder ? (
                 <View style={styles.older}>
-                  <ActivityIndicator color={colors.primary} />
+                  <ActivityIndicator color={t.colors.primary} />
                 </View>
               ) : !hasMore && visible.length > 0 ? (
                 <Text variant="caption" style={styles.beginning}>This is the start of your chat</Text>
@@ -154,7 +157,7 @@ export default function ChatScreen() {
                 <EmptyState
                   icon="chatbubble-ellipses-outline"
                   title="Say hi 👋"
-                  message={isGroup ? 'Plan your next match with the squad.' : 'Start the conversation — keep it friendly.'}
+                  message={isGroup ? `Plan your next match with the ${t.words.squad}.` : 'Start the conversation — keep it friendly.'}
                 />
               </View>
             }
@@ -163,8 +166,8 @@ export default function ChatScreen() {
 
         {partnerBlocked ? (
           <View style={styles.blockedBanner} accessibilityRole="alert">
-            <Ionicons name="ban-outline" size={18} color={colors.textMuted} />
-            <Text muted style={{ flex: 1, marginLeft: spacing.sm }}>
+            <Ionicons name="ban-outline" size={20} color={t.colors.danger} />
+            <Text variant="label" style={styles.blockedText}>
               You blocked this player. Unblock them in Settings → Blocked players to send messages.
             </Text>
           </View>
@@ -177,6 +180,7 @@ export default function ChatScreen() {
 }
 
 function DmHeader({ partner }: { partner: MemberProfile }) {
+  const styles = useStyles();
   return (
     <Pressable
       accessibilityRole="button"
@@ -197,11 +201,10 @@ function DmHeader({ partner }: { partner: MemberProfile }) {
 }
 
 function GroupHeader({ title, memberCount }: { title: string; memberCount: number }) {
+  const styles = useStyles();
   return (
     <View style={styles.headerTitle} accessible accessibilityLabel={`${title}, ${memberCount} members`}>
-      <View style={styles.groupAvatar}>
-        <Ionicons name="people" size={16} color={colors.primary} />
-      </View>
+      <Avatar name={title} size={32} highlight />
       <View style={{ marginLeft: spacing.sm, flexShrink: 1 }}>
         <Text style={styles.headerName} numberOfLines={1}>{title}</Text>
         <Text variant="caption" numberOfLines={1}>{memberCount} {memberCount === 1 ? 'member' : 'members'}</Text>
@@ -210,28 +213,25 @@ function GroupHeader({ title, memberCount }: { title: string; memberCount: numbe
   );
 }
 
-const styles = StyleSheet.create({
-  list: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  older: { paddingVertical: spacing.lg, alignItems: 'center' },
-  beginning: { textAlign: 'center', paddingVertical: spacing.lg },
-  blockedBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    margin: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  headerTitle: { flexDirection: 'row', alignItems: 'center', minHeight: 44, maxWidth: 260 },
-  headerName: { fontSize: font.size.md, fontWeight: font.weight.semibold },
-  groupAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.surfaceRaised,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+const useStyles = makeStyles((t) =>
+  StyleSheet.create({
+    list: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+    older: { paddingVertical: spacing.lg, alignItems: 'center' },
+    beginning: { textAlign: 'center', paddingVertical: spacing.lg },
+    blockedBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      margin: spacing.md,
+      padding: spacing.md,
+      borderRadius: t.radius.md,
+      backgroundColor: t.colors.surface,
+      borderWidth: 1,
+      borderColor: t.colors.border,
+      borderLeftWidth: 3,
+      borderLeftColor: t.colors.danger,
+    },
+    blockedText: { flex: 1, marginLeft: spacing.sm, color: t.colors.textMuted, lineHeight: 20 },
+    headerTitle: { flexDirection: 'row', alignItems: 'center', minHeight: 44, maxWidth: 260 },
+    headerName: { ...textStyle(t, 'heading'), fontSize: fontSize.lg, lineHeight: 22 },
+  }),
+);

@@ -26,7 +26,9 @@ export type PlayTime = 'morning' | 'afternoon' | 'evening' | 'late_night';
 export type LfgStatus = 'open' | 'full' | 'closed';
 export type RequestStatus = 'pending' | 'accepted' | 'declined';
 export type FriendshipStatus = 'pending' | 'accepted';
-export type ReportTarget = 'profile' | 'message' | 'lfg_post';
+export type ReportTarget = 'profile' | 'message' | 'lfg_post' | 'community_post' | 'community_reply';
+export type CommunityPostKind = 'take' | 'question';
+export type CommunitySort = 'hot' | 'new' | 'unanswered';
 export type ReportReason = 'harassment' | 'hate' | 'cheating' | 'spam' | 'scam' | 'inappropriate' | 'other';
 
 // ── Tables ──────────────────────────────────────────────────────────────────
@@ -146,6 +148,73 @@ export interface Report {
   created_at: ISODate;
 }
 
+
+// ── Community (blog / forum) ────────────────────────────────────────────────
+
+/** table: community_posts — opinions ("take") and help questions ("question") */
+export interface CommunityPost {
+  id: UUID;
+  author_id: UUID;
+  kind: CommunityPostKind;
+  game_id: string | null; // null = general / not about one game
+  title: string; // 5–120 chars
+  body: string; // 1–5000 chars, plain text (line breaks kept)
+  solved_reply_id: UUID | null; // questions only: the reply the author marked as the answer
+  gg_count: number; // maintained by the server, read-only for users
+  reply_count: number; // maintained by the server, read-only for users
+  last_activity_at: ISODate; // created_at, bumped on each new reply
+  created_at: ISODate;
+  updated_at: ISODate;
+}
+
+/** table: community_replies */
+export interface CommunityReply {
+  id: UUID;
+  post_id: UUID;
+  author_id: UUID;
+  body: string; // 1–3000 chars
+  gg_count: number; // maintained by the server
+  created_at: ISODate;
+  updated_at: ISODate;
+}
+
+/** table: community_post_ggs — PK (post_id, profile_id). Users insert/delete only their own row via the toggle RPC. */
+export interface CommunityPostGg {
+  post_id: UUID;
+  profile_id: UUID;
+  created_at: ISODate;
+}
+
+/** table: community_reply_ggs — PK (reply_id, profile_id) */
+export interface CommunityReplyGg {
+  reply_id: UUID;
+  profile_id: UUID;
+  created_at: ISODate;
+}
+
+type AuthorLite = Pick<Profile, 'id' | 'username' | 'display_name' | 'avatar_url'>;
+
+/** Row returned by list_community_posts / get_community_post */
+export interface CommunityPostSummary {
+  post: CommunityPost;
+  author: AuthorLite;
+  has_gg: boolean; // the caller gave this post a GG
+  is_solved: boolean; // question with solved_reply_id set
+}
+
+/** Row returned by list_community_replies */
+export interface CommunityReplyItem {
+  reply: CommunityReply;
+  author: AuthorLite;
+  has_gg: boolean;
+  is_solution: boolean; // this reply is the post's solved_reply_id
+}
+
+export interface GgToggleResult {
+  has_gg: boolean;
+  gg_count: number;
+}
+
 // ── Database functions (Supabase RPC) ───────────────────────────────────────
 // Call with: supabase.rpc('<name>', { ...args })
 
@@ -181,6 +250,36 @@ export interface RpcFunctions {
 
   /** True if username is free (case-insensitive) and valid. Callable before a profile exists. */
   is_username_available: { args: { p_username: string }; returns: boolean };
+
+  // ── Community ──
+  /** Feed. Excludes posts by users blocked in EITHER direction (server-side). Pagination: pass the last row's
+   *  cursor value (last_activity_at for 'hot'/'unanswered' ordering ties are fine; created_at for 'new') as p_before. */
+  list_community_posts: {
+    args: {
+      p_sort: CommunitySort; // hot = score by GGs + replies decayed by age; new = newest; unanswered = questions with 0 replies, newest first
+      p_kind: CommunityPostKind | null; // null = both
+      p_game_id: string | null; // null = all games
+      p_search: string | null; // case-insensitive match on title/body, null = none
+      p_limit?: number; // default 20, max 50
+      p_offset?: number; // default 0 (simple offset paging)
+    };
+    returns: CommunityPostSummary[];
+  };
+
+  /** One post with author. Returns no row if missing or the author is blocked either way. */
+  get_community_post: { args: { p_post_id: UUID }; returns: CommunityPostSummary[] };
+
+  /** Replies oldest-first, solution pinned first. Excludes blocked authors either way. */
+  list_community_replies: { args: { p_post_id: UUID; p_limit?: number; p_offset?: number }; returns: CommunityReplyItem[] };
+
+  /** Gives or removes the caller's GG on a post. Cannot GG your own post. */
+  toggle_post_gg: { args: { p_post_id: UUID }; returns: GgToggleResult };
+
+  /** Gives or removes the caller's GG on a reply. Cannot GG your own reply. */
+  toggle_reply_gg: { args: { p_reply_id: UUID }; returns: GgToggleResult };
+
+  /** Post author marks a reply on their QUESTION as the solution (p_reply_id), or clears it (null). */
+  set_solution: { args: { p_post_id: UUID; p_reply_id: UUID | null }; returns: null };
 }
 
 export interface SquadmateMatch {
@@ -242,4 +341,9 @@ export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
   scam: 'Scam or fraud',
   inappropriate: 'Sexual or inappropriate content',
   other: 'Something else',
+};
+
+export const COMMUNITY_KIND_LABELS: Record<CommunityPostKind, string> = {
+  take: 'Take',
+  question: 'Question',
 };

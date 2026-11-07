@@ -27,6 +27,11 @@ export default function TabsLayout() {
         name="squad"
         options={{ title: label('Duo'), tabBarIcon: ({ color, size }) => <Ionicons name="people" color={String(color)} size={size} /> }}
       />
+      {/* Community: takes (opinions) and questions — "Scrolls" in Ronin */}
+      <Tabs.Screen
+        name="community"
+        options={{ title: label(t.words.community), tabBarIcon: ({ color, size }) => <Ionicons name="newspaper" color={String(color)} size={size} /> }}
+      />
       <Tabs.Screen
         name="chats"
         options={{

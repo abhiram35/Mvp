@@ -51,6 +51,7 @@ export interface AppTheme {
     squad: string; // "squad" / "clan"
     squadUp: string; // main CTA: "Squad up" / "Join clan"
     lobbies: string; // "Lobbies" / "Dojo"
+    community: string; // discussion tab: "Community" / "Scrolls"
   };
 }
 
@@ -88,7 +89,7 @@ export const THEMES: Record<ThemeId, AppTheme> = {
     },
     radius: { sm: 2, md: 2, lg: 2, pill: 2 },
     shape: { cut: 12, headingUppercase: true, headingLetterSpacing: 1.5 },
-    words: { gg: 'GGs', squad: 'squad', squadUp: 'Squad up', lobbies: 'Lobbies' },
+    words: { gg: 'GGs', squad: 'squad', squadUp: 'Squad up', lobbies: 'Lobbies', community: 'Community' },
   },
   defuse: {
     id: 'defuse',
@@ -123,7 +124,7 @@ export const THEMES: Record<ThemeId, AppTheme> = {
     },
     radius: { sm: 0, md: 0, lg: 0, pill: 0 },
     shape: { cut: 0, headingUppercase: true, headingLetterSpacing: 1 },
-    words: { gg: 'GGs', squad: 'squad', squadUp: 'Squad up', lobbies: 'Lobbies' },
+    words: { gg: 'GGs', squad: 'squad', squadUp: 'Squad up', lobbies: 'Lobbies', community: 'Community' },
   },
   ronin: {
     id: 'ronin',
@@ -158,7 +159,7 @@ export const THEMES: Record<ThemeId, AppTheme> = {
     },
     radius: { sm: 3, md: 4, lg: 6, pill: 999 },
     shape: { cut: 0, headingUppercase: false, headingLetterSpacing: 0.5 },
-    words: { gg: 'honours', squad: 'clan', squadUp: 'Join clan', lobbies: 'Dojo' },
+    words: { gg: 'honours', squad: 'clan', squadUp: 'Join clan', lobbies: 'Dojo', community: 'Scrolls' },
   },
 };
 

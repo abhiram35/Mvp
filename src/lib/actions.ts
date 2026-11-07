@@ -1,3 +1,4 @@
+import type { ReportTarget } from './types';
 import { router } from 'expo-router';
 import { Alert } from 'react-native';
 import { errorMessage, supabase } from './supabase';
@@ -13,6 +14,6 @@ export async function openDm(otherId: string): Promise<void> {
 }
 
 /** Opens the report screen for any profile, message or LFG post. */
-export function openReport(type: 'profile' | 'message' | 'lfg_post', id: string): void {
+export function openReport(type: ReportTarget, id: string): void {
   router.push({ pathname: '/report', params: { type, id } });
 }

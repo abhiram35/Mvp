@@ -1,0 +1,237 @@
+import { Ionicons } from '@expo/vector-icons';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { useHeaderHeight } from 'expo-router/react-navigation';
+import * as Clipboard from 'expo-clipboard';
+import { useCallback, useMemo } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  KeyboardAvoidingView,
+  Pressable,
+  StyleSheet,
+  View,
+  type AlertButton,
+} from 'react-native';
+import { Avatar, EmptyState, ErrorState, LoadingState, Screen, Text } from '../../components/ui';
+import { openReport } from '../../lib/actions';
+import { errorMessage } from '../../lib/supabase';
+import { useUserId } from '../../providers/AuthProvider';
+import { colors, font, radius, spacing } from '../../theme';
+import { Composer } from '../../features/chat/Composer';
+import { bubbleLayout } from '../../features/chat/layout';
+import { MessageBubble } from '../../features/chat/MessageBubble';
+import { useConversation, type MemberProfile } from '../../features/chat/useConversation';
+import { useMessages, type ChatMessage } from '../../features/chat/useMessages';
+import { useBlockedIds } from '../../features/safety/blocks';
+
+export default function ChatScreen() {
+  const params = useLocalSearchParams<{ id: string }>();
+  const conversationId = Array.isArray(params.id) ? params.id[0] : params.id;
+  const myId = useUserId();
+  const headerHeight = useHeaderHeight();
+  const { blockedIds } = useBlockedIds();
+
+  const { conversation, members, membersById, partner, loading: convLoading, error: convError, reload: reloadConv } =
+    useConversation(conversationId, myId);
+  const { messages, loading: msgLoading, loadingOlder, hasMore, error: msgError, reload: reloadMsgs, loadOlder, send } =
+    useMessages(conversationId, myId, membersById);
+
+  const isGroup = conversation?.is_group ?? false;
+  const partnerBlocked = !!partner && blockedIds.has(partner.id);
+
+  const visible = useMemo(() => messages.filter((m) => !blockedIds.has(m.sender_id)), [messages, blockedIds]);
+
+  const handleSend = useCallback(
+    async (text: string) => {
+      try {
+        await send(text);
+      } catch (err) {
+        Alert.alert('Message not sent', errorMessage(err));
+        throw err;
+      }
+    },
+    [send],
+  );
+
+  const handleLongPress = useCallback(
+    (message: ChatMessage) => {
+      if (message.pending) return;
+      const buttons: AlertButton[] = [
+        {
+          text: 'Copy',
+          onPress: () => void Clipboard.setStringAsync(message.body),
+        },
+      ];
+      if (message.sender_id !== myId) {
+        buttons.push({ text: 'Report message', style: 'destructive', onPress: () => openReport('message', message.id) });
+      }
+      buttons.push({ text: 'Cancel', style: 'cancel' });
+      Alert.alert(message.sender_id === myId ? 'Your message' : (message.sender?.display_name ?? 'Message'), undefined, buttons);
+    },
+    [myId],
+  );
+
+  const header = (
+    <Stack.Screen
+      options={{
+        title: isGroup ? (conversation?.title ?? 'Squad chat') : (partner?.display_name ?? 'Chat'),
+        headerTitle:
+          !isGroup && partner
+            ? () => <DmHeader partner={partner} />
+            : isGroup
+              ? () => <GroupHeader title={conversation?.title ?? 'Squad chat'} memberCount={members.length} />
+              : undefined,
+      }}
+    />
+  );
+
+  if (convLoading && !conversation) {
+    return (
+      <Screen edges={['bottom']}>
+        {header}
+        <LoadingState />
+      </Screen>
+    );
+  }
+
+  if (convError || !conversation) {
+    return (
+      <Screen edges={['bottom']}>
+        {header}
+        <ErrorState message={convError ?? "Couldn't open this chat."} onRetry={() => void reloadConv()} />
+      </Screen>
+    );
+  }
+
+  return (
+    <Screen edges={['bottom']} padded={false}>
+      {header}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        // Expo apps are edge-to-edge on Android, so the window no longer resizes for the
+        // keyboard: 'padding' is the recommended behavior on both platforms.
+        behavior="padding"
+        keyboardVerticalOffset={headerHeight}
+      >
+        {msgLoading && visible.length === 0 ? (
+          <LoadingState />
+        ) : msgError && visible.length === 0 ? (
+          <ErrorState message={msgError} onRetry={() => void reloadMsgs()} />
+        ) : (
+          <FlatList
+            inverted
+            data={visible}
+            keyExtractor={(m) => m.id}
+            renderItem={({ item, index }) => (
+              <MessageBubble
+                message={item}
+                mine={item.sender_id === myId}
+                layout={bubbleLayout(visible, index, isGroup)}
+                onLongPress={handleLongPress}
+              />
+            )}
+            onEndReached={() => {
+              if (hasMore) void loadOlder();
+            }}
+            onEndReachedThreshold={0.3}
+            keyboardDismissMode="interactive"
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={[styles.list, visible.length === 0 && { flexGrow: 1 }]}
+            // Inverted list: the footer renders at the top (oldest end).
+            ListFooterComponent={
+              loadingOlder ? (
+                <View style={styles.older}>
+                  <ActivityIndicator color={colors.primary} />
+                </View>
+              ) : !hasMore && visible.length > 0 ? (
+                <Text variant="caption" style={styles.beginning}>This is the start of your chat</Text>
+              ) : undefined
+            }
+            ListEmptyComponent={
+              // VirtualizedList re-inverts the empty component itself, so no manual flip here.
+              <View style={{ flex: 1 }}>
+                <EmptyState
+                  icon="chatbubble-ellipses-outline"
+                  title="Say hi 👋"
+                  message={isGroup ? 'Plan your next match with the squad.' : 'Start the conversation — keep it friendly.'}
+                />
+              </View>
+            }
+          />
+        )}
+
+        {partnerBlocked ? (
+          <View style={styles.blockedBanner} accessibilityRole="alert">
+            <Ionicons name="ban-outline" size={18} color={colors.textMuted} />
+            <Text muted style={{ flex: 1, marginLeft: spacing.sm }}>
+              You blocked this player. Unblock them in Settings → Blocked players to send messages.
+            </Text>
+          </View>
+        ) : (
+          <Composer onSend={handleSend} />
+        )}
+      </KeyboardAvoidingView>
+    </Screen>
+  );
+}
+
+function DmHeader({ partner }: { partner: MemberProfile }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`View ${partner.display_name}'s profile`}
+      onPress={() => router.push({ pathname: '/user/[id]', params: { id: partner.id } })}
+      hitSlop={8}
+      style={styles.headerTitle}
+    >
+      <Avatar uri={partner.avatar_url} name={partner.display_name} size={32} />
+      <View style={{ marginLeft: spacing.sm, flexShrink: 1 }}>
+        <Text style={styles.headerName} numberOfLines={1}>{partner.display_name}</Text>
+        {partner.username ? (
+          <Text variant="caption" numberOfLines={1}>@{partner.username}</Text>
+        ) : null}
+      </View>
+    </Pressable>
+  );
+}
+
+function GroupHeader({ title, memberCount }: { title: string; memberCount: number }) {
+  return (
+    <View style={styles.headerTitle} accessible accessibilityLabel={`${title}, ${memberCount} members`}>
+      <View style={styles.groupAvatar}>
+        <Ionicons name="people" size={16} color={colors.primary} />
+      </View>
+      <View style={{ marginLeft: spacing.sm, flexShrink: 1 }}>
+        <Text style={styles.headerName} numberOfLines={1}>{title}</Text>
+        <Text variant="caption" numberOfLines={1}>{memberCount} {memberCount === 1 ? 'member' : 'members'}</Text>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  list: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+  older: { paddingVertical: spacing.lg, alignItems: 'center' },
+  beginning: { textAlign: 'center', paddingVertical: spacing.lg },
+  blockedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    margin: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  headerTitle: { flexDirection: 'row', alignItems: 'center', minHeight: 44, maxWidth: 260 },
+  headerName: { fontSize: font.size.md, fontWeight: font.weight.semibold },
+  groupAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.surfaceRaised,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});

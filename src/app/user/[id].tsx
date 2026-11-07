@@ -2,7 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Redirect, Stack, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
-import { Button, Divider, EmptyState, ErrorState, LoadingState, Screen } from '../../components/ui';
+import { Button, EmptyState, ErrorState, LoadingState, Screen, Text } from '../../components/ui';
+import { ActionRow } from '../../features/profile/ActionRow';
 import { FriendButton } from '../../features/friends/FriendButton';
 import { ProfileGamesList } from '../../features/profile/ProfileGamesList';
 import { ProfileHeader } from '../../features/profile/ProfileHeader';
@@ -11,12 +12,14 @@ import { blockUser, unblockUser, useBlockedIds } from '../../features/safety/blo
 import { openDm, openReport } from '../../lib/actions';
 import { errorMessage } from '../../lib/supabase';
 import { useUserId } from '../../providers/AuthProvider';
-import { colors, spacing } from '../../theme';
+import { makeStyles, spacing, useTheme } from '../../theme';
 
 export default function UserProfileScreen() {
   const params = useLocalSearchParams<{ id: string }>();
   const id = Array.isArray(params.id) ? params.id[0] : params.id;
   const me = useUserId();
+  const t = useTheme();
+  const styles = useStyles();
   const { profile, games, loading, error, reload } = useProfile(id);
   const { blockedIds } = useBlockedIds();
   const [busy, setBusy] = useState(false);
@@ -53,7 +56,7 @@ export default function UserProfileScreen() {
   };
 
   const confirmBlock = () =>
-    Alert.alert(`Block ${name}?`, "They won't be able to message you or join your squads, and you won't see their posts. Any friendship is removed.", [
+    Alert.alert(`Block ${name}?`, "They won't be able to message you or join your ${t.words.squad}s, and you won't see their posts. Any friendship is removed.", [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Block', style: 'destructive', onPress: () => void doBlock() },
     ]);
@@ -83,7 +86,7 @@ export default function UserProfileScreen() {
         headerRight: () =>
           id ? (
             <Pressable onPress={openMenu} accessibilityRole="button" accessibilityLabel="More options" hitSlop={8} style={styles.menuBtn}>
-              <Ionicons name="ellipsis-horizontal" size={22} color={colors.text} />
+              <Ionicons name="ellipsis-horizontal" size={22} color={t.colors.text} />
             </Pressable>
           ) : null,
       }}
@@ -139,25 +142,34 @@ export default function UserProfileScreen() {
   return (
     <Screen scroll edges={['bottom']}>
       {header}
-      <ProfileHeader profile={profile} />
-      <View style={styles.actions}>
-        <View style={{ flex: 1 }}>
-          <FriendButton profileId={id} />
+      <ProfileHeader profile={profile} gamesCount={games.length}>
+        <View style={styles.actions}>
+          <View style={{ flex: 1 }}>
+            <FriendButton profileId={id} />
+          </View>
+          <Button title="Message" icon="chatbubble-outline" variant="secondary" onPress={message} loading={messaging} style={{ flex: 1 }} />
         </View>
-        <Button title="Message" icon="chatbubble-outline" variant="secondary" onPress={message} loading={messaging} style={{ flex: 1 }} />
+      </ProfileHeader>
+
+      <View style={styles.section}>
+        <ProfileGamesList games={games} />
       </View>
-      <Divider />
-      <ProfileGamesList games={games} />
-      <Divider />
-      <View style={styles.actions}>
-        <Button title="Report" icon="flag-outline" variant="ghost" size="sm" onPress={() => openReport('profile', id)} style={{ flex: 1 }} />
-        <Button title="Block" icon="ban-outline" variant="ghost" size="sm" onPress={confirmBlock} loading={busy} style={{ flex: 1 }} />
+
+      <Text variant="heading" style={styles.groupTitle}>Safety</Text>
+      <View style={styles.group}>
+        <ActionRow icon="flag-outline" label="Report player" onPress={() => openReport('profile', id)} />
+        <ActionRow icon="ban-outline" label={busy ? 'Blocking…' : 'Block player'} danger disabled={busy} onPress={confirmBlock} last />
       </View>
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  actions: { flexDirection: 'row', gap: spacing.md },
-  menuBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-});
+const useStyles = makeStyles((t) =>
+  StyleSheet.create({
+    actions: { flexDirection: 'row', gap: spacing.md },
+    menuBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+    section: { marginTop: spacing.xl },
+    groupTitle: { marginTop: spacing.xl, marginBottom: spacing.sm },
+    group: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.colors.border },
+  }),
+);

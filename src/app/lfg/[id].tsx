@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
-import { Avatar, Button, Card, Divider, EmptyState, ErrorState, LoadingState, Screen, Text, TextField, type IconName } from '../../components/ui';
+import { Avatar, Button, Card, EmptyState, ErrorState, LoadingState, PanelFrame, Screen, SegmentBar, Text, TextField, type IconName } from '../../components/ui';
 import { useGames } from '../../features/games/useGames';
 import {
   acceptLfgRequest,
@@ -22,7 +22,7 @@ import { openDm, openReport } from '../../lib/actions';
 import { errorMessage } from '../../lib/supabase';
 import type { LfgPostWithAuthor, RequestStatus } from '../../lib/types';
 import { useUserId } from '../../providers/AuthProvider';
-import { colors, font, radius, spacing } from '../../theme';
+import { fontSize, makeStyles, spacing, useTheme, type AppTheme } from '../../theme';
 
 function openChat(conversationId: string) {
   router.push({ pathname: '/chat/[id]', params: { id: conversationId } });
@@ -32,13 +32,18 @@ function openProfile(id: string) {
   router.push({ pathname: '/user/[id]', params: { id } });
 }
 
-function Fact({ icon, label, value, tint }: { icon: IconName; label: string; value: string; tint?: string }) {
+/** A fact inside the dark hero panel (onPanel colours). */
+function Fact({ icon, label, value, highlight }: { icon: IconName; label: string; value: string; highlight?: boolean }) {
+  const t = useTheme();
+  const styles = useStyles();
   return (
     <View style={styles.fact} accessible accessibilityLabel={`${label}: ${value}`}>
-      <Ionicons name={icon} size={16} color={tint ?? colors.textMuted} />
+      <Ionicons name={icon} size={16} color={highlight ? t.colors.primary : t.colors.onPanel} style={{ opacity: highlight ? 1 : 0.75 }} />
       <View style={{ marginLeft: spacing.sm, flexShrink: 1 }}>
-        <Text variant="caption">{label}</Text>
-        <Text style={[styles.factValue, tint ? { color: tint } : null]} numberOfLines={1}>
+        <Text variant="caption" style={styles.factLabel}>
+          {label}
+        </Text>
+        <Text style={styles.factValue} numberOfLines={1}>
           {value}
         </Text>
       </View>
@@ -46,20 +51,43 @@ function Fact({ icon, label, value, tint }: { icon: IconName; label: string; val
   );
 }
 
-const STATUS_STYLE: Record<RequestStatus, { label: string; color: string; icon: IconName }> = {
-  pending: { label: 'Pending', color: colors.warning, icon: 'time-outline' },
-  accepted: { label: 'Accepted', color: colors.accent, icon: 'checkmark' },
-  declined: { label: 'Declined', color: colors.textFaint, icon: 'close' },
-};
+function statusStyle(t: AppTheme, status: RequestStatus): { label: string; color: string; icon: IconName } {
+  switch (status) {
+    case 'pending':
+      return { label: 'Pending', color: t.colors.warning, icon: 'time-outline' };
+    case 'accepted':
+      return { label: 'Accepted', color: t.colors.accent, icon: 'checkmark' };
+    case 'declined':
+      return { label: 'Declined', color: t.colors.textFaint, icon: 'close' };
+  }
+}
 
 function StatusBadge({ status }: { status: RequestStatus }) {
-  const s = STATUS_STYLE[status];
+  const t = useTheme();
+  const styles = useStyles();
+  const st = statusStyle(t, status);
   return (
-    <View style={[styles.badge, { borderColor: s.color }]}>
-      <Ionicons name={s.icon} size={12} color={s.color} />
-      <Text variant="caption" style={{ color: s.color, marginLeft: 3, fontWeight: font.weight.semibold }}>
-        {s.label}
+    <View style={[styles.badge, { borderColor: st.color }]}>
+      <Ionicons name={st.icon} size={12} color={st.color} />
+      <Text variant="caption" style={{ color: st.color, marginLeft: 3, fontFamily: t.fonts.bodyBold }}>
+        {st.label}
       </Text>
+    </View>
+  );
+}
+
+/** A ruled section: hairline on top, heading, optional right-side content. */
+function Section({ title, right, children }: { title: string; right?: ReactNode; children: ReactNode }) {
+  const styles = useStyles();
+  return (
+    <View style={styles.section}>
+      <View style={styles.rowBetween}>
+        <Text variant="heading" accessibilityRole="header">
+          {title}
+        </Text>
+        {right}
+      </View>
+      {children}
     </View>
   );
 }
@@ -76,6 +104,8 @@ function RequesterPanel({
   joinable: boolean;
   onPostStale: () => void;
 }) {
+  const t = useTheme();
+  const styles = useStyles();
   const { request, loading, error, reload } = useMyLfgRequest(post.id, myId, true);
   const acceptedWithoutChat = request?.status === 'accepted' && !post.conversation_id;
 
@@ -127,11 +157,7 @@ function RequesterPanel({
 
   if (request) {
     return (
-      <Card style={styles.panel}>
-        <View style={styles.rowBetween}>
-          <Text variant="heading">Your request</Text>
-          <StatusBadge status={request.status} />
-        </View>
+      <Section title="Your request" right={<StatusBadge status={request.status} />}>
         {request.message ? (
           <Text muted style={{ marginTop: spacing.sm }}>
             “{request.message}”
@@ -148,39 +174,37 @@ function RequesterPanel({
         {request.status === 'accepted' ? (
           post.conversation_id ? (
             <Button
-              title="Open squad chat"
+              title={`Open ${t.words.squad} chat`}
               icon="chatbubbles-outline"
               onPress={() => openChat(post.conversation_id!)}
               style={{ marginTop: spacing.md }}
             />
           ) : (
             <Text variant="caption" style={{ marginTop: spacing.sm }}>
-              You're in! The squad chat will appear here shortly.
+              You're in! The {t.words.squad} chat will appear here shortly.
             </Text>
           )
         ) : null}
         {request.status === 'declined' ? (
           <Text variant="caption" style={{ marginTop: spacing.sm }}>
-            Not this time — there are plenty of other squads on the board.
+            Not this time — there are plenty of other open {t.words.lobbies === 'Lobbies' ? 'lobbies' : `posts in the ${t.words.lobbies}`}.
           </Text>
         ) : null}
-      </Card>
+      </Section>
     );
   }
 
   if (!joinable) {
     return (
-      <Card style={styles.panel}>
+      <View style={styles.section}>
         <Text muted>This post isn't taking requests any more.</Text>
-      </Card>
+      </View>
     );
   }
 
   return (
-    <Card style={styles.panel}>
-      <Text variant="heading" style={{ marginBottom: spacing.md }}>
-        Want in?
-      </Text>
+    <Section title="Want in?">
+      <View style={{ height: spacing.md }} />
       <TextField
         label="Message to the host (optional)"
         placeholder="e.g. Diamond IGL, mic on, free till midnight"
@@ -190,8 +214,14 @@ function RequesterPanel({
         multiline
         hint={`${message.length}/${LFG_LIMITS.requestMessage}`}
       />
-      <Button title="Request to join" icon="person-add-outline" onPress={send} loading={busy} />
-    </Card>
+      <Button
+        title={t.words.squadUp}
+        accessibilityLabel={`${t.words.squadUp}: request to join`}
+        icon="person-add-outline"
+        onPress={send}
+        loading={busy}
+      />
+    </Section>
   );
 }
 
@@ -209,6 +239,7 @@ function RequestRow({
   busy: boolean;
   canAccept: boolean;
 }) {
+  const styles = useStyles();
   const name = req.requester?.display_name || req.requester?.username || 'Player';
   return (
     <View style={styles.requestRow}>
@@ -220,7 +251,7 @@ function RequestRow({
       >
         <Avatar uri={req.requester?.avatar_url} name={name} size={40} />
         <View style={{ marginLeft: spacing.md, flex: 1 }}>
-          <Text numberOfLines={1} style={{ fontWeight: font.weight.semibold }}>
+          <Text variant="strong" numberOfLines={1}>
             {name}
           </Text>
           <Text variant="caption" numberOfLines={1}>
@@ -253,6 +284,8 @@ function RequestRow({
 }
 
 function AuthorPanel({ post, joinable, onChanged }: { post: LfgPostWithAuthor; joinable: boolean; onChanged: () => void }) {
+  const t = useTheme();
+  const styles = useStyles();
   const { requests, loading, error, reload } = useLfgRequests(post.id, true);
   const { blockedIds } = useBlockedIds();
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -289,7 +322,7 @@ function AuthorPanel({ post, joinable, onChanged }: { post: LfgPostWithAuthor; j
   };
 
   const close = () => {
-    Alert.alert('Close this post?', 'It will leave the board and stop taking requests. Your squad chat stays.', [
+    Alert.alert('Close this post?', `It will leave the board and stop taking requests. Your ${t.words.squad} chat stays.`, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Close post',
@@ -333,19 +366,23 @@ function AuthorPanel({ post, joinable, onChanged }: { post: LfgPostWithAuthor; j
     <>
       {post.conversation_id ? (
         <Button
-          title="Open squad chat"
+          title={`Open ${t.words.squad} chat`}
           icon="chatbubbles-outline"
           onPress={() => openChat(post.conversation_id!)}
-          style={{ marginBottom: spacing.lg }}
+          style={{ marginTop: spacing.lg }}
         />
       ) : null}
 
-      <Card style={styles.panel}>
-        <View style={styles.rowBetween}>
-          <Text variant="heading">Join requests</Text>
-          <Text variant="caption">
+      <Section
+        title="Join requests"
+        right={
+          <Text variant="caption" style={{ color: t.colors.textMuted }}>
             {acceptedCount}/{post.slots_needed} filled
           </Text>
+        }
+      >
+        <View style={styles.segment}>
+          <SegmentBar filled={Math.min(acceptedCount, post.slots_needed)} total={post.slots_needed} />
         </View>
         {loading ? (
           <View style={{ paddingVertical: spacing.xl }}>
@@ -373,15 +410,15 @@ function AuthorPanel({ post, joinable, onChanged }: { post: LfgPostWithAuthor; j
                 onDecline={() => void decline(r)}
               />
             ))}
-            {pending.length > 0 && decided.length > 0 ? <Divider /> : null}
+            {pending.length > 0 && decided.length > 0 ? <View style={styles.rule} /> : null}
             {decided.map((r) => (
               <RequestRow key={r.id} req={r} busy={false} canAccept={false} onAccept={() => {}} onDecline={() => {}} />
             ))}
           </>
         )}
-      </Card>
+      </Section>
 
-      <View style={styles.ownerActions}>
+      <View style={[styles.ownerActions, styles.section]}>
         {post.status === 'open' ? (
           <Button title="Close post" icon="lock-closed-outline" variant="secondary" onPress={close} disabled={postBusy} style={{ flex: 1 }} />
         ) : null}
@@ -393,6 +430,8 @@ function AuthorPanel({ post, joinable, onChanged }: { post: LfgPostWithAuthor; j
 
 // ── Screen ──────────────────────────────────────────────────────────────────
 export default function LfgPostScreen() {
+  const t = useTheme();
+  const styles = useStyles();
   const { id } = useLocalSearchParams<{ id: string }>();
   const myId = useUserId();
   const { byId } = useGames();
@@ -410,7 +449,7 @@ export default function LfgPostScreen() {
         icon="search"
         title="Post not found"
         message="It may have been deleted by its author."
-        action={<Button title="Back to the board" variant="secondary" onPress={() => router.replace('/')} />}
+        action={<Button title={`Back to ${t.words.lobbies}`} variant="secondary" onPress={() => router.replace('/')} />}
       />
     );
   } else {
@@ -422,71 +461,84 @@ export default function LfgPostScreen() {
 
     let banner: { text: string; icon: IconName } | null = null;
     if (post.status === 'closed') banner = { text: 'This post is closed.', icon: 'lock-closed-outline' };
-    else if (post.status === 'full') banner = { text: 'Squad is full.', icon: 'people' };
+    else if (post.status === 'full') banner = { text: `${t.words.squad.charAt(0).toUpperCase()}${t.words.squad.slice(1)} is full.`, icon: 'people' };
     else if (expired) banner = { text: 'This post has expired.', icon: 'hourglass-outline' };
 
     content = (
       <Screen scroll edges={['bottom']}>
-        <Stack.Screen options={{ title: game?.name ?? 'Squad post' }} />
+        <Stack.Screen options={{ title: game?.name ?? 'Lobby' }} />
 
         {banner ? (
           <View style={styles.banner} accessibilityRole="alert">
-            <Ionicons name={banner.icon} size={16} color={colors.warning} />
+            <Ionicons name={banner.icon} size={16} color={t.colors.warning} />
             <Text style={styles.bannerText}>{banner.text}</Text>
           </View>
         ) : null}
 
-        <View style={styles.hero}>
-          <Text style={styles.heroEmoji}>{game?.emoji ?? '🎮'}</Text>
-          <View style={{ flex: 1 }}>
-            <Text variant="label">{game?.name ?? post.game_id}</Text>
-            <Text variant="caption">
-              Posted {timeAgo(post.created_at)} · {post.status === 'open' ? expiresIn(post.expires_at) : post.status}
-            </Text>
+        <Card tone="panel" style={styles.hero}>
+          <Text style={styles.heroGame} numberOfLines={1}>
+            {game?.emoji ? `${game.emoji}  ` : ''}
+            {game?.name ?? post.game_id}
+          </Text>
+          <Text style={styles.heroTitle} accessibilityRole="header">
+            {post.title}
+          </Text>
+          <Text variant="caption" style={styles.heroMeta}>
+            Posted {timeAgo(post.created_at)} · {post.status === 'open' ? expiresIn(post.expires_at) : post.status}
+          </Text>
+
+          <View style={styles.facts}>
+            <Fact icon="people" label="Need" value={`${post.slots_needed} ${post.slots_needed === 1 ? 'player' : 'players'}`} highlight />
+            <Fact icon="trophy-outline" label="Rank" value={post.rank ?? 'Any'} />
+            <Fact icon="globe-outline" label="Region" value={regionLabel(post.region)} />
+            <Fact icon="language-outline" label="Language" value={post.language} />
+            <Fact
+              icon={post.mic_required ? 'mic' : 'mic-off-outline'}
+              label="Mic"
+              value={post.mic_required ? 'Required' : 'Optional'}
+              highlight={post.mic_required}
+            />
           </View>
-        </View>
+          <PanelFrame />
+        </Card>
 
-        <Text variant="title" style={styles.title}>
-          {post.title}
-        </Text>
-        {post.description ? <Text style={styles.description}>{post.description}</Text> : null}
-
-        <View style={styles.facts}>
-          <Fact icon="people" label="Need" value={`${post.slots_needed} ${post.slots_needed === 1 ? 'player' : 'players'}`} tint={colors.accent} />
-          <Fact icon="trophy-outline" label="Rank" value={post.rank ?? 'Any'} />
-          <Fact icon="globe-outline" label="Region" value={regionLabel(post.region)} />
-          <Fact icon="language-outline" label="Language" value={post.language} />
-          <Fact
-            icon={post.mic_required ? 'mic' : 'mic-off-outline'}
-            label="Mic"
-            value={post.mic_required ? 'Required' : 'Optional'}
-            tint={post.mic_required ? colors.primary : undefined}
-          />
-        </View>
-
-        <Pressable
-          onPress={() => openProfile(post.author_id)}
-          accessibilityRole="button"
-          accessibilityLabel={`Posted by ${authorName}. View profile.`}
-          style={({ pressed }) => [styles.authorRow, pressed && { backgroundColor: colors.surfaceRaised }]}
-        >
-          <Avatar uri={post.author?.avatar_url} name={authorName} size={40} />
-          <View style={{ marginLeft: spacing.md, flex: 1 }}>
-            <Text style={{ fontWeight: font.weight.semibold }}>
-              {authorName}
-              {isAuthor ? ' (you)' : ''}
+        {post.description ? (
+          <View style={styles.section}>
+            <Text variant="heading" accessibilityRole="header">
+              Details
             </Text>
-            <Text variant="caption">@{post.author?.username ?? 'unknown'}</Text>
+            <Text style={styles.description}>{post.description}</Text>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={colors.textFaint} />
-        </Pressable>
+        ) : null}
+
+        <View style={styles.section}>
+          <Text variant="label" style={{ marginBottom: spacing.xs }}>
+            Host
+          </Text>
+          <Pressable
+            onPress={() => openProfile(post.author_id)}
+            accessibilityRole="button"
+            accessibilityLabel={`Posted by ${authorName}. View profile.`}
+            style={({ pressed }) => [styles.authorRow, pressed && { backgroundColor: t.colors.surfaceRaised }]}
+          >
+            <Avatar uri={post.author?.avatar_url} name={authorName} size={44} />
+            <View style={{ marginLeft: spacing.md, flex: 1 }}>
+              <Text variant="strong">
+                {authorName}
+                {isAuthor ? ' (you)' : ''}
+              </Text>
+              <Text variant="caption">@{post.author?.username ?? 'unknown'}</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color={t.colors.textFaint} />
+          </Pressable>
+        </View>
 
         {isAuthor ? (
           <AuthorPanel post={post} joinable={joinable} onChanged={reload} />
         ) : (
           <>
             <RequesterPanel post={post} myId={myId} joinable={joinable} onPostStale={reload} />
-            <View style={styles.ownerActions}>
+            <View style={[styles.ownerActions, styles.section]}>
               <Button
                 title="Message host"
                 icon="chatbubble-ellipses-outline"
@@ -512,57 +564,68 @@ export default function LfgPostScreen() {
   return <Screen edges={['bottom']}>{content}</Screen>;
 }
 
-const styles = StyleSheet.create({
-  banner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginTop: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.warning,
-    backgroundColor: colors.surface,
-  },
-  bannerText: { color: colors.warning, fontWeight: font.weight.medium },
-  hero: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.lg },
-  heroEmoji: { fontSize: 36, marginRight: spacing.md },
-  title: { marginTop: spacing.md, fontSize: font.size.xl },
-  description: { marginTop: spacing.sm, color: colors.textMuted, lineHeight: 22 },
-  facts: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: spacing.lg,
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    rowGap: spacing.md,
-  },
-  fact: { flexDirection: 'row', alignItems: 'center', width: '50%', paddingRight: spacing.sm },
-  factValue: { fontSize: font.size.sm, fontWeight: font.weight.semibold },
-  authorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: spacing.lg,
-    padding: spacing.sm,
-    borderRadius: radius.md,
-    minHeight: 56,
-  },
-  panel: { marginBottom: spacing.lg },
-  rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-  },
-  requestRow: { marginTop: spacing.md },
-  requesterTap: { flexDirection: 'row', alignItems: 'center', minHeight: 44 },
-  requestMessage: { marginTop: spacing.sm, marginLeft: 40 + spacing.md },
-  requestActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, marginLeft: 40 + spacing.md },
-  ownerActions: { flexDirection: 'row', gap: spacing.sm },
+const useStyles = makeStyles((t) => {
+  const heading = {
+    letterSpacing: t.shape.headingLetterSpacing,
+    textTransform: t.shape.headingUppercase ? ('uppercase' as const) : ('none' as const),
+  };
+  return StyleSheet.create({
+    banner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      marginTop: spacing.md,
+      padding: spacing.md,
+      borderRadius: t.radius.md,
+      borderWidth: 1,
+      borderColor: t.colors.warning,
+      backgroundColor: t.colors.surface,
+    },
+    bannerText: { color: t.colors.warning, fontFamily: t.fonts.bodyMedium },
+    hero: { marginTop: spacing.lg, padding: spacing.xl },
+    heroGame: { ...heading, fontFamily: t.fonts.heading, fontSize: fontSize.sm, color: t.colors.onPanel, opacity: 0.75 },
+    heroTitle: {
+      ...heading,
+      fontFamily: t.fonts.display,
+      fontSize: 44,
+      lineHeight: 46,
+      color: t.colors.onPanel,
+      marginTop: spacing.sm,
+    },
+    heroMeta: { color: t.colors.onPanel, opacity: 0.75, marginTop: spacing.sm },
+    facts: { flexDirection: 'row', flexWrap: 'wrap', marginTop: spacing.lg, rowGap: spacing.md },
+    fact: { flexDirection: 'row', alignItems: 'center', width: '50%', paddingRight: spacing.sm },
+    factLabel: { color: t.colors.onPanel, opacity: 0.7 },
+    factValue: { fontSize: fontSize.sm, fontFamily: t.fonts.bodyBold, color: t.colors.onPanel },
+    section: {
+      marginTop: spacing.lg,
+      paddingTop: spacing.lg,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: t.colors.border,
+    },
+    rule: { height: StyleSheet.hairlineWidth, backgroundColor: t.colors.border, marginTop: spacing.md },
+    segment: { marginTop: spacing.md },
+    description: { marginTop: spacing.sm, color: t.colors.textMuted, lineHeight: 22 },
+    authorRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: spacing.sm,
+      borderRadius: t.radius.md,
+      minHeight: 56,
+    },
+    rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+    badge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderWidth: 1,
+      borderRadius: t.radius.pill,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 2,
+    },
+    requestRow: { marginTop: spacing.md },
+    requesterTap: { flexDirection: 'row', alignItems: 'center', minHeight: 44 },
+    requestMessage: { marginTop: spacing.sm, marginLeft: 40 + spacing.md },
+    requestActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, marginLeft: 40 + spacing.md },
+    ownerActions: { flexDirection: 'row', gap: spacing.sm },
+  });
 });

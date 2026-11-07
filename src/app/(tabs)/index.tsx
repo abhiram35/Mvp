@@ -2,16 +2,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
-import { Button, EmptyState, ErrorState, LoadingState, Screen, Text } from '../../components/ui';
+import { Button, EmptyState, ErrorState, LoadingState, Screen, ScreenHeader, Text } from '../../components/ui';
 import { useGames } from '../../features/games/useGames';
 import { useLfgPosts, useNewLfgPostsCount } from '../../features/lfg/api';
-import { REGIONS, regionLabel } from '../../features/lfg/format';
+import { hostCta, REGIONS, regionLabel } from '../../features/lfg/format';
 import { GameChipScroller, HorizontalChips } from '../../features/lfg/HorizontalChips';
 import { LfgPostCard } from '../../features/lfg/LfgPostCard';
 import { useBlockedIds } from '../../features/safety/blocks';
 import { LANGUAGES, type LfgPostWithAuthor, type Region } from '../../lib/types';
 import { useUserId } from '../../providers/AuthProvider';
-import { colors, font, radius, spacing } from '../../theme';
+import { fontSize, makeStyles, spacing, useTheme } from '../../theme';
 
 const REGION_OPTIONS = REGIONS.map((r) => ({ value: r, label: regionLabel(r) }));
 const LANGUAGE_OPTIONS = LANGUAGES.map((l) => ({ value: l as string, label: l as string }));
@@ -27,6 +27,8 @@ function useNow(intervalMs = 60_000) {
 }
 
 export default function LfgBoardScreen() {
+  const t = useTheme();
+  const styles = useStyles();
   const myId = useUserId();
   const { byId } = useGames();
   const { blockedIds } = useBlockedIds();
@@ -75,7 +77,7 @@ export default function LfgBoardScreen() {
 
   let body: ReactNode;
   if (loading && posts.length === 0) {
-    body = <LoadingState label="Finding squads…" />;
+    body = <LoadingState label={`Loading ${t.words.lobbies.toLowerCase()}…`} />;
   } else if (error && posts.length === 0) {
     body = <ErrorState message={error} onRetry={retry} />;
   } else {
@@ -85,13 +87,13 @@ export default function LfgBoardScreen() {
         keyExtractor={(p) => p.id}
         renderItem={renderItem}
         contentContainerStyle={[styles.list, visible.length === 0 && { flexGrow: 1 }]}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} colors={[colors.primary]} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={t.colors.primary} colors={[t.colors.primary]} progressBackgroundColor={t.colors.surface} />}
         ListEmptyComponent={
           <EmptyState
             icon="flash-outline"
-            title={gameId || region || language ? 'No squads match these filters' : 'No open squads right now'}
-            message="Be the first — post what you're playing and let teammates come to you."
-            action={<Button title="Post an LFG" icon="add" onPress={() => router.push('/lfg/new')} />}
+            title={gameId || region || language ? 'No lobbies match these filters' : 'No open lobbies right now'}
+            message="Be the first — host what you're playing and let teammates come to you."
+            action={<Button title={hostCta(t.words)} icon="add" onPress={() => router.push('/lfg/new')} />}
           />
         }
       />
@@ -101,10 +103,11 @@ export default function LfgBoardScreen() {
   return (
     <Screen padded={false}>
       <View style={styles.header}>
-        <Text variant="title" style={styles.title} accessibilityRole="header">
-          Looking for group
-        </Text>
-        <Button title="Post" icon="add" size="sm" onPress={() => router.push('/lfg/new')} style={styles.postButton} />
+        <ScreenHeader
+          title={t.words.lobbies}
+          subtitle="Open lobbies you can join now"
+          right={<Button title="Host" icon="add" size="sm" onPress={() => router.push('/lfg/new')} style={styles.hostButton} accessibilityLabel={hostCta(t.words)} />}
+        />
       </View>
 
       <View style={styles.filters}>
@@ -113,16 +116,20 @@ export default function LfgBoardScreen() {
             <GameChipScroller value={gameId} onChange={setGameId} allowAll />
           </View>
           <Pressable
-            onPress={() => setShowFilters((s) => !s)}
+            onPress={() => setShowFilters((v) => !v)}
             accessibilityRole="button"
             accessibilityLabel={`${showFilters ? 'Hide' : 'Show'} region and language filters${
               activeExtraFilters ? `, ${activeExtraFilters} active` : ''
             }`}
             accessibilityState={{ expanded: showFilters }}
-            style={[styles.filterToggle, (showFilters || activeExtraFilters > 0) && styles.filterToggleActive]}
+            style={({ pressed }) => [
+              styles.filterToggle,
+              (showFilters || activeExtraFilters > 0) && styles.filterToggleActive,
+              pressed && { backgroundColor: t.colors.surfaceRaised },
+            ]}
             hitSlop={6}
           >
-            <Ionicons name="options-outline" size={18} color={activeExtraFilters ? colors.primary : colors.textMuted} />
+            <Ionicons name="options-outline" size={18} color={activeExtraFilters ? t.colors.primary : t.colors.textMuted} />
             {activeExtraFilters ? <Text style={styles.filterCount}>{activeExtraFilters}</Text> : null}
           </Pressable>
         </View>
@@ -140,10 +147,10 @@ export default function LfgBoardScreen() {
           <Pressable
             onPress={onRefresh}
             accessibilityRole="button"
-            accessibilityLabel="New posts available. Tap to refresh."
-            style={styles.newPill}
+            accessibilityLabel={`New ${t.words.lobbies.toLowerCase()} available. Tap to refresh.`}
+            style={({ pressed }) => [styles.newPill, pressed && { backgroundColor: t.colors.primaryPressed }]}
           >
-            <Ionicons name="arrow-up" size={14} color={colors.onPrimary} />
+            <Ionicons name="arrow-up" size={14} color={t.colors.onPrimary} />
             <Text style={styles.newPillText}>New posts — tap to refresh</Text>
           </Pressable>
         ) : null}
@@ -152,51 +159,56 @@ export default function LfgBoardScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    paddingBottom: spacing.sm,
-  },
-  title: { fontSize: font.size.xl, flexShrink: 1, marginRight: spacing.md },
-  postButton: { minHeight: 44 },
-  filters: { paddingLeft: spacing.lg, paddingBottom: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-  filterLine: { flexDirection: 'row', alignItems: 'center' },
-  filterToggle: {
-    width: 44,
-    height: 44,
-    marginHorizontal: spacing.sm,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  filterToggleActive: { borderColor: colors.primary },
-  filterCount: { color: colors.primary, fontSize: font.size.xs, fontWeight: font.weight.bold, marginLeft: 2 },
-  extraFilters: { gap: spacing.sm, marginTop: spacing.sm },
-  list: { padding: spacing.lg },
-  newPill: {
-    position: 'absolute',
-    top: spacing.md,
-    alignSelf: 'center',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs,
-    backgroundColor: colors.primary,
-    borderRadius: radius.pill,
-    paddingHorizontal: spacing.lg,
-    minHeight: 36,
-    shadowColor: colors.bg,
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
-  },
-  newPillText: { color: colors.onPrimary, fontSize: font.size.sm, fontWeight: font.weight.semibold },
-});
+const useStyles = makeStyles((t) =>
+  StyleSheet.create({
+    header: { paddingHorizontal: spacing.lg },
+    hostButton: { minHeight: 44 },
+    filters: {
+      paddingLeft: spacing.lg,
+      paddingBottom: spacing.sm,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: t.colors.border,
+    },
+    filterLine: { flexDirection: 'row', alignItems: 'center' },
+    filterToggle: {
+      width: 44,
+      height: 44,
+      marginHorizontal: spacing.sm,
+      borderRadius: t.radius.md,
+      borderWidth: 1,
+      borderColor: t.colors.border,
+      backgroundColor: t.colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexDirection: 'row',
+    },
+    filterToggleActive: { borderColor: t.colors.primary },
+    filterCount: { color: t.colors.primary, fontSize: fontSize.xs, fontFamily: t.fonts.bodyBold, marginLeft: 2 },
+    extraFilters: { gap: spacing.sm, marginTop: spacing.sm },
+    list: { paddingBottom: spacing.xxl },
+    newPill: {
+      position: 'absolute',
+      top: spacing.md,
+      alignSelf: 'center',
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      backgroundColor: t.colors.primary,
+      borderRadius: t.radius.pill,
+      paddingHorizontal: spacing.lg,
+      minHeight: 44,
+      shadowColor: t.colors.panel,
+      shadowOpacity: t.dark ? 0.5 : 0.2,
+      shadowRadius: 8,
+      shadowOffset: { width: 0, height: 2 },
+      elevation: 4,
+    },
+    newPillText: {
+      color: t.colors.onPrimary,
+      fontSize: fontSize.sm,
+      fontFamily: t.fonts.heading,
+      letterSpacing: t.shape.headingLetterSpacing,
+      textTransform: t.shape.headingUppercase ? 'uppercase' : 'none',
+    },
+  }),
+);

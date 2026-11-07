@@ -61,8 +61,8 @@ function RootNavigator() {
       <Stack.Protected guard={onboarded} redirectTo={home}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         {/* LFG agent */}
-        <Stack.Screen name="lfg/new" options={{ title: 'New squad post', presentation: 'modal' }} />
-        <Stack.Screen name="lfg/[id]" options={{ title: 'Squad post' }} />
+        <Stack.Screen name="lfg/new" options={{ title: 'Host lobby', presentation: 'modal' }} />
+        <Stack.Screen name="lfg/[id]" options={{ title: 'Lobby' }} />
         {/* Auth & Profile agent */}
         <Stack.Screen name="user/[id]" options={{ title: 'Player' }} />
         <Stack.Screen name="settings/edit-profile" options={{ title: 'Edit profile' }} />

@@ -18,9 +18,10 @@ import { useProfile } from '../../features/profile/useProfile';
 import { useUsernameAvailability } from '../../features/profile/useUsernameAvailability';
 import { errorMessage } from '../../lib/supabase';
 import { useAuth, useUserId } from '../../providers/AuthProvider';
-import { colors, spacing } from '../../theme';
+import { makeStyles, spacing } from '../../theme';
 
 export default function EditProfileScreen() {
+  const styles = useStyles();
   const userId = useUserId();
   const { refreshProfile } = useAuth();
   const { profile, games, loading, error, reload } = useProfile(userId);
@@ -108,7 +109,9 @@ export default function EditProfileScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  section: { marginTop: spacing.lg, marginBottom: spacing.md },
-  submitError: { color: colors.danger, textAlign: 'center', marginBottom: spacing.md },
-});
+const useStyles = makeStyles((t) =>
+  StyleSheet.create({
+    section: { marginTop: spacing.lg, marginBottom: spacing.md },
+    submitError: { color: t.colors.danger, textAlign: 'center', marginBottom: spacing.md },
+  }),
+);

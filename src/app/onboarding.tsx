@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Button, Screen, Text } from '../components/ui';
+import { Button, Screen, SegmentBar, Text } from '../components/ui';
 import { createProfile } from '../features/profile/api';
 import {
   emptyForm,
@@ -13,19 +13,29 @@ import {
   type ProfileFormValues,
 } from '../features/profile/form';
 import { AboutFields, GamesFields, IdentityFields, PrefsFields } from '../features/profile/ProfileFormFields';
+import { ThemePickerList } from '../features/profile/ThemeOptionCard';
 import { useUsernameAvailability } from '../features/profile/useUsernameAvailability';
 import { errorMessage } from '../lib/supabase';
 import { useAuth, useUserId } from '../providers/AuthProvider';
-import { colors, radius, spacing } from '../theme';
+import { makeStyles, spacing, useTheme, useThemeSwitcher } from '../theme';
 
-const STEPS = [
-  { title: 'Pick your gamer tag', subtitle: 'This is how squadmates find you.' },
-  { title: 'How do you play?', subtitle: 'We use this to match you with the right squad.' },
-  { title: 'Your games', subtitle: 'Pick what you play. Rank and role are optional.' },
-  { title: 'Finishing touches', subtitle: 'A photo and a short bio help people say yes.' },
-] as const;
+const stepsFor = (squad: string) =>
+  [
+    { title: 'Pick your gamer tag', subtitle: `This is how ${squad}mates find you.` },
+    { title: 'How do you play?', subtitle: `We use this to match you with the right ${squad}.` },
+    { title: 'Your games', subtitle: 'Pick what you play. Rank and role are optional.' },
+    { title: 'Finishing touches', subtitle: 'A photo and a short bio help people say yes.' },
+    { title: 'Pick your look', subtitle: 'Optional. Change it any time in Profile → Theme.' },
+  ] as const;
+const STEP_COUNT = 5;
+/** Index of the optional theme step (no validation; it never blocks sign-up). */
+const THEME_STEP = 4;
 
 export default function OnboardingScreen() {
+  const t = useTheme();
+  const styles = useStyles();
+  const { themeId, setThemeId } = useThemeSwitcher();
+  const STEPS = stepsFor(t.words.squad);
   const userId = useUserId();
   const { refreshProfile, signOut } = useAuth();
   const [step, setStep] = useState(0);
@@ -52,8 +62,10 @@ export default function OnboardingScreen() {
         return validatePrefs(values);
       case 2:
         return validateGames(values.games);
-      default:
+      case 3:
         return validateAbout(values);
+      default:
+        return {};
     }
   };
 
@@ -61,6 +73,17 @@ export default function OnboardingScreen() {
     const e = validateStep(step);
     setErrors(e);
     if (hasErrors(e)) return;
+    if (step === STEP_COUNT - 1) {
+      // Re-check every data step before creating the profile (the theme step has no data).
+      for (let i = 0; i < THEME_STEP; i++) {
+        const stepErrors = validateStep(i);
+        if (hasErrors(stepErrors)) {
+          setErrors(stepErrors);
+          setStep(i);
+          return;
+        }
+      }
+    }
     if (step < STEPS.length - 1) {
       setStep(step + 1);
       return;
@@ -91,14 +114,14 @@ export default function OnboardingScreen() {
     <Screen scroll edges={['top', 'bottom']}>
       <View style={styles.header}>
         <Text variant="caption" accessibilityLabel={`Step ${step + 1} of ${STEPS.length}`}>
-          STEP {step + 1} / {STEPS.length}
+          Step {step + 1} / {STEPS.length}
         </Text>
         <View
           style={styles.track}
           accessibilityRole="progressbar"
           accessibilityValue={{ min: 0, max: STEPS.length, now: step + 1 }}
         >
-          <View style={[styles.fill, { width: `${((step + 1) / STEPS.length) * 100}%` }]} />
+          <SegmentBar filled={step + 1} total={STEPS.length} height={6} />
         </View>
         <Text variant="title" style={{ marginTop: spacing.lg }}>{current.title}</Text>
         <Text muted style={{ marginTop: spacing.xs }}>{current.subtitle}</Text>
@@ -110,8 +133,10 @@ export default function OnboardingScreen() {
         <PrefsFields values={values} onChange={patch} errors={errors} />
       ) : step === 2 ? (
         <GamesFields games={values.games} onChange={(games) => patch({ games })} errors={errors} />
-      ) : (
+      ) : step === 3 ? (
         <AboutFields values={values} onChange={patch} errors={errors} displayName={values.display_name} />
+      ) : (
+        <ThemePickerList themeId={themeId} onSelect={setThemeId} />
       )}
 
       {submitError ? (
@@ -138,10 +163,11 @@ export default function OnboardingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  header: { paddingTop: spacing.xl, marginBottom: spacing.xl },
-  track: { height: 6, backgroundColor: colors.surfaceRaised, borderRadius: radius.pill, marginTop: spacing.sm, overflow: 'hidden' },
-  fill: { height: '100%', backgroundColor: colors.primary, borderRadius: radius.pill },
-  submitError: { color: colors.danger, textAlign: 'center', marginBottom: spacing.md },
-  actions: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.md },
-});
+const useStyles = makeStyles((t) =>
+  StyleSheet.create({
+    header: { paddingTop: spacing.xl, marginBottom: spacing.xl },
+    track: { marginTop: spacing.sm },
+    submitError: { color: t.colors.danger, textAlign: 'center', marginBottom: spacing.md },
+    actions: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.xl },
+  }),
+);

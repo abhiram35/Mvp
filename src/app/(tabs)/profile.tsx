@@ -1,7 +1,7 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
-import { Button, Divider, EmptyState, ErrorState, LoadingState, Screen } from '../../components/ui';
+import { Button, EmptyState, ErrorState, LoadingState, Screen, ScreenHeader, Text } from '../../components/ui';
 import { ActionRow } from '../../features/profile/ActionRow';
 import { ProfileGamesList } from '../../features/profile/ProfileGamesList';
 import { ProfileHeader } from '../../features/profile/ProfileHeader';
@@ -9,9 +9,11 @@ import { useProfile } from '../../features/profile/useProfile';
 import { showCommunityGuidelines } from '../../features/safety/guidelines';
 import { errorMessage, supabase } from '../../lib/supabase';
 import { useAuth, useUserId } from '../../providers/AuthProvider';
-import { colors, radius, spacing } from '../../theme';
+import { makeStyles, spacing, useTheme } from '../../theme';
 
 export default function MyProfileScreen() {
+  const t = useTheme();
+  const styles = useStyles();
   const userId = useUserId();
   const { signOut } = useAuth();
   const { profile, games, loading, error, reload } = useProfile(userId);
@@ -94,32 +96,35 @@ export default function MyProfileScreen() {
 
   return (
     <Screen scroll>
-      <ProfileHeader profile={profile} />
-      <Button title="Edit profile" icon="create-outline" variant="secondary" onPress={() => router.push('/settings/edit-profile')} />
-      <Divider />
-      <ProfileGamesList games={games} />
-      <Divider />
+      <ScreenHeader title="Profile" />
+      <ProfileHeader profile={profile} gamesCount={games.length} own>
+        <Button title="Edit profile" icon="create-outline" variant="secondary" onPress={() => router.push('/settings/edit-profile')} />
+      </ProfileHeader>
 
-      <View style={styles.group}>
-        <ActionRow icon="people-outline" label="Friends" onPress={() => router.push('/friends')} />
-        <ActionRow icon="ban-outline" label="Blocked players" onPress={() => router.push('/settings/blocked')} />
-        <ActionRow icon="shield-checkmark-outline" label="Community guidelines" onPress={showCommunityGuidelines} />
+      <View style={styles.section}>
+        <ProfileGamesList games={games} />
       </View>
 
-      <View style={[styles.group, { marginTop: spacing.lg }]}>
+      <Text variant="heading" style={styles.groupTitle}>Settings</Text>
+      <View style={styles.group}>
+        <ActionRow icon="color-palette-outline" label="Theme" value={t.name} onPress={() => router.push('/settings/theme')} />
+        <ActionRow icon="people-outline" label="Friends" onPress={() => router.push('/friends')} />
+        <ActionRow icon="ban-outline" label="Blocked players" onPress={() => router.push('/settings/blocked')} />
+        <ActionRow icon="shield-checkmark-outline" label="Community guidelines" onPress={showCommunityGuidelines} last />
+      </View>
+
+      <View style={[styles.group, { marginTop: spacing.xl }]}>
         <ActionRow icon="log-out-outline" label="Sign out" onPress={confirmSignOut} />
-        <ActionRow icon="trash-outline" label={deleting ? 'Deleting…' : 'Delete account'} danger disabled={deleting} onPress={confirmDelete} />
+        <ActionRow icon="trash-outline" label={deleting ? 'Deleting…' : 'Delete account'} danger disabled={deleting} onPress={confirmDelete} last />
       </View>
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  group: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    overflow: 'hidden',
-  },
-});
+const useStyles = makeStyles((t) =>
+  StyleSheet.create({
+    section: { marginTop: spacing.xl },
+    groupTitle: { marginTop: spacing.xl, marginBottom: spacing.sm },
+    group: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.colors.border },
+  }),
+);

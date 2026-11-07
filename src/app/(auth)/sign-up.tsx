@@ -4,10 +4,10 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Button, EmptyState, Screen, Text, TextField } from '../../components/ui';
 import { Checkbox } from '../../features/profile/Checkbox';
-import { Wordmark } from '../../features/profile/Wordmark';
+import { AuthHero } from '../../features/profile/AuthHero';
 import { showCommunityGuidelines, showTerms } from '../../features/safety/guidelines';
 import { errorMessage, supabase } from '../../lib/supabase';
-import { colors, font, spacing } from '../../theme';
+import { makeStyles, spacing, useTheme } from '../../theme';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const MIN_PASSWORD = 8;
@@ -15,6 +15,8 @@ const MIN_PASSWORD = 8;
 type Errors = Partial<Record<'email' | 'password' | 'confirm' | 'age' | 'terms' | 'form', string>>;
 
 export default function SignUpScreen() {
+  const t = useTheme();
+  const styles = useStyles();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -68,11 +70,11 @@ export default function SignUpScreen() {
           accessibilityLabel="Back to sign in"
           style={styles.back}
         >
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
+          <Ionicons name="chevron-back" size={24} color={t.colors.text} />
         </Pressable>
 
-        <Wordmark compact />
-        <Text variant="heading" style={{ marginBottom: spacing.lg }}>Create your account</Text>
+        <AuthHero />
+        <Text variant="heading" style={{ marginBottom: spacing.lg }}>Create your player card</Text>
 
         <TextField
           label="Email"
@@ -130,13 +132,30 @@ export default function SignUpScreen() {
         {errors.form ? <Text style={styles.formError} accessibilityLiveRegion="polite">{errors.form}</Text> : null}
 
         <Button title="Create account" icon="rocket-outline" onPress={signUp} loading={loading} style={{ marginTop: spacing.md }} />
+
+        <View style={styles.footer}>
+          <Text muted>Already have a player card? </Text>
+          <Pressable
+            onPress={() => router.replace('/(auth)/sign-in')}
+            accessibilityRole="link"
+            accessibilityLabel="Already have a player card? Sign in"
+            hitSlop={12}
+            style={styles.linkTarget}
+          >
+            <Text variant="strong" style={{ color: t.colors.primary }}>Sign in</Text>
+          </Pressable>
+        </View>
       </KeyboardAvoidingView>
     </Screen>
   );
 }
 
-const styles = StyleSheet.create({
-  back: { width: 44, height: 44, justifyContent: 'center', marginTop: spacing.sm, marginBottom: spacing.sm },
-  link: { color: colors.primary, fontWeight: font.weight.semibold },
-  formError: { color: colors.danger, marginVertical: spacing.md, textAlign: 'center' },
-});
+const useStyles = makeStyles((t) =>
+  StyleSheet.create({
+    back: { width: 44, height: 44, justifyContent: 'center', marginTop: spacing.sm, marginBottom: spacing.md },
+    link: { color: t.colors.primary, fontFamily: t.fonts.bodyBold },
+    formError: { color: t.colors.danger, marginVertical: spacing.md, textAlign: 'center' },
+    footer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', marginTop: spacing.xl },
+    linkTarget: { minHeight: 44, justifyContent: 'center' },
+  }),
+);

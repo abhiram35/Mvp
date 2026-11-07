@@ -2,13 +2,15 @@ import { Link } from 'expo-router';
 import { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Button, Screen, Text, TextField } from '../../components/ui';
-import { Wordmark } from '../../features/profile/Wordmark';
+import { AuthHero } from '../../features/profile/AuthHero';
 import { errorMessage, supabase } from '../../lib/supabase';
-import { colors, font, spacing } from '../../theme';
+import { makeStyles, spacing, useTheme } from '../../theme';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function SignInScreen() {
+  const t = useTheme();
+  const styles = useStyles();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<{ email?: string; password?: string; form?: string }>({});
@@ -46,7 +48,7 @@ export default function SignInScreen() {
     <Screen scroll>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.hero}>
-          <Wordmark />
+          <AuthHero />
         </View>
 
         <TextField
@@ -81,7 +83,7 @@ export default function SignInScreen() {
           style={styles.forgot}
           hitSlop={8}
         >
-          <Text style={{ color: colors.primary }}>{resetting ? 'Sending…' : 'Forgot password?'}</Text>
+          <Text variant="strong" style={{ color: t.colors.primary }}>{resetting ? 'Sending…' : 'Forgot password?'}</Text>
         </Pressable>
 
         {errors.form ? (
@@ -93,8 +95,8 @@ export default function SignInScreen() {
         <View style={styles.footer}>
           <Text muted>New to GG? </Text>
           <Link href="/(auth)/sign-up" asChild>
-            <Pressable accessibilityRole="link" accessibilityLabel="Create an account" hitSlop={12} style={styles.linkTarget}>
-              <Text style={{ color: colors.primary, fontWeight: font.weight.semibold }}>Create an account</Text>
+            <Pressable accessibilityRole="link" accessibilityLabel="New to GG? Create your player card" hitSlop={12} style={styles.linkTarget}>
+              <Text variant="strong" style={{ color: t.colors.primary }}>Create your player card</Text>
             </Pressable>
           </Link>
         </View>
@@ -103,10 +105,12 @@ export default function SignInScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  hero: { paddingTop: spacing.xxl * 2 },
+const useStyles = makeStyles((t) =>
+  StyleSheet.create({
+  hero: { paddingTop: spacing.xxl * 1.5 },
   forgot: { alignSelf: 'flex-end', minHeight: 44, justifyContent: 'center', marginTop: -spacing.sm, marginBottom: spacing.md },
-  formError: { color: colors.danger, marginBottom: spacing.md, textAlign: 'center' },
-  footer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginTop: spacing.xl },
+  formError: { color: t.colors.danger, marginBottom: spacing.md, textAlign: 'center' },
+  footer: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', alignItems: 'center', marginTop: spacing.xl },
   linkTarget: { minHeight: 44, justifyContent: 'center' },
-});
+  }),
+);

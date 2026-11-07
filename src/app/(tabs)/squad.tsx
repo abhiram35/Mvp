@@ -1,9 +1,9 @@
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
-import { Button, EmptyState, ErrorState, LoadingState, Screen, Text } from '../../components/ui';
+import { Button, EmptyState, ErrorState, LoadingState, Screen, ScreenHeader, Text } from '../../components/ui';
 import { useGames } from '../../features/games/useGames';
-import { REGIONS, regionLabel } from '../../features/lfg/format';
+import { hostCta, REGIONS, regionLabel } from '../../features/lfg/format';
 import { GameChipScroller, HorizontalChips } from '../../features/lfg/HorizontalChips';
 import { useBlockedIds } from '../../features/safety/blocks';
 import { fetchMyGameIds, useSquadSearch } from '../../features/squad/api';
@@ -11,7 +11,7 @@ import { SquadmateCard } from '../../features/squad/SquadmateCard';
 import { openDm } from '../../lib/actions';
 import { LANGUAGES, PLAY_STYLE_LABELS, type PlayStyle, type Region, type SquadmateMatch } from '../../lib/types';
 import { useAuth, useUserId } from '../../providers/AuthProvider';
-import { colors, font, spacing } from '../../theme';
+import { makeStyles, spacing, useTheme } from '../../theme';
 
 const REGION_OPTIONS = REGIONS.map((r) => ({ value: r, label: regionLabel(r) }));
 const STYLE_OPTIONS = (Object.keys(PLAY_STYLE_LABELS) as PlayStyle[])
@@ -19,6 +19,8 @@ const STYLE_OPTIONS = (Object.keys(PLAY_STYLE_LABELS) as PlayStyle[])
   .map((s) => ({ value: s, label: PLAY_STYLE_LABELS[s] }));
 
 export default function SquadFinderScreen() {
+  const t = useTheme();
+  const styles = useStyles();
   const myId = useUserId();
   const { profile } = useAuth();
   const { games, byId } = useGames();
@@ -60,14 +62,16 @@ export default function SquadFinderScreen() {
     void search({ gameId, region, language, playStyle });
   };
 
+  const filterSummary = [
+    byId(gameId)?.name ?? 'Pick a game',
+    region ? regionLabel(region) : 'any region',
+    language ?? 'any language',
+    playStyle ? PLAY_STYLE_LABELS[playStyle].toLowerCase() : 'any style',
+  ].join(' · ');
+
   const header = (
     <View style={styles.headerBlock}>
-      <Text variant="title" style={styles.title} accessibilityRole="header">
-        Find your squad
-      </Text>
-      <Text muted style={{ marginBottom: spacing.lg }}>
-        Players who match your game, region, language and style.
-      </Text>
+      <ScreenHeader title="Find a duo" subtitle={filterSummary} />
 
       <GameChipScroller label="Game" value={gameId} onChange={setGameId} />
       <View style={styles.filters}>
@@ -77,7 +81,7 @@ export default function SquadFinderScreen() {
       </View>
 
       <Button
-        title="Find teammates"
+        title="Find players"
         icon="search"
         onPress={runSearch}
         disabled={!gameId}
@@ -104,7 +108,7 @@ export default function SquadFinderScreen() {
   else if (results === null)
     empty = (
       <View style={styles.stateBox}>
-        <EmptyState icon="people" title="Ready when you are" message="Set your filters and tap Find teammates." />
+        <EmptyState icon="people" title="Ready when you are" message="Set your filters and tap Find players." />
       </View>
     );
   else
@@ -113,8 +117,8 @@ export default function SquadFinderScreen() {
         <EmptyState
           icon="search"
           title="No matches yet"
-          message="Try removing a filter, or post on the LFG board so players can find you."
-          action={<Button title="Post an LFG" variant="secondary" icon="add" onPress={() => router.push('/lfg/new')} />}
+          message={`Try removing a filter, or open a post in ${t.words.lobbies} so players can find you.`}
+          action={<Button title={hostCta(t.words)} variant="secondary" icon="add" onPress={() => router.push('/lfg/new')} />}
         />
       </View>
     );
@@ -142,11 +146,18 @@ export default function SquadFinderScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
-  headerBlock: { paddingTop: spacing.md, marginBottom: spacing.md },
-  title: { fontSize: font.size.xl, marginBottom: spacing.xs },
-  filters: { gap: spacing.sm, marginTop: spacing.md },
-  resultsLabel: { marginTop: spacing.xl, color: colors.textMuted },
-  stateBox: { minHeight: 240 },
-});
+const useStyles = makeStyles((t) =>
+  StyleSheet.create({
+    list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
+    headerBlock: { marginBottom: spacing.md },
+    filters: { gap: spacing.sm, marginTop: spacing.md },
+    resultsLabel: {
+      marginTop: spacing.xl,
+      paddingTop: spacing.md,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: t.colors.border,
+      color: t.colors.textMuted,
+    },
+    stateBox: { minHeight: 240 },
+  }),
+);

@@ -1,20 +1,21 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
 import { Button, Chip, Divider, ErrorState, LoadingState, Screen, Text, TextField } from '../../components/ui';
 import { useGames } from '../../features/games/useGames';
 import { createLfgPost } from '../../features/lfg/api';
-import { DURATION_OPTIONS, LFG_LIMITS, REGIONS, regionLabel } from '../../features/lfg/format';
+import { DURATION_OPTIONS, hostCta, LFG_LIMITS, REGIONS, regionLabel } from '../../features/lfg/format';
 import { GameChipScroller, HorizontalChips } from '../../features/lfg/HorizontalChips';
 import { errorMessage } from '../../lib/supabase';
 import { LANGUAGES, type Region } from '../../lib/types';
 import { useAuth, useUserId } from '../../providers/AuthProvider';
-import { colors, font, radius, spacing } from '../../theme';
+import { fontSize, makeStyles, spacing, useTheme } from '../../theme';
 
 const REGION_OPTIONS = REGIONS.map((r) => ({ value: r, label: regionLabel(r) }));
 
 function Section({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
+  const styles = useStyles();
   return (
     <View style={styles.section}>
       <Text variant="label" style={styles.sectionLabel}>
@@ -31,6 +32,8 @@ function Section({ label, children, hint }: { label: string; children: ReactNode
 }
 
 function Stepper({ value, onChange, min, max }: { value: number; onChange: (n: number) => void; min: number; max: number }) {
+  const t = useTheme();
+  const styles = useStyles();
   const btn = (icon: 'remove' | 'add', next: number, disabled: boolean, label: string) => (
     <Pressable
       onPress={() => onChange(next)}
@@ -38,9 +41,9 @@ function Stepper({ value, onChange, min, max }: { value: number; onChange: (n: n
       accessibilityRole="button"
       accessibilityLabel={label}
       accessibilityState={{ disabled }}
-      style={({ pressed }) => [styles.stepBtn, pressed && { backgroundColor: colors.surfaceRaised }, disabled && { opacity: 0.4 }]}
+      style={({ pressed }) => [styles.stepBtn, pressed && { backgroundColor: t.colors.surfaceRaised }, disabled && { opacity: 0.4 }]}
     >
-      <Ionicons name={icon} size={20} color={colors.text} />
+      <Ionicons name={icon} size={20} color={t.colors.text} />
     </Pressable>
   );
   return (
@@ -64,6 +67,8 @@ function Stepper({ value, onChange, min, max }: { value: number; onChange: (n: n
 }
 
 export default function NewLfgPostScreen() {
+  const t = useTheme();
+  const styles = useStyles();
   const { profile } = useAuth();
   const myId = useUserId();
   const { byId, loading: gamesLoading, error: gamesError } = useGames();
@@ -112,7 +117,7 @@ export default function NewLfgPostScreen() {
       });
       router.replace({ pathname: '/lfg/[id]', params: { id } });
     } catch (e) {
-      Alert.alert("Couldn't post", errorMessage(e));
+      Alert.alert("Couldn't open the lobby", errorMessage(e));
       setSubmitting(false);
     }
   };
@@ -133,8 +138,9 @@ export default function NewLfgPostScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: t.colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <Screen scroll edges={['bottom']}>
+        <Stack.Screen options={{ title: hostCta(t.words) }} />
         <View style={{ height: spacing.lg }} />
 
         <Section label="Game *">
@@ -201,8 +207,9 @@ export default function NewLfgPostScreen() {
             value={micRequired}
             onValueChange={setMicRequired}
             accessibilityLabel="Mic required"
-            trackColor={{ false: colors.surfaceRaised, true: colors.primary }}
-            thumbColor={colors.text}
+            trackColor={{ false: t.colors.border, true: t.colors.primary }}
+            thumbColor={micRequired ? t.colors.onPrimary : t.colors.surface}
+            ios_backgroundColor={t.colors.border}
           />
         </View>
 
@@ -220,27 +227,34 @@ export default function NewLfgPostScreen() {
           Keep it friendly. Toxic, hateful or spam posts get removed and can lead to a ban.
         </Text>
 
-        <Button title="Post to LFG board" icon="flash" onPress={submit} loading={submitting} />
+        <Button title={hostCta(t.words)} icon="flash" onPress={submit} loading={submitting} />
       </Screen>
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
-  section: { marginBottom: spacing.lg },
-  sectionLabel: { marginBottom: spacing.xs },
-  error: { color: colors.danger, marginTop: spacing.xs },
-  inlineRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.sm, minHeight: 56 },
-  stepper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-  },
-  stepBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md },
-  stepValue: { minWidth: 28, textAlign: 'center', fontSize: font.size.lg, fontWeight: font.weight.bold },
-  durationRow: { flexDirection: 'row', gap: spacing.sm },
-  guidelines: { marginBottom: spacing.md, textAlign: 'center' },
-});
+const useStyles = makeStyles((t) =>
+  StyleSheet.create({
+    section: { marginBottom: spacing.lg },
+    sectionLabel: { marginBottom: spacing.xs },
+    error: { color: t.colors.danger, marginTop: spacing.xs },
+    inlineRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: spacing.sm,
+      minHeight: 56,
+    },
+    stepper: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: t.colors.surface,
+      borderWidth: 1,
+      borderColor: t.colors.border,
+      borderRadius: t.radius.md,
+    },
+    stepBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: t.radius.md },
+    stepValue: { minWidth: 28, textAlign: 'center', fontSize: fontSize.xl, fontFamily: t.fonts.display, color: t.colors.text },
+    durationRow: { flexDirection: 'row', gap: spacing.sm },
+    guidelines: { marginBottom: spacing.md, textAlign: 'center' },
+  }),
+);

@@ -1,14 +1,13 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, StyleSheet } from 'react-native';
+import { Alert, StyleSheet, View } from 'react-native';
 import { Button, Chip, ChipRow, EmptyState, Screen, Text, TextField } from '../components/ui';
 import { errorMessage, supabase } from '../lib/supabase';
 import { REPORT_REASON_LABELS, type ReportReason, type ReportTarget } from '../lib/types';
 import { useUserId } from '../providers/AuthProvider';
-import { colors, spacing } from '../theme';
+import { makeStyles, spacing, useTheme } from '../theme';
 
 const TARGETS: ReportTarget[] = ['profile', 'message', 'lfg_post'];
-const TARGET_LABELS: Record<ReportTarget, string> = { profile: 'player', message: 'message', lfg_post: 'squad post' };
 const DETAILS_MAX = 1000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -21,6 +20,9 @@ export default function ReportScreen() {
   const type = first(params.type) as ReportTarget | undefined;
   const id = first(params.id);
   const me = useUserId();
+  const t = useTheme();
+  const styles = useStyles();
+  const TARGET_LABELS: Record<ReportTarget, string> = { profile: 'player', message: 'message', lfg_post: `${t.words.squad} post` };
   const [reason, setReason] = useState<ReportReason | null>(null);
   const [details, setDetails] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -81,6 +83,7 @@ export default function ReportScreen() {
           <Chip key={r} label={REPORT_REASON_LABELS[r]} selected={reason === r} onPress={() => setReason(r)} />
         ))}
       </ChipRow>
+      <View style={{ height: spacing.xl }} />
 
       <TextField
         label="Details (optional)"
@@ -100,6 +103,8 @@ export default function ReportScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  error: { color: colors.danger, textAlign: 'center', marginBottom: spacing.md },
-});
+const useStyles = makeStyles((t) =>
+  StyleSheet.create({
+    error: { color: t.colors.danger, textAlign: 'center', marginBottom: spacing.md },
+  }),
+);

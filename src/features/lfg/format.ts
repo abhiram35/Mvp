@@ -54,3 +54,24 @@ export const LFG_LIMITS = {
   minSlots: 1,
   maxSlots: 9,
 } as const;
+
+/** Compact time left for the board's right column: "<1m", "25m", "3h", "2d", or null when expired. */
+export function timeLeftShort(iso: string, now: number = Date.now()): string | null {
+  const diff = new Date(iso).getTime() - now;
+  if (diff <= 0) return null;
+  if (diff < MINUTE) return '<1m';
+  if (diff < HOUR) return `${Math.floor(diff / MINUTE)}m`;
+  if (diff < DAY) return `${Math.floor(diff / HOUR)}h`;
+  return `${Math.floor(diff / DAY)}d`;
+}
+
+/** True when an unexpired post closes within the next 30 minutes. */
+export function expiresSoon(post: Pick<LfgPost, 'expires_at'>, now: number = Date.now()): boolean {
+  const diff = new Date(post.expires_at).getTime() - now;
+  return diff > 0 && diff < 30 * MINUTE;
+}
+
+/** Submit / host copy that reads well in every theme: "Host lobby" (Protocol, Defuse) / "Open in the Dojo" (Ronin). */
+export function hostCta(words: { lobbies: string }): string {
+  return words.lobbies.toLowerCase() === 'lobbies' ? 'Host lobby' : `Open in the ${words.lobbies}`;
+}

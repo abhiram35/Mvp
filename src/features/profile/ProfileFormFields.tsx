@@ -13,7 +13,7 @@ import {
   type PlayTime,
   type Region,
 } from '../../lib/types';
-import { colors, spacing } from '../../theme';
+import { makeStyles, spacing, useTheme } from '../../theme';
 import { GamePicker } from '../games/GamePicker';
 import { useGames } from '../games/useGames';
 import {
@@ -30,9 +30,10 @@ import {
 import type { UsernameStatus } from './useUsernameAvailability';
 
 function FieldError({ message }: { message?: string }) {
+  const t = useTheme();
   if (!message) return null;
   return (
-    <Text variant="caption" style={{ color: colors.danger, marginTop: spacing.xs }} accessibilityLiveRegion="polite">
+    <Text variant="caption" style={{ color: t.colors.danger, marginTop: spacing.xs }} accessibilityLiveRegion="polite">
       {message}
     </Text>
   );
@@ -73,6 +74,7 @@ export function IdentityFields({
   errors: FieldErrors;
   usernameStatus: UsernameStatus;
 }) {
+  const theme = useTheme();
   const statusError =
     usernameStatus === 'taken'
       ? 'That username is taken'
@@ -97,7 +99,7 @@ export function IdentityFields({
         label="Display name"
         value={values.display_name}
         onChangeText={(t) => onChange({ display_name: t })}
-        placeholder="What squadmates call you"
+        placeholder={`What ${theme.words.squad}mates call you`}
         maxLength={DISPLAY_NAME_MAX}
         error={errors.display_name}
       />
@@ -238,6 +240,8 @@ export function AboutFields({
   errors: FieldErrors;
   displayName: string;
 }) {
+  const t = useTheme();
+  const styles = useStyles();
   const [picking, setPicking] = useState(false);
   const shownUri = values.localAvatarUri ?? values.avatar_url;
 
@@ -277,7 +281,7 @@ export function AboutFields({
           >
             <Avatar uri={shownUri} name={displayName || '?'} size={88} />
             <View style={styles.avatarBadge}>
-              <Ionicons name="camera" size={16} color={colors.onPrimary} />
+              <Ionicons name="camera" size={16} color={t.colors.onPrimary} />
             </View>
           </Pressable>
           <View style={{ marginLeft: spacing.lg, gap: spacing.sm, flex: 1 }}>
@@ -290,7 +294,7 @@ export function AboutFields({
         label="Bio (optional)"
         value={values.bio}
         onChangeText={(t) => onChange({ bio: t })}
-        placeholder="Main game, best clutch, what squad you're looking for…"
+        placeholder={`Main game, best clutch, what ${t.words.squad} you're looking for…`}
         multiline
         maxLength={BIO_MAX}
         error={errors.bio}
@@ -300,7 +304,8 @@ export function AboutFields({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((t) =>
+  StyleSheet.create({
   avatarRow: { flexDirection: 'row', alignItems: 'center' },
   avatarPress: { width: 88, height: 88 },
   avatarBadge: {
@@ -309,11 +314,12 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: 30,
     height: 30,
-    borderRadius: 15,
-    backgroundColor: colors.primary,
+    borderRadius: t.id === 'ronin' ? 15 : t.radius.sm,
+    backgroundColor: t.colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: colors.bg,
+    borderColor: t.colors.bg,
   },
-});
+  }),
+);

@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useRef } from 'react';
+import { Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, type IconName } from '../../components/ui';
 import { fontSize, makeStyles, spacing, useTheme } from '../../theme';
@@ -29,8 +30,40 @@ export function ActionMenu({
   const t = useTheme();
   const s = useStyles();
   const insets = useSafeAreaInsets();
+  // iOS can't present an Alert or a modal screen while this Modal is still animating
+  // out (the new one silently never appears). Run the chosen action once the sheet
+  // has gone: on iOS from onDismiss (with a fallback timer), elsewhere straight away.
+  const pending = useRef<(() => void) | null>(null);
+  const fallback = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const runPending = useCallback(() => {
+    if (fallback.current) clearTimeout(fallback.current);
+    fallback.current = null;
+    const action = pending.current;
+    pending.current = null;
+    action?.();
+  }, []);
+  useEffect(() => () => {
+    if (fallback.current) clearTimeout(fallback.current);
+  }, []);
+  const choose = (action: () => void) => {
+    onClose();
+    if (Platform.OS === 'ios') {
+      pending.current = action;
+      fallback.current = setTimeout(runPending, 700);
+    } else {
+      action();
+    }
+  };
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent navigationBarTranslucent>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+      onDismiss={runPending}
+      statusBarTranslucent
+      navigationBarTranslucent
+    >
       <View style={s.root}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityRole="button" accessibilityLabel="Close menu" />
         <View style={[s.sheet, { paddingBottom: Math.max(insets.bottom, spacing.md) }]} accessibilityViewIsModal>
@@ -44,10 +77,7 @@ export function ActionMenu({
               key={a.label}
               accessibilityRole="button"
               accessibilityLabel={a.label}
-              onPress={() => {
-                onClose();
-                a.onPress();
-              }}
+              onPress={() => choose(a.onPress)}
               style={({ pressed }) => [s.row, pressed && { backgroundColor: t.colors.surfaceRaised }]}
             >
               <Ionicons name={a.icon} size={20} color={a.destructive ? t.colors.danger : t.colors.text} />

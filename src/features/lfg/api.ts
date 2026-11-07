@@ -300,7 +300,10 @@ export function useMyLfgRequest(postId: UUID | undefined, myId: UUID, enabled: b
 export async function requestToJoin(postId: UUID, requesterId: UUID, message: string | null): Promise<void> {
   const { error } = await supabase.from('lfg_requests').insert({ post_id: postId, requester_id: requesterId, message });
   // 23505 = unique violation: a request already exists; the caller just reloads.
-  if (error && error.code !== '23505') throw error;
+  if (!error || error.code === '23505') return;
+  // 42501 = RLS rejected it: post closed/expired, your own post, or a block between you.
+  if (error.code === '42501') throw new Error("This squad isn't taking your request right now.");
+  throw error;
 }
 
 /** Accepts a request; returns the squad conversation id. */

@@ -72,6 +72,9 @@ export default function OnboardingScreen() {
       await refreshProfile(); // root layout guard now moves us into the app
     } catch (err) {
       setSubmitError(errorMessage(err));
+    } finally {
+      // If the profile refresh failed we stay here; let the user tap again
+      // (createProfile falls back to an update when the row already exists).
       setSaving(false);
     }
   };

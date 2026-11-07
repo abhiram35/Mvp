@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { Button, EmptyState, ErrorState, LoadingState, Screen, Text } from '../../components/ui';
 import { useGames } from '../../features/games/useGames';
@@ -37,8 +37,20 @@ export default function LfgBoardScreen() {
   const [language, setLanguage] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
 
-  const { posts, loading, refreshing, error, refresh, retry } = useLfgPosts({ gameId, region, language });
+  const { posts, loading, refreshing, error, refresh, retry, reloadSilently } = useLfgPosts({ gameId, region, language });
   const { count: newCount, reset: resetNew } = useNewLfgPostsCount(myId);
+
+  // Coming back from creating / closing / deleting a post: refresh quietly so the
+  // board isn't stale. Skip the first focus (the initial load already runs).
+  const focusedOnce = useRef(false);
+  const reloadRef = useRef(reloadSilently);
+  reloadRef.current = reloadSilently;
+  useFocusEffect(
+    useCallback(() => {
+      if (focusedOnce.current) void reloadRef.current();
+      focusedOnce.current = true;
+    }, []),
+  );
 
   const visible = useMemo(
     () => posts.filter((p) => !blockedIds.has(p.author_id) && new Date(p.expires_at).getTime() > now),

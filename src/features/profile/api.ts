@@ -66,7 +66,11 @@ export async function createProfile(userId: string, v: ProfileFormValues): Promi
   const { error } = await supabase.from('profiles').insert(row);
   if (error) {
     const { data: existing } = await supabase.from('profiles').select('id').eq('id', userId).maybeSingle();
-    if (!existing) throw error;
+    if (!existing) {
+      // 23505 = unique violation: someone grabbed this username in the meantime.
+      if (error.code === '23505') throw new Error('That username was just taken. Go back and pick another one.');
+      throw error;
+    }
     await updateProfile(userId, { ...v, localAvatarUri: null, avatar_url: avatarUrl });
     return;
   }
@@ -82,7 +86,10 @@ export async function updateProfile(userId: string, v: ProfileFormValues): Promi
   const avatarUrl = await resolveAvatar(userId, v);
   const { id: _id, ...fields } = profileRow(userId, v, avatarUrl);
   const { error } = await supabase.from('profiles').update(fields).eq('id', userId);
-  if (error) throw error;
+  if (error) {
+    if (error.code === '23505') throw new Error('That username is taken. Pick another one.');
+    throw error;
+  }
   const { error: delErr } = await supabase.from('profile_games').delete().eq('profile_id', userId);
   if (delErr) throw delErr;
   const rows = gameRows(userId, v);

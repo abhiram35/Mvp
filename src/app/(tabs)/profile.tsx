@@ -32,6 +32,13 @@ export default function MyProfileScreen() {
 
   const deleteAccount = async () => {
     setDeleting(true);
+    // Remove the avatar file through the Storage API (Supabase blocks deleting
+    // storage objects with SQL, so the RPC can't do it). Best-effort.
+    try {
+      await supabase.storage.from('avatars').remove([`${userId}/avatar.jpg`]);
+    } catch {
+      // ignore: never block account deletion on storage cleanup
+    }
     const { error: rpcError } = await supabase.rpc('delete_my_account');
     if (rpcError) {
       setDeleting(false);

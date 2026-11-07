@@ -90,7 +90,10 @@ revoke all on table
 from anon, authenticated;
 
 grant select                         on public.games                to authenticated;
-grant select, insert, update         on public.profiles             to authenticated;
+grant select, insert                 on public.profiles             to authenticated;
+-- id and created_at are not updatable by users.
+grant update (username, display_name, avatar_url, bio, region, languages, play_style,
+              has_mic, play_times)   on public.profiles             to authenticated;
 grant select, insert, update, delete on public.profile_games        to authenticated;
 grant select, delete                 on public.lfg_posts            to authenticated;
 grant insert (id, author_id, game_id, title, description, rank, region, language,

@@ -31,6 +31,9 @@ function RootNavigator() {
 
   const signedIn = !!session;
   const onboarded = signedIn && !!profile;
+  // Explicit redirect targets for guarded routes. Without these, Expo Router falls back
+  // to the first unguarded route group (e.g. "/(auth)"), which has no index screen.
+  const home = !signedIn ? '/sign-in' : !onboarded ? '/onboarding' : '/';
 
   return (
     <Stack
@@ -42,17 +45,17 @@ function RootNavigator() {
       }}
     >
       {/* Signed out: sign in / sign up (owned by the Auth & Profile agent) */}
-      <Stack.Protected guard={!signedIn}>
+      <Stack.Protected guard={!signedIn} redirectTo={home}>
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       </Stack.Protected>
 
       {/* Signed in but no profile yet: onboarding (owned by the Auth & Profile agent) */}
-      <Stack.Protected guard={signedIn && !onboarded}>
+      <Stack.Protected guard={signedIn && !onboarded} redirectTo={home}>
         <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       </Stack.Protected>
 
       {/* Fully set up: the main app */}
-      <Stack.Protected guard={onboarded}>
+      <Stack.Protected guard={onboarded} redirectTo={home}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         {/* LFG agent */}
         <Stack.Screen name="lfg/new" options={{ title: 'New squad post', presentation: 'modal' }} />

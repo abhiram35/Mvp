@@ -76,4 +76,4 @@ where r.status = 'open' order by r.created_at desc;
 - `reports` has no SELECT permission. Insert without `.select()`.
 - Accepting a join request must go through `rpc('accept_lfg_request')`, because it creates the group chat. The author can set a request to `declined` directly.
 - Blocking someone automatically removes any friendship between you and declines pending LFG requests between you.
-- `delete_my_account` deletes the user's DMs and avatar file records, then the auth user. Everything else cascades.
+- `delete_my_account` deletes the user's DMs, then the auth user. Everything else cascades. The app removes the avatar file through the Storage API first, because Supabase doesn't allow deleting storage objects with SQL.

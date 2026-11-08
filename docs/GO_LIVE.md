@@ -28,15 +28,21 @@ You can skip Firebase at first. The app works without it, except that phones won
 Follow **[supabase/README.md](../supabase/README.md)**. In short:
 
 1. Create a project (region: **Mumbai** if your players are in India).
-2. Run **every** file in `supabase/migrations/` **in order**: `0001` → `0002` → … → the last one (`0009` at the
+2. Run **every** file in `supabase/migrations/` **in order**: `0001` → `0002` → … → the last one (`0011` at the
    time of writing). Skipping or re-ordering breaks things. Running a file twice is safe.
+   **Whenever the repo gets a new migration, run it before you publish a new build or update** — new app
+   versions expect the new tables and columns and will fail (sign-up, Edit profile, game lists) without them.
 3. **Authentication → Sign In / Providers → Email**: enabled, **Confirm email** on.
 4. **Authentication → Email Templates**: in **Confirm signup** and **Reset password**, make sure the email
    contains the 6-digit code `{{ .Token }}` (the README has the exact text). The app asks players to type this
    code, so links in emails are not needed.
 5. **Authentication → URL Configuration → Redirect URLs**: add `gg://**` and `exp://**`.
-6. Optional: deploy the Edge Functions (`generate-theme` for AI themes, `send-push` for push notifications) and
-   set their secrets, as described in the README.
+6. Optional: deploy the Edge Functions and set their secrets, as described in the README:
+   - `generate-theme` for AI themes (`ANTHROPIC_API_KEY`),
+   - `send-push` for push notifications,
+   - `steam-link` for Steam account linking (`STEAM_API_KEY` from <https://steamcommunity.com/dev/apikey>).
+   `supabase/config.toml` already marks `send-push` and `steam-link` as "no JWT check" (Steam's browser redirect
+   and the database trigger don't carry a login token), so a plain `supabase functions deploy <name>` is correct.
 
 ## 3. Connect the app to Supabase
 
@@ -157,7 +163,8 @@ are not on the Play Store, so this is expected.
 
 ## 10. Ship fixes without a new build
 
-For changes to **JavaScript/TypeScript only** (screens, text, logic, styles):
+For changes to **JavaScript/TypeScript only** (screens, text, logic, styles). If the change came with a new file in
+`supabase/migrations/`, run it in Supabase **first** (step 2).
 
 ```bash
 npx eas-cli@latest update --channel preview --environment preview --message "Fix chat scroll"
@@ -200,7 +207,7 @@ Restart the app. **Me → Moderation** now shows reports, and you can dismiss, r
   screen. A burst of the same message after an update means that update broke something: fix it and publish
   another update.
 - **Reports:** the Moderation screen, or **Table Editor → reports** (supabase/README.md section 5).
-- **Function logs:** **Edge Functions → generate-theme / send-push → Logs**.
+- **Function logs:** **Edge Functions → generate-theme / send-push / steam-link → Logs**.
 - **Builds and updates:** expo.dev → your project → **Builds** / **Updates**.
 
 ## 13. Free-plan limits to watch
@@ -246,6 +253,8 @@ month by the server.
 - [ ] Supabase keys added as Expo environment variables (`preview`)
 - [ ] (Optional) Firebase + FCM V1 key uploaded, `send-push` deployed; a test push arrives
 - [ ] (Optional) `generate-theme` deployed with `ANTHROPIC_API_KEY`
+- [ ] (Optional) `steam-link` deployed with `STEAM_API_KEY`; linking works from the Me tab
+- [ ] App version bumped and a NEW build made whenever native modules changed (1.1.0 added expo-image and expo-web-browser)
 - [ ] Preview APK built, installed on your own phone first, smoke-tested
 - [ ] You are in the `moderators` table and can open Moderation
 - [ ] Community guidelines visible; you know how to ban and remove content

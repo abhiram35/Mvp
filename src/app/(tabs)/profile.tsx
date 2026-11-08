@@ -7,6 +7,7 @@ import { BannedBanner } from '../../features/moderation/BannedBanner';
 import { useMyStatus } from '../../features/moderation/useMyStatus';
 import { ActionRow } from '../../features/profile/ActionRow';
 import { ProfileGamesList } from '../../features/profile/ProfileGamesList';
+import { SteamCard } from '../../features/steam/SteamCard';
 import { ProfileHeader } from '../../features/profile/ProfileHeader';
 import { useProfile } from '../../features/profile/useProfile';
 import { showCommunityGuidelines } from '../../features/safety/guidelines';
@@ -19,7 +20,7 @@ export default function MyProfileScreen() {
   const styles = useStyles();
   const userId = useUserId();
   const { signOut } = useAuth();
-  const { profile, games, loading, error, reload } = useProfile(userId);
+  const { profile, games, gameIds, steam, loading, error, reload } = useProfile(userId);
   const { isModerator } = useMyStatus();
   const [deleting, setDeleting] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -121,7 +122,16 @@ export default function MyProfileScreen() {
       </ProfileHeader>
 
       <View style={styles.section}>
-        <ProfileGamesList games={games} />
+        <ProfileGamesList games={games} gameIds={gameIds} />
+        {userId ? (
+          <SteamCard
+            account={steam}
+            own
+            profileId={userId}
+            myGameIds={games.map((g) => g.game_id)}
+            onChanged={() => void reload()}
+          />
+        ) : null}
       </View>
 
       <Text variant="heading" style={styles.groupTitle}>Settings</Text>

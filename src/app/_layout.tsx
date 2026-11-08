@@ -81,6 +81,7 @@ function RootNavigator() {
         <Stack.Screen name="report" options={{ title: 'Report', presentation: 'modal' }} />
         {/* Theme picker */}
         <Stack.Screen name="settings/theme" options={{ title: 'Theme' }} />
+        <Stack.Screen name="steam-linked" options={{ headerShown: false, animation: 'none' }} />
         {/* Chat & Friends agent */}
         <Stack.Screen name="chat/[id]" options={{ title: 'Chat' }} />
         <Stack.Screen name="friends" options={{ title: 'Friends' }} />

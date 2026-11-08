@@ -6,6 +6,7 @@ import { Button, EmptyState, ErrorState, LoadingState, Screen, Text } from '../.
 import { ActionRow } from '../../features/profile/ActionRow';
 import { FriendButton } from '../../features/friends/FriendButton';
 import { ProfileGamesList } from '../../features/profile/ProfileGamesList';
+import { SteamCard } from '../../features/steam/SteamCard';
 import { ProfileHeader } from '../../features/profile/ProfileHeader';
 import { useProfile } from '../../features/profile/useProfile';
 import { blockUser, unblockUser, useBlockedIds } from '../../features/safety/blocks';
@@ -20,7 +21,7 @@ export default function UserProfileScreen() {
   const me = useUserId();
   const t = useTheme();
   const styles = useStyles();
-  const { profile, games, loading, error, reload } = useProfile(id);
+  const { profile, games, gameIds, steam, loading, error, reload } = useProfile(id);
   const { blockedIds } = useBlockedIds();
   const [busy, setBusy] = useState(false);
   const [messaging, setMessaging] = useState(false);
@@ -152,7 +153,8 @@ export default function UserProfileScreen() {
       </ProfileHeader>
 
       <View style={styles.section}>
-        <ProfileGamesList games={games} />
+        <ProfileGamesList games={games} gameIds={gameIds} />
+        <SteamCard account={steam} profileId={id} />
       </View>
 
       <Text variant="heading" style={styles.groupTitle}>Safety</Text>

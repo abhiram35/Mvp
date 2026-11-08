@@ -149,7 +149,7 @@ export default function NewLfgPostScreen() {
         <View style={{ height: spacing.lg }} />
 
         <Section label="Game *">
-          <GameChipScroller value={gameId} onChange={changeGame} />
+          <GameChipScroller value={gameId} onChange={changeGame} squadOnly />
           {gameError ? <Text variant="caption" style={styles.error}>{gameError}</Text> : null}
         </Section>
 

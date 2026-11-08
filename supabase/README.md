@@ -13,6 +13,7 @@ Everything the app needs lives in `migrations/`. Run the files **in order**:
 | `0007_custom_themes.sql` | Custom AI themes: saved themes, generation log, monthly quota (`get_theme_quota`) |
 | `0008_engagement.sql` | Notifications (inbox + push), teammate ratings, XP / levels, reputation in squad finder |
 | `0009_safety_telemetry.sql` | Moderators + bans, profanity filter, report queue, product events, crash reports, beta metrics |
+| `0010_games_steam.sql` | Game categories (Competitive / Story / Co-op & Casual), story games, game artwork, private in-game IDs, "playing now", spoiler tags, Steam accounts |
 
 All files are safe to run again. Re-running them will not create duplicates.
 
@@ -25,7 +26,7 @@ All files are safe to run again. Re-running them will not create duplicates.
 **Option A: SQL Editor (easiest)**
 1. In the dashboard open **SQL Editor → New query**.
 2. Open `migrations/0001_schema.sql`, copy the whole file, paste it, and click **Run**.
-3. Do the same for `0002`, `0003`, `0004`, `0005`, `0006`, `0007`, `0008` and `0009`, in that order.
+3. Do the same for `0002`, `0003`, `0004`, `0005`, `0006`, `0007`, `0008`, `0009` and `0010`, in that order.
 
 **Option B: Supabase CLI**
 ```bash
@@ -35,7 +36,7 @@ supabase link --project-ref <your-project-ref>   # the ref is in your project UR
 supabase db push              # runs everything in supabase/migrations
 ```
 
-To check it worked, open **Table Editor**. You should see tables like `profiles`, `lfg_posts` and `messages`, and `games` should have 14 rows.
+To check it worked, open **Table Editor**. You should see tables like `profiles`, `lfg_posts` and `messages`, and `games` should have 27 rows.
 
 ## 3. Turn on email sign-in
 1. **Authentication → Sign In / Providers → Email**: make sure it is **enabled**. Keep **Confirm email** on for real users. You can turn it off while testing.
@@ -204,7 +205,42 @@ The app asks for the 6-digit code from the email, so the emails must contain it.
 3. **Reset password** (sometimes "Reset Password" / "Recovery"): add `Your GG reset code is {{ .Token }}`.
 4. Save both. You can keep the links in the emails too; the app only needs the code.
 
+## 11. Steam linking ("Sign in through Steam")
+Players link Steam on **Profile → Steam**. They sign in on Steam's own page (GG never sees their password), so a
+linked account is verified. GG then shows their most-played games and lets them add matching games in one tap.
+
+1. Run `migrations/0010_games_steam.sql` if you haven't yet.
+2. Get a free Steam Web API key: <https://steamcommunity.com/dev/apikey>. Sign in, type any domain name (for
+   example your Supabase project domain `xxxx.supabase.co`), accept the terms, and copy the key.
+   Your Steam account must have spent at least US$5 on Steam to get a key.
+3. Install and link the Supabase CLI (see step 6.3) if you haven't yet, then:
+   ```bash
+   supabase secrets set STEAM_API_KEY=<your key>
+   supabase functions deploy steam-link --no-verify-jwt
+   ```
+   `--no-verify-jwt` is required: Steam sends the browser back to the function without a GG login. The function
+   checks the GG login itself for everything else and verifies every sign-in with Steam.
+4. Try it in the app: **Profile → Sign in through Steam**.
+
+Notes:
+- A player's library only shows if their Steam **Game details** privacy setting is **Public**. The app tells them how
+  to change it.
+- One Steam account can be linked to one GG profile.
+- Errors: **Edge Functions → steam-link → Logs**. `not_configured` means the `STEAM_API_KEY` secret is missing.
+
+## 12. Game list and artwork
+- `games.category` is `competitive`, `story` or `casual` (shown as "Co-op & Casual"). Story games only appear in
+  Squad Finder and lobbies when `is_coop` is true (`squadable` is computed from both).
+- Artwork: games with a `steam_appid` automatically use their Steam store image. For other games (BGMI, Free Fire,
+  Valorant…), upload an image (about 460×215, wide) to **Storage → game-art**, copy its public URL and put it in
+  `games.logo_url`. Use official press-kit images from the publisher. Games without artwork show their emoji.
+- To add a game, insert a row in **Table Editor → games** (or add it to `0010` and re-run it).
+
 ## Notes for developers
+- In-game IDs live in `profile_game_ids`, not `profile_games`, so they stay private: only the player, accepted
+  friends and people who share a chat with them can read them (never across a block). Rows are deleted with the
+  matching `profile_games` row, so write `profile_games` first.
+- `lfg_posts` rejects games where `squadable` is false.
 - Expired LFG posts are not closed automatically. The app should query
   `.gt('expires_at', new Date().toISOString())` together with `status = 'open'`.
 - `reports` has no SELECT permission. Insert without `.select()`.

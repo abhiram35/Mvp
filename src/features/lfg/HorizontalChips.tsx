@@ -54,13 +54,17 @@ export function GameChipScroller({
   onChange,
   allowAll,
   label,
+  squadOnly,
 }: {
   value: string | null;
   onChange: (id: string | null) => void;
   allowAll?: boolean;
   label?: string;
+  /** Only games you can team up in (hides single-player story games). */
+  squadOnly?: boolean;
 }) {
-  const { games, loading, error } = useGames();
+  const { games: all, loading, error } = useGames();
+  const games = squadOnly ? all.filter((g) => g.squadable) : all;
   if (loading) return <Text muted style={styles.label}>Loading games…</Text>;
   if (error) return <Text style={styles.label} muted>Couldn&apos;t load games: {error}</Text>;
   return (

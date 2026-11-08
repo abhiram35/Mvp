@@ -1,15 +1,22 @@
 // Shared form model + validation for onboarding and edit-profile.
-import type { PlayStyle, PlayTime, Profile, ProfileGame, Region } from '../../lib/types';
+import type { PlayStatus, PlayStyle, PlayTime, Profile, ProfileGame, Region } from '../../lib/types';
 
 export const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 export const DISPLAY_NAME_MAX = 40;
 export const BIO_MAX = 280;
 export const ROLE_MAX = 30;
+export const IN_GAME_ID_MAX = 64;
 
 export interface GameEntry {
   game_id: string;
   rank: string | null;
   role: string; // '' = none
+  play_status: PlayStatus | null;
+  in_game_id: string; // '' = none
+}
+
+export function newGameEntry(game_id: string): GameEntry {
+  return { game_id, rank: null, role: '', play_status: null, in_game_id: '' };
 }
 
 export interface IdentityValues {
@@ -53,7 +60,11 @@ export const emptyForm: ProfileFormValues = {
   bio: '',
 };
 
-export function formFromProfile(profile: Profile, games: ProfileGame[]): ProfileFormValues {
+export function formFromProfile(
+  profile: Profile,
+  games: ProfileGame[],
+  gameIds: Record<string, string> = {},
+): ProfileFormValues {
   return {
     username: profile.username,
     display_name: profile.display_name,
@@ -62,7 +73,13 @@ export function formFromProfile(profile: Profile, games: ProfileGame[]): Profile
     play_style: profile.play_style,
     has_mic: profile.has_mic,
     play_times: [...profile.play_times],
-    games: games.map((g) => ({ game_id: g.game_id, rank: g.rank, role: g.role ?? '' })),
+    games: games.map((g) => ({
+      game_id: g.game_id,
+      rank: g.rank,
+      role: g.role ?? '',
+      play_status: g.play_status ?? null,
+      in_game_id: gameIds[g.game_id] ?? '',
+    })),
     avatar_url: profile.avatar_url,
     localAvatarUri: null,
     bio: profile.bio ?? '',
@@ -98,6 +115,7 @@ export function validateGames(games: GameEntry[]): FieldErrors {
   if (games.length === 0) e.games = 'Pick at least one game';
   for (const g of games) {
     if (g.role.trim().length > ROLE_MAX) e[`role_${g.game_id}`] = `Max ${ROLE_MAX} characters`;
+    if (g.in_game_id.trim().length > IN_GAME_ID_MAX) e[`igid_${g.game_id}`] = `Max ${IN_GAME_ID_MAX} characters`;
   }
   return e;
 }

@@ -21,7 +21,7 @@ import { BannedBanner } from '../../features/moderation/BannedBanner';
 import { useMyStatus } from '../../features/moderation/useMyStatus';
 import { ReplyComposer } from '../../features/community/ReplyComposer';
 import { ReplyRow } from '../../features/community/ReplyRow';
-import { KindTag, SolvedTag } from '../../features/community/Tags';
+import { KindTag, SolvedTag, SpoilerTag } from '../../features/community/Tags';
 import { useGames } from '../../features/games/useGames';
 import { openReport } from '../../lib/actions';
 import { useLatestRef, useNow } from '../../lib/hooks';
@@ -45,6 +45,7 @@ export default function CommunityThreadScreen() {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const now = useNow();
   const { banned } = useMyStatus();
+  const [revealed, setRevealed] = useState(false);
 
   const { summary, loading, error, reload: reloadPost } = useCommunityPost(postId);
   const reloadPostQuietly = useCallback(() => void reloadPost(true), [reloadPost]);
@@ -81,6 +82,8 @@ export default function CommunityThreadScreen() {
   const post = summary?.post;
   const isAuthor = !!post && post.author_id === myId;
   const isQuestion = post?.kind === 'question';
+  // Spoiler posts hide the body and the replies until the reader taps. Authors always see theirs.
+  const spoilerHidden = !!post?.is_spoiler && !revealed && !isAuthor;
 
   const openPostMenu = () => {
     if (!post) return;
@@ -242,7 +245,7 @@ export default function CommunityThreadScreen() {
       >
         <FlatList
           ref={listRef}
-          data={replies}
+          data={spoilerHidden ? [] : replies}
           keyExtractor={(r) => r.reply.id}
           renderItem={({ item }) => <ReplyRow item={item} mine={item.reply.author_id === myId} now={now} onMenu={openReplyMenu} />}
           keyboardShouldPersistTaps="handled"
@@ -253,10 +256,17 @@ export default function CommunityThreadScreen() {
           }}
           onEndReachedThreshold={0.3}
           ListHeaderComponent={
-            <PostBlock summary={summary} myId={myId} now={now} onMenu={openPostMenu} />
+            <PostBlock
+              summary={summary}
+              myId={myId}
+              now={now}
+              onMenu={openPostMenu}
+              spoilerHidden={spoilerHidden}
+              onReveal={() => setRevealed(true)}
+            />
           }
           ListEmptyComponent={
-            repliesLoading ? (
+            spoilerHidden ? undefined : repliesLoading ? (
               <View style={s.state}>
                 <ActivityIndicator color={t.colors.primary} />
               </View>
@@ -304,11 +314,15 @@ function PostBlock({
   myId,
   now,
   onMenu,
+  spoilerHidden,
+  onReveal,
 }: {
   summary: CommunityPostSummary;
   myId: string;
   now: number;
   onMenu: () => void;
+  spoilerHidden: boolean;
+  onReveal: () => void;
 }) {
   const t = useTheme();
   const s = useStyles();
@@ -323,6 +337,7 @@ function PostBlock({
       <View style={s.tags}>
         <KindTag kind={post.kind} />
         {is_solved ? <SolvedTag /> : null}
+        {post.is_spoiler ? <SpoilerTag /> : null}
         <Text style={s.game} numberOfLines={1}>
           {game ? `${game.emoji} ${game.name}` : 'General'}
         </Text>
@@ -353,9 +368,23 @@ function PostBlock({
         </Pressable>
       </View>
 
-      <Text style={s.body} selectable>
-        {post.body}
-      </Text>
+      {spoilerHidden ? (
+        <Pressable
+          onPress={onReveal}
+          accessibilityRole="button"
+          accessibilityLabel="Contains spoilers. Tap to show the post and replies"
+          style={({ pressed }) => [s.spoiler, pressed && { backgroundColor: t.colors.surfaceRaised }]}
+        >
+          <Ionicons name="eye-off-outline" size={22} color={t.colors.warning} />
+          <Text style={{ flex: 1 }}>
+            Contains spoilers{game ? ` for ${game.name}` : ''}. Tap to show the post and replies.
+          </Text>
+        </Pressable>
+      ) : (
+        <Text style={s.body} selectable>
+          {post.body}
+        </Text>
+      )}
 
       <View style={s.actionBar}>
         <GgButton target="post" id={post.id} base={{ has_gg: summary.has_gg, gg_count: post.gg_count }} own={own} />
@@ -401,6 +430,19 @@ const useStyles = makeStyles((t) =>
     authorRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.lg },
     author: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 44, flexShrink: 1 },
     name: { fontFamily: t.fonts.bodyBold, fontSize: fontSize.md, color: t.colors.text },
+    spoiler: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      padding: spacing.lg,
+      marginVertical: spacing.md,
+      borderWidth: 1,
+      borderStyle: 'dashed',
+      borderColor: t.colors.warning,
+      borderRadius: t.radius.md,
+      backgroundColor: t.colors.surface,
+      minHeight: 44,
+    },
     body: {
       fontFamily: t.fonts.body,
       fontSize: fontSize.md,

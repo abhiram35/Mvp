@@ -37,7 +37,9 @@
         {
           "color": "#D63A2F"
         }
-      ]
+      ],
+      "expo-image",
+      "expo-web-browser"
     ],
     "scheme": "gg",
     "experiments": {

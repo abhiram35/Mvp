@@ -1,66 +1,187 @@
-import { FunctionsHttpError } from '@supabase/supabase-js';
+import { FunctionsFetchError, FunctionsHttpError, FunctionsRelayError } from '@supabase/supabase-js';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
+import { Platform } from 'react-native';
 import { supabase } from '../../lib/supabase';
 import type { Game, SteamAccount, SteamGame } from '../../lib/types';
+import { createAttemptClaim, createOnce, minutesLeft, readSteamParams, type SteamReturn } from './linkFlow';
 
 /** The app route Steam sign-in returns to (see src/app/steam-linked.tsx). */
 export const STEAM_RETURN_PATH = 'steam-linked';
 
+/** Steam linking needs the in-app browser + app deep link, so it's off on web. */
+export const STEAM_LINK_SUPPORTED = Platform.OS !== 'web';
+
 export type SteamLinkResult =
   | { status: 'linked' }
   | { status: 'cancelled' }
-  | { status: 'error'; message: string };
+  | { status: 'error'; message: string }
+  /** Steam verified the sign-in; the app still has to call `complete` with this code. */
+  | { status: 'verified'; code: string };
 
-const REASON_MESSAGES: Record<string, string> = {
+const GENERIC_SERVER = 'Something went wrong on our side. Please try again in a moment.';
+const OFFLINE = "Couldn't reach the server. Check your connection.";
+
+/** Redirect reasons (…?steam=error&reason=…). */
+export const REASON_MESSAGES: Record<string, string> = {
   expired: 'That took too long. Please try again.',
   invalid: "Steam couldn't confirm the sign-in. Please try again.",
   already_linked: 'That Steam account is already linked to another GG profile.',
   steam_unavailable: 'Steam is not responding right now. Try again in a few minutes.',
+  internal: GENERIC_SERVER,
 };
 
-const ERROR_MESSAGES: Record<string, string> = {
-  not_configured: "Steam linking isn't set up on the server yet.",
-  no_profile: 'Finish your profile first.',
-  not_linked: 'No Steam account is linked.',
-  steam_unavailable: 'Steam is not responding right now. Try again in a few minutes.',
+/** Edge Function error codes ({ error: code }). */
+export const ERROR_MESSAGES: Record<string, string> = {
   unauthorized: 'Please sign in again.',
+  no_profile: 'Finish your profile first.',
+  not_linked: 'No Steam account is linked any more. Link it again.',
+  invalid_request: 'Something went wrong with that request. Please try again.',
+  invalid_code: 'That Steam sign-in expired or was already used. Please try again.',
+  already_linked: 'That Steam account is already linked to another GG profile.',
+  steam_unavailable: 'Steam is not responding right now. Try again in a few minutes.',
+  not_configured: "Steam linking isn't set up on the server yet.",
+  internal: GENERIC_SERVER,
+  method_not_allowed: 'This version of GG is out of date. Please update the app.',
 };
+
+/** An error from the steam-link Edge Function, already turned into friendly copy. */
+export class SteamApiError extends Error {
+  constructor(
+    message: string,
+    readonly code: string,
+  ) {
+    super(message);
+    this.name = 'SteamApiError';
+  }
+}
+
+/** Friendly copy for an Edge Function error code (and its JSON body, for too_soon). */
+export function steamErrorMessage(code: string, body?: Record<string, unknown> | null): string {
+  if (code === 'too_soon') {
+    const m = minutesLeft(body?.retry_after_seconds);
+    return `Steam was refreshed recently. Try again in ${m} ${m === 1 ? 'minute' : 'minutes'}.`;
+  }
+  return ERROR_MESSAGES[code] ?? GENERIC_SERVER;
+}
+
+/** Turns a functions.invoke error into a SteamApiError with friendly copy. */
+export async function toSteamError(err: unknown): Promise<SteamApiError> {
+  if (err instanceof FunctionsHttpError) {
+    let body: Record<string, unknown> | null = null;
+    try {
+      const json: unknown = await (err.context as Response).json();
+      body = json && typeof json === 'object' && !Array.isArray(json) ? (json as Record<string, unknown>) : null;
+    } catch {
+      body = null;
+    }
+    const code = typeof body?.error === 'string' ? body.error : '';
+    return new SteamApiError(steamErrorMessage(code, body), code || 'http');
+  }
+  if (err instanceof FunctionsRelayError) return new SteamApiError(GENERIC_SERVER, 'relay');
+  if (err instanceof FunctionsFetchError) return new SteamApiError(OFFLINE, 'network');
+  return new SteamApiError(OFFLINE, 'network');
+}
 
 async function invokeSteam<T>(body: Record<string, unknown>): Promise<T> {
-  const res = await supabase.functions.invoke('steam-link', { body });
-  if (res.error) {
-    let code = '';
-    if (res.error instanceof FunctionsHttpError) {
-      try {
-        const j = (await (res.error.context as Response).json()) as { error?: unknown };
-        code = typeof j?.error === 'string' ? j.error : '';
-      } catch {
-        code = '';
-      }
-    }
-    throw new Error(ERROR_MESSAGES[code] ?? "Couldn't reach the server. Check your connection.");
+  let res: Awaited<ReturnType<typeof supabase.functions.invoke>>;
+  try {
+    res = await supabase.functions.invoke('steam-link', { body });
+  } catch (e) {
+    throw await toSteamError(e);
   }
+  if (res.error) throw await toSteamError(res.error);
   return res.data as T;
 }
 
-/** Reads ?steam=…&reason=… from the URL Steam sign-in returned to. */
-export function parseSteamReturn(url: string): SteamLinkResult {
-  const { queryParams } = Linking.parse(url);
-  const steam = typeof queryParams?.steam === 'string' ? queryParams.steam : '';
-  if (steam === 'linked') return { status: 'linked' };
-  if (steam === 'cancel') return { status: 'cancelled' };
-  const reason = typeof queryParams?.reason === 'string' ? queryParams.reason : '';
-  return { status: 'error', message: REASON_MESSAGES[reason] ?? 'Something went wrong. Please try again.' };
+/** Maps a parsed redirect to a result (without completing it). */
+export function steamReturnToResult(ret: SteamReturn): SteamLinkResult {
+  switch (ret.kind) {
+    case 'verified':
+      return { status: 'verified', code: ret.code };
+    case 'linked':
+      return { status: 'linked' };
+    case 'cancel':
+    case 'none':
+      return { status: 'cancelled' };
+    case 'error':
+      return { status: 'error', message: REASON_MESSAGES[ret.reason] ?? 'Something went wrong. Please try again.' };
+  }
 }
 
-/** Opens "Sign in through Steam" and waits for it to come back to the app. */
-export async function linkSteam(): Promise<SteamLinkResult> {
+/** Reads ?steam=…&code=…&reason=… from the URL Steam sign-in returned to. */
+export function parseSteamReturn(url: string): SteamLinkResult {
+  const { queryParams } = Linking.parse(url);
+  return steamReturnToResult(readSteamParams(queryParams));
+}
+
+// ── Completion (shared by the browser result and the /steam-linked route) ────
+const completeOnce = createOnce<SteamLinkResult>();
+const attempts = createAttemptClaim();
+const listeners = new Set<() => void>();
+
+/** Listen for "the linked Steam account may have changed" (used by the Steam card). */
+export function subscribeSteamChanges(fn: () => void): () => void {
+  listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
+}
+
+export function notifySteamChanged(): void {
+  for (const fn of [...listeners]) {
+    try {
+      fn();
+    } catch {
+      // a listener must never break the others
+    }
+  }
+}
+
+/**
+ * Exchanges a completion code for the link. Each code is sent at most once, however many
+ * times this is called (both the browser result and the deep-link route may call it).
+ */
+export function completeSteamLink(code: string): Promise<SteamLinkResult> {
+  return completeOnce(code, async () => {
+    try {
+      await invokeSteam<{ account: SteamAccount }>({ action: 'complete', code });
+      return { status: 'linked' } as const;
+    } catch (e) {
+      return { status: 'error', message: e instanceof Error ? e.message : GENERIC_SERVER } as const;
+    } finally {
+      notifySteamChanged();
+    }
+  });
+}
+
+/** Completes a `verified` result; other results pass through. Never throws. */
+export async function finishSteamResult(res: SteamLinkResult): Promise<Exclude<SteamLinkResult, { status: 'verified' }>> {
+  if (res.status === 'verified') {
+    const done = await completeSteamLink(res.code);
+    return done.status === 'verified' ? { status: 'error', message: GENERIC_SERVER } : done;
+  }
+  return res;
+}
+
+/**
+ * True for the first caller that reports the outcome of the current link attempt, so the
+ * user sees one message even when both the browser result and the route finish it.
+ */
+export function claimSteamOutcome(): boolean {
+  return attempts.claim();
+}
+
+/** Opens "Sign in through Steam", waits for it to come back and completes the link. */
+export async function linkSteam(): Promise<Exclude<SteamLinkResult, { status: 'verified' }>> {
+  if (!STEAM_LINK_SUPPORTED) return { status: 'error', message: 'Link Steam from the GG app on your phone.' };
+  attempts.begin();
   const redirect = Linking.createURL(STEAM_RETURN_PATH);
   const { url } = await invokeSteam<{ url: string }>({ action: 'start', redirect_to: redirect });
   const res = await WebBrowser.openAuthSessionAsync(url, redirect);
+  // Android may report "dismiss" before the redirect arrives: /steam-linked then finishes the link.
   if (res.type !== 'success') return { status: 'cancelled' };
-  return parseSteamReturn(res.url);
+  return finishSteamResult(parseSteamReturn(res.url));
 }
 
 /** Re-fetches the linked account's profile and library from Steam. */

@@ -17,7 +17,7 @@
 // Push tokens are never logged.
 
 // deno-lint-ignore no-import-prefix -- Supabase's documented style for Edge Functions
-import { createClient } from 'npm:@supabase/supabase-js@2';
+import { createClient } from 'npm:@supabase/supabase-js@2.119.0';
 import { json } from '../_shared/cors.ts';
 import {
   buildExpoMessages,

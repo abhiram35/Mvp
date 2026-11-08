@@ -9,6 +9,7 @@
 ## Checklist
 
 - [ ] `npm run typecheck`, `npm run lint` and `npm test` pass
+- [ ] Changed `supabase/functions/`? `deno check */index.ts`, `deno lint` and `deno test` pass (in `supabase/functions`)
 - [ ] No hard-coded colours, fonts or radii (uses `useTheme()` / kit components)
 - [ ] Tested on a phone (Expo Go or a build), against my **own** Supabase project
 - [ ] New pure logic has a test in `__tests__/`

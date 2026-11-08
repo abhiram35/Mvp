@@ -1,4 +1,4 @@
-import { compactCount, plural, timeAgo } from '../format';
+import { compactCount, plural, spoilerForGame, timeAgo } from '../format';
 
 const NOW = Date.UTC(2026, 10, 7, 12, 0, 0);
 const MIN = 60_000;
@@ -43,5 +43,24 @@ describe('plural', () => {
     expect(plural(1, 'reply', 'replies')).toBe('1 reply');
     expect(plural(0, 'reply', 'replies')).toBe('0 replies');
     expect(plural(2, 'GG', 'GGs')).toBe('2 GGs');
+  });
+});
+
+describe('spoilerForGame (composer auto-toggle)', () => {
+  const story = { category: 'story' };
+  const casual = { category: 'casual' };
+  const auto = { editing: false, touched: false };
+
+  it('turns on for story games and off again for non-story / General', () => {
+    expect(spoilerForGame(false, story, auto)).toBe(true);
+    expect(spoilerForGame(true, casual, auto)).toBe(false);
+    expect(spoilerForGame(true, null, auto)).toBe(false);
+    expect(spoilerForGame(true, {}, auto)).toBe(false); // missing category = competitive
+  });
+
+  it('leaves a box the author set themselves, and never changes it while editing', () => {
+    expect(spoilerForGame(true, casual, { editing: false, touched: true })).toBe(true);
+    expect(spoilerForGame(false, story, { editing: false, touched: true })).toBe(false);
+    expect(spoilerForGame(false, story, { editing: true, touched: false })).toBe(false);
   });
 });

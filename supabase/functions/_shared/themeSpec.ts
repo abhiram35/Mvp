@@ -59,6 +59,8 @@ export const CONTRAST_RULES: { fg: ColorKey; bgs: ColorKey[]; min: number }[] = 
   { fg: 'textMuted', bgs: ['bg', 'surface'], min: 4.5 },
   { fg: 'textFaint', bgs: ['bg'], min: 3 },
   { fg: 'primary', bgs: ['bg'], min: 3 },
+  { fg: 'accent', bgs: ['bg', 'surface'], min: 3 },
+  { fg: 'warning', bgs: ['bg', 'surface'], min: 3 },
   // after primary may have moved:
   { fg: 'onPrimary', bgs: ['primary'], min: 4.5 },
   { fg: 'onPanel', bgs: ['panel'], min: 4.5 },

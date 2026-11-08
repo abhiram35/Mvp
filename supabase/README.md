@@ -14,8 +14,15 @@ Everything the app needs lives in `migrations/`. Run the files **in order**:
 | `0008_engagement.sql` | Notifications (inbox + push), teammate ratings, XP / levels, reputation in squad finder |
 | `0009_safety_telemetry.sql` | Moderators + bans, profanity filter, report queue, product events, crash reports, beta metrics |
 | `0010_games_steam.sql` | Game categories (Competitive / Story / Co-op & Casual), story games, game artwork, private in-game IDs, "playing now", spoiler tags, Steam accounts |
+| `0011_review_fixes.sql` | Privacy and safety fixes for 0010: in-game IDs and Steam accounts only visible to friends / squad chats / DMs where the player wrote to you, safer Steam linking (2 steps), one-call profile game saving, Steam name filter, Genshin Impact moved to Co-op & Casual |
 
-All files are safe to run again. Re-running them will not create duplicates.
+All files are safe to run again. Re-running them will not create duplicates, and it will not undo your own edits
+to the game list.
+
+> **Important: run new migrations BEFORE you publish a new app build or an over-the-air update.**
+> A new version of the app expects the new database functions (for example `save_profile_games`). If the app
+> goes out first, players get errors until the SQL is run. So the order is always: 1) run the new SQL files,
+> 2) deploy changed Edge Functions, 3) publish the build or update.
 
 ## 1. Create a free Supabase project
 1. Go to <https://supabase.com>, sign up, then click **New project**.
@@ -26,7 +33,8 @@ All files are safe to run again. Re-running them will not create duplicates.
 **Option A: SQL Editor (easiest)**
 1. In the dashboard open **SQL Editor → New query**.
 2. Open `migrations/0001_schema.sql`, copy the whole file, paste it, and click **Run**.
-3. Do the same for `0002`, `0003`, `0004`, `0005`, `0006`, `0007`, `0008`, `0009` and `0010`, in that order.
+3. Do the same for `0002`, `0003`, `0004`, `0005`, `0006`, `0007`, `0008`, `0009`, `0010` and `0011`, in that order
+   (so the full run order is **0001 → 0011**). Already ran some of them earlier? Just run the newer ones, in order.
 
 **Option B: Supabase CLI**
 ```bash
@@ -143,8 +151,10 @@ The inbox (bell icon) works as soon as `0008` is run. Phone push notifications n
    openssl rand -hex 32
    ```
    Copy the output. Below it is called `<secret>`.
-3. Save it for the function and deploy the function. `--no-verify-jwt` is required, because the database calls the
-   function without a user login; the secret protects it instead.
+3. Save it for the function and deploy the function (run this from the project folder). The database calls the
+   function without a user login, so the login (JWT) check must be off; the secret protects it instead.
+   `supabase/config.toml` already turns the check off for `send-push`, and `--no-verify-jwt` does the same thing
+   (keep it as a safety net in case the CLI doesn't pick up the file).
    ```bash
    supabase secrets set PUSH_SHARED_SECRET=<secret>
    supabase functions deploy send-push --no-verify-jwt
@@ -206,26 +216,37 @@ The app asks for the 6-digit code from the email, so the emails must contain it.
 4. Save both. You can keep the links in the emails too; the app only needs the code.
 
 ## 11. Steam linking ("Sign in through Steam")
-Players link Steam on **Profile → Steam**. They sign in on Steam's own page (GG never sees their password), so a
+Players link Steam on **Me** (profile) **→ Steam**. They sign in on Steam's own page (GG never sees their password), so a
 linked account is verified. GG then shows their most-played games and lets them add matching games in one tap.
 
-1. Run `migrations/0010_games_steam.sql` if you haven't yet.
+1. Run `migrations/0010_games_steam.sql` and then `migrations/0011_review_fixes.sql` if you haven't yet.
 2. Get a free Steam Web API key: <https://steamcommunity.com/dev/apikey>. Sign in, type any domain name (for
    example your Supabase project domain `xxxx.supabase.co`), accept the terms, and copy the key.
    Your Steam account must have spent at least US$5 on Steam to get a key.
-3. Install and link the Supabase CLI (see step 6.3) if you haven't yet, then:
+3. Install and link the Supabase CLI (see step 6.3) if you haven't yet, then, from the project folder:
    ```bash
    supabase secrets set STEAM_API_KEY=<your key>
    supabase functions deploy steam-link --no-verify-jwt
    ```
-   `--no-verify-jwt` is required: Steam sends the browser back to the function without a GG login. The function
-   checks the GG login itself for everything else and verifies every sign-in with Steam.
-4. Try it in the app: **Profile → Sign in through Steam**.
+   The login (JWT) check must be off for this function: Steam sends the browser back to it without a GG login.
+   `supabase/config.toml` already turns it off for `steam-link`; `--no-verify-jwt` does the same and is a safety
+   net. The function checks the GG login itself for every other request and verifies every sign-in with Steam.
+   (`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are provided by Supabase automatically; don't set them.)
+4. Try it in the app: **Me → Sign in through Steam**. The browser opens Steam's page, you sign in, then you come
+   back to GG and it finishes linking. Linking is two steps on purpose: Steam's answer only proves who you are on
+   Steam, and the app then confirms it from your own signed-in GG account (within 5 minutes). That way a forwarded
+   or stolen link can't attach someone's Steam account to a different GG profile. If linking doesn't finish (for
+   example you closed the browser), just tap the button again.
 
 Notes:
 - A player's library only shows if their Steam **Game details** privacy setting is **Public**. The app tells them how
   to change it.
 - One Steam account can be linked to one GG profile.
+- A linked Steam account is private in the same way as in-game IDs: only the player, accepted friends, people in a
+  squad chat with them, and people they have sent a DM to can see it. Nobody else (not strangers, not anyone across
+  a block). Steam names go through the profanity filter.
+- "Refresh" from Steam works at most once every 5 minutes per player (`too_soon`).
+- Steam linking is not shown in the web version of the app, only on phones.
 - Errors: **Edge Functions → steam-link → Logs**. `not_configured` means the `STEAM_API_KEY` secret is missing.
 
 ## 12. Game list and artwork
@@ -238,8 +259,22 @@ Notes:
 
 ## Notes for developers
 - In-game IDs live in `profile_game_ids`, not `profile_games`, so they stay private: only the player, accepted
-  friends and people who share a chat with them can read them (never across a block). Rows are deleted with the
-  matching `profile_games` row, so write `profile_games` first.
+  friends, members of a squad (group) chat with them, and people in a DM **where the player has sent at least one
+  message** can read them (never across a block). Just opening a DM with `get_or_create_dm` is not enough.
+  `steam_accounts` uses exactly the same rule (`gg_can_see_game_ids`). Rows are deleted with the matching
+  `profile_games` row. IDs are max 64 characters with no control characters (line breaks, tabs…); `updated_at` is
+  set by the server (users can insert `profile_id, game_id, in_game_id` and update `in_game_id` only).
+- Saving a player's games: call `rpc('save_profile_games', { p_games })` instead of writing `profile_games` /
+  `profile_game_ids` yourself. `p_games` is the full list (max 30) of `{ game_id, rank, role, play_status,
+  in_game_id }`. Games not in the list are removed. `in_game_id`: `null` = keep the saved one, `''` = remove it,
+  text = set it (spaces at the ends are trimmed). `rank` / `role` / `play_status` `''` count as none. Everything
+  happens in one transaction: on bad input it raises an error with code `22023` (or `42501` when signed out / no
+  profile) and nothing changes. Returns null.
+- `find_squadmates` returns no one for single-player story games (`squadable = false`).
+- `list_community_posts` search matches a spoiler post's title only, never its hidden body.
+- Steam linking is two steps (see `docs/REVIEW_FIXES.md` §1): `steam_link_requests` has `steam_id`,
+  `completion_code` and `verified_at`; the app finishes with `{ action: "complete", code }`. The table is service-role
+  only. `steam_accounts.profile_url` must start with `https://steamcommunity.com/` and `avatar_url` with `https://`.
 - `lfg_posts` rejects games where `squadable` is false.
 - Expired LFG posts are not closed automatically. The app should query
   `.gt('expires_at', new Date().toISOString())` together with `status = 'open'`.

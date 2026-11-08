@@ -40,9 +40,21 @@ Follow **[supabase/README.md](../supabase/README.md)**. In short:
 6. Optional: deploy the Edge Functions and set their secrets, as described in the README:
    - `generate-theme` for AI themes (`ANTHROPIC_API_KEY`),
    - `send-push` for push notifications,
-   - `steam-link` for Steam account linking (`STEAM_API_KEY` from <https://steamcommunity.com/dev/apikey>).
-   `supabase/config.toml` already marks `send-push` and `steam-link` as "no JWT check" (Steam's browser redirect
-   and the database trigger don't carry a login token), so a plain `supabase functions deploy <name>` is correct.
+   - `steam-link` for Steam account linking (README section 11). In short:
+     1. Get a free Steam Web API key at <https://steamcommunity.com/dev/apikey> (any domain name is fine, e.g.
+        `xxxx.supabase.co`; your Steam account must have spent US$5 on Steam).
+     2. `supabase secrets set STEAM_API_KEY=<your key>`
+     3. `supabase functions deploy steam-link`
+     4. In the app: **Me → Sign in through Steam**. Linking is two steps on purpose (Steam proves who you are,
+        then the app confirms it from your signed-in account), so a forwarded link can't hijack an account.
+     A linked Steam account is only visible to the player, their accepted friends, people in a squad chat with
+     them and people they have sent a DM to.
+
+   Run the deploy commands from the project folder. `supabase/config.toml` already marks `send-push` and
+   `steam-link` as "no JWT check" (Steam's browser redirect and the database trigger don't carry a login token),
+   so a plain `supabase functions deploy <name>` is correct. If the function logs show `401` for Steam's redirect
+   or for the database's calls, deploy again with `--no-verify-jwt` added (same effect). `generate-theme` must keep
+   the check: never deploy it with `--no-verify-jwt`.
 
 ## 3. Connect the app to Supabase
 
@@ -183,6 +195,26 @@ You **need a new build** (step 9) instead when you:
 When you do, bump `"version"` in `app.json` (e.g. `1.0.0` → `1.1.0`). With the `appVersion` runtime policy this
 keeps old builds from receiving updates that need the new native code.
 
+### Releasing 1.1.0 (story games + Steam)
+
+`app.json` is already at `1.1.0`, because this release added two native libraries (`expo-image` and
+`expo-web-browser`). That means:
+
+1. Run `0010_games_steam.sql` and `0011_review_fixes.sql` in Supabase first (step 2), if you haven't.
+2. Deploy `steam-link` (step 2.6) if you want Steam linking.
+3. Make a **new build**: `npx eas-cli@latest build -p android --profile preview` (step 9) and send friends the
+   new link. They install it over the old app (same package name, their login stays).
+4. `eas update` alone will **not** reach phones that still have a `1.0.0` build: updates only go to builds with
+   the same `version`. Friends on `1.0.0` keep the old app until they install the new build.
+
+### Release order (every time)
+
+1. Run new files from `supabase/migrations/` (in order).
+2. Deploy any changed Edge Functions (`supabase functions deploy <name>`).
+3. Then publish the build or the update.
+
+The other way round, players get errors until the database catches up.
+
 ## 11. Make yourself a moderator
 
 After signing up in the app, run this in Supabase **SQL Editor** (replace the username):
@@ -237,6 +269,7 @@ month by the server.
 | `eas build` fails at "Install dependencies" | Run `npm install` locally, commit `package-lock.json`, try again. |
 | Friends don't get an update | Same channel? (`preview` build ⇄ `--channel preview`). Same `version` in `app.json` as the build? Did the update change native code (then it needs a build)? Ask them to reopen the app twice. |
 | No push notifications | Needs a real build (not Expo Go), step 8 done, notification permission allowed on the phone, `send-push` deployed. Check its logs. |
+| Steam linking fails | **Edge Functions → steam-link → Logs**. `not_configured` = `STEAM_API_KEY` missing. `401` on Steam's redirect = redeploy with `--no-verify-jwt`. Errors about `save_profile_games` or Steam columns = `0011` not run. |
 | "Install blocked" on the phone | Allow installs from unknown sources for the browser/Files app. |
 | Play Protect warns about the APK | Normal for apps not from the Play Store. Tap "Install anyway". |
 | `npx expo start` QR doesn't connect | Phone and computer on the same Wi-Fi, or run `npx expo start --tunnel`. |
@@ -245,7 +278,8 @@ month by the server.
 
 ## Beta checklist
 
-- [ ] All migrations run in order, `games` table has rows
+- [ ] All migrations run in order `0001` → `0011` (including `0010_games_steam.sql` and `0011_review_fixes.sql`),
+      `games` table has rows
 - [ ] Email confirm + reset templates contain `{{ .Token }}`; redirect URLs `gg://**`, `exp://**` added
 - [ ] `.env` filled; app works in Expo Go (sign up, lobby, chat, community post)
 - [ ] `npm run typecheck`, `npm run lint`, `npm test` all pass (CI is green on GitHub)
@@ -253,8 +287,11 @@ month by the server.
 - [ ] Supabase keys added as Expo environment variables (`preview`)
 - [ ] (Optional) Firebase + FCM V1 key uploaded, `send-push` deployed; a test push arrives
 - [ ] (Optional) `generate-theme` deployed with `ANTHROPIC_API_KEY`
-- [ ] (Optional) `steam-link` deployed with `STEAM_API_KEY`; linking works from the Me tab
-- [ ] App version bumped and a NEW build made whenever native modules changed (1.1.0 added expo-image and expo-web-browser)
+- [ ] (Optional) `STEAM_API_KEY` set and `steam-link` deployed; **Me → Sign in through Steam** links your
+      account, and a friend sees your Steam card while a stranger does not
+- [ ] App version bumped and a NEW build made whenever native modules changed (1.1.0 added expo-image and
+      expo-web-browser: `npx eas-cli@latest build -p android --profile preview`, then share the new link)
+- [ ] Migrations run and functions deployed BEFORE the build or update went out
 - [ ] Preview APK built, installed on your own phone first, smoke-tested
 - [ ] You are in the `moderators` table and can open Moderation
 - [ ] Community guidelines visible; you know how to ban and remove content

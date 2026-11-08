@@ -120,6 +120,22 @@ describe('validateSpec', () => {
     expect(validateSpec(lowPanel)).toBeNull();
   });
 
+  it('repairs accent and warning on older saved themes up to 3:1 on bg and surface', () => {
+    const rgb = (h: string) => [1, 3, 5].map((k) => parseInt(h.slice(k, k + 2), 16)) as [number, number, number];
+    for (const key of ['accent', 'warning'] as const) {
+      const low = goodSpec();
+      low.colors[key] = '#2A3340'; // close to surface
+      const out = validateSpec(low);
+      expect(out).not.toBeNull();
+      expect(out!.colors[key]).not.toBe('#2A3340');
+      for (const bg of ['bg', 'surface'] as const) {
+        expect(contrastRatio(rgb(out!.colors[key]), rgb(out!.colors[bg]))).toBeGreaterThanOrEqual(3);
+      }
+    }
+    // Already-readable colours are left alone.
+    expect(validateSpec(goodSpec())!.colors.accent).toBe('#D9A441');
+  });
+
   it('derives `dark` from the background instead of trusting the input', () => {
     expect(validateSpec({ ...goodSpec(), dark: false })!.dark).toBe(true);
 
@@ -132,6 +148,8 @@ describe('validateSpec', () => {
       textFaint: '#767676',
       primary: '#B3261E',
       onPrimary: '#FFFFFF',
+      accent: '#2E7D4F',
+      warning: '#A8670F',
     });
     expect(validateSpec({ ...light, dark: true })!.dark).toBe(false);
   });

@@ -1,5 +1,5 @@
 // Shared form model + validation for onboarding and edit-profile.
-import type { PlayStatus, PlayStyle, PlayTime, Profile, ProfileGame, Region } from '../../lib/types';
+import type { PlayStatus, PlayStyle, PlayTime, Profile, ProfileGame, Region, SaveProfileGameInput } from '../../lib/types';
 
 export const USERNAME_RE = /^[a-z0-9_]{3,20}$/;
 export const DISPLAY_NAME_MAX = 40;
@@ -86,6 +86,11 @@ export function formFromProfile(
   };
 }
 
+/** Fills in in-game IDs that loaded after the form was seeded (e.g. after a retry). */
+export function withGameIds(games: GameEntry[], gameIds: Record<string, string>): GameEntry[] {
+  return games.map((g) => ({ ...g, in_game_id: gameIds[g.game_id] ?? '' }));
+}
+
 /** Normalises what the user types into a valid-looking username. */
 export function normaliseUsername(input: string): string {
   return input.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20);
@@ -118,6 +123,24 @@ export function validateGames(games: GameEntry[]): FieldErrors {
     if (g.in_game_id.trim().length > IN_GAME_ID_MAX) e[`igid_${g.game_id}`] = `Max ${IN_GAME_ID_MAX} characters`;
   }
   return e;
+}
+
+/**
+ * Rows for the `save_profile_games` RPC (docs/REVIEW_FIXES.md §3).
+ * in_game_id: '' = remove, string = set, null = keep what's stored (used when the IDs
+ * couldn't be loaded, so the form never overwrites IDs it didn't see).
+ */
+export function buildSaveGamesInput(games: GameEntry[], opts: { keepInGameIds?: boolean } = {}): SaveProfileGameInput[] {
+  return games.map((g) => {
+    const role = g.role.trim();
+    return {
+      game_id: g.game_id,
+      rank: g.rank,
+      role: role ? role : null,
+      play_status: g.play_status,
+      in_game_id: opts.keepInGameIds ? null : g.in_game_id.trim(),
+    };
+  });
 }
 
 export function validateAbout(v: AboutValues): FieldErrors {

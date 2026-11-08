@@ -1,5 +1,6 @@
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { Chip, Text } from '../../components/ui';
+import { isSquadable } from '../games/art';
 import { useGames } from '../games/useGames';
 import { spacing } from '../../theme';
 
@@ -64,7 +65,7 @@ export function GameChipScroller({
   squadOnly?: boolean;
 }) {
   const { games: all, loading, error } = useGames();
-  const games = squadOnly ? all.filter((g) => g.squadable) : all;
+  const games = squadOnly ? all.filter(isSquadable) : all;
   if (loading) return <Text muted style={styles.label}>Loading games…</Text>;
   if (error) return <Text style={styles.label} muted>Couldn&apos;t load games: {error}</Text>;
   return (

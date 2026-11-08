@@ -8,6 +8,10 @@ type ProfileData = {
   /** game_id → in-game ID. Only filled when you may see them (you, friends, chat partners). */
   gameIds: Record<string, string>;
   steam: SteamAccount | null;
+  /** Loading in-game IDs failed: `gameIds` is empty but that says nothing about the real IDs. */
+  idsError: boolean;
+  /** Loading the Steam account failed: `steam` is null but it may be linked. */
+  steamError: boolean;
 };
 
 async function fetchProfileData(id: string): Promise<ProfileData> {
@@ -19,7 +23,8 @@ async function fetchProfileData(id: string): Promise<ProfileData> {
   ]);
   if (p.error) throw p.error;
   if (g.error) throw g.error;
-  // In-game IDs and Steam are extras: a failure there shouldn't hide the whole profile.
+  // In-game IDs and Steam are extras: a failure there shouldn't hide the whole profile,
+  // but callers get a flag so they never mistake "failed" for "none".
   const gameIds: Record<string, string> = {};
   for (const r of (ids.error ? [] : (ids.data ?? [])) as Pick<ProfileGameId, 'game_id' | 'in_game_id'>[]) {
     gameIds[r.game_id] = r.in_game_id;
@@ -29,6 +34,8 @@ async function fetchProfileData(id: string): Promise<ProfileData> {
     games: (g.data ?? []) as ProfileGame[],
     gameIds,
     steam: steam.error ? null : ((steam.data as SteamAccount | null) ?? null),
+    idsError: !!ids.error,
+    steamError: !!steam.error,
   };
 }
 
@@ -38,6 +45,8 @@ export function useProfile(id: string | null | undefined) {
   const [games, setGames] = useState<ProfileGame[]>([]);
   const [gameIds, setGameIds] = useState<Record<string, string>>({});
   const [steam, setSteam] = useState<SteamAccount | null>(null);
+  const [idsError, setIdsError] = useState(false);
+  const [steamError, setSteamError] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,6 +55,8 @@ export function useProfile(id: string | null | undefined) {
     setGames(d.games);
     setGameIds(d.gameIds);
     setSteam(d.steam);
+    setIdsError(d.idsError);
+    setSteamError(d.steamError);
     setError(null);
     setLoading(false);
   }, []);
@@ -82,5 +93,5 @@ export function useProfile(id: string | null | undefined) {
     };
   }, [id, commit, fail]);
 
-  return { profile, games, gameIds, steam, loading: loading && !!id, error, reload: load };
+  return { profile, games, gameIds, steam, idsError, steamError, loading: loading && !!id, error, reload: load };
 }

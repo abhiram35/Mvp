@@ -16,6 +16,7 @@ import {
   type Region,
 } from '../../lib/types';
 import { makeStyles, spacing, useTheme } from '../../theme';
+import { gameCategory, isSquadable } from '../games/art';
 import { GameLogo } from '../games/GameLogo';
 import { GamePicker } from '../games/GamePicker';
 import { useGames } from '../games/useGames';
@@ -177,10 +178,13 @@ export function GamesFields({
   games,
   onChange,
   errors,
+  hideInGameIds = false,
 }: {
   games: GameEntry[];
   onChange: (games: GameEntry[]) => void;
   errors: FieldErrors;
+  /** In-game IDs couldn't be loaded, so they can't be edited right now. */
+  hideInGameIds?: boolean;
 }) {
   const { byId, error: gamesError } = useGames();
   const ids = games.map((g) => g.game_id);
@@ -219,7 +223,7 @@ export function GamesFields({
                 </ChipRow>
               </View>
             ) : null}
-            {game.category === 'story' ? (
+            {gameCategory(game) === 'story' ? (
               <View style={{ marginBottom: spacing.lg }}>
                 <Text variant="label" style={{ marginBottom: spacing.sm }}>Progress (optional)</Text>
                 <ChipRow>
@@ -234,17 +238,18 @@ export function GamesFields({
                   ))}
                 </ChipRow>
               </View>
-            ) : (
+            ) : null}
+            {gameCategory(game) !== 'story' || game.is_coop === true ? (
               <TextField
                 label="Role (optional)"
                 value={entry.role}
                 onChangeText={(t) => patch(entry.game_id, { role: t })}
-                placeholder="e.g. IGL, Sniper, Duelist"
+                placeholder={gameCategory(game) === 'story' ? 'e.g. Healer, Support, Main DPS' : 'e.g. IGL, Sniper, Duelist'}
                 maxLength={ROLE_MAX}
                 error={errors[`role_${entry.game_id}`]}
               />
-            )}
-            {game.squadable ? (
+            ) : null}
+            {isSquadable(game) && !hideInGameIds ? (
               <TextField
                 label="In-game ID (optional)"
                 value={entry.in_game_id}

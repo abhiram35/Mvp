@@ -14,9 +14,23 @@ export function gameArtUrl(game: Pick<Game, 'logo_url' | 'steam_appid'> | undefi
 
 export const CATEGORY_ORDER: readonly GameCategory[] = ['competitive', 'casual', 'story'];
 
+/**
+ * A game's category, defaulting to 'competitive' when it's missing or unknown
+ * (e.g. the app talking to a database that hasn't run the category migration yet).
+ */
+export function gameCategory(game: { category?: unknown } | null | undefined): GameCategory {
+  const c = game?.category;
+  return typeof c === 'string' && (CATEGORY_ORDER as readonly string[]).includes(c) ? (c as GameCategory) : 'competitive';
+}
+
+/** Whether a game gets LFG / Squad Finder. Missing (older database) counts as yes. */
+export function isSquadable(game: { squadable?: unknown } | null | undefined): boolean {
+  return game?.squadable !== false;
+}
+
 /** Games grouped by category in display order; empty groups are left out. */
-export function groupByCategory<T extends Pick<Game, 'category'>>(games: readonly T[]): { category: GameCategory; games: T[] }[] {
-  return CATEGORY_ORDER.map((category) => ({ category, games: games.filter((g) => g.category === category) })).filter(
+export function groupByCategory<T extends { category?: unknown }>(games: readonly T[]): { category: GameCategory; games: T[] }[] {
+  return CATEGORY_ORDER.map((category) => ({ category, games: games.filter((g) => gameCategory(g) === category) })).filter(
     (g) => g.games.length > 0,
   );
 }

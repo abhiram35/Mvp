@@ -3,6 +3,7 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'react-native';
 import { Button, EmptyState, ErrorState, LoadingState, Screen, ScreenHeader, Text } from '../../components/ui';
+import { useLatestRef, useNow } from '../../lib/hooks';
 import { useCommunityFeed } from '../../features/community/api';
 import { KIND_FILTER_OPTIONS } from '../../features/community/format';
 import { PostRow } from '../../features/community/PostRow';
@@ -27,16 +28,6 @@ function useDebounced<T>(value: T, ms = 300): T {
   return v;
 }
 
-/** Re-render every minute so "12m ago" stays accurate. */
-function useNow(intervalMs = 60_000) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), intervalMs);
-    return () => clearInterval(id);
-  }, [intervalMs]);
-  return now;
-}
-
 function openNew(kind?: CommunityPostKind) {
   router.push(kind ? { pathname: '/community/new', params: { kind } } : '/community/new');
 }
@@ -58,13 +49,12 @@ export default function CommunityScreen() {
 
   // Back from posting / deleting: refresh quietly. Skip the first focus (initial load runs).
   const focusedOnce = useRef(false);
-  const reloadRef = useRef(feed.reloadSilently);
-  reloadRef.current = feed.reloadSilently;
+  const reloadRef = useLatestRef(feed.reloadSilently);
   useFocusEffect(
     useCallback(() => {
       if (focusedOnce.current) void reloadRef.current();
       focusedOnce.current = true;
-    }, []),
+    }, [reloadRef]),
   );
 
   const renderItem = useCallback(
@@ -158,7 +148,7 @@ export default function CommunityScreen() {
           ) : loadMoreError ? (
             <View style={s.footer}>
               <Text variant="label" style={{ textAlign: 'center' }}>
-                Couldn't load more.
+                Couldn&apos;t load more.
               </Text>
               <Button title="Try again" variant="ghost" size="sm" onPress={() => void feed.loadMore()} />
             </View>

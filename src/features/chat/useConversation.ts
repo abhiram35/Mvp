@@ -20,6 +20,26 @@ export async function fetchProfiles(ids: string[]): Promise<MemberProfile[]> {
   return (data ?? []) as MemberProfile[];
 }
 
+type ConversationData = { conversation: Conversation; members: MemberProfile[] };
+
+async function fetchConversation(conversationId: string | undefined): Promise<ConversationData> {
+  if (!conversationId) throw new Error('Chat not found.');
+  const [convRes, memRes] = await Promise.all([
+    supabase.from('conversations').select('*').eq('id', conversationId).maybeSingle(),
+    supabase.from('conversation_members').select('*').eq('conversation_id', conversationId),
+  ]);
+  if (convRes.error) throw convRes.error;
+  if (memRes.error) throw memRes.error;
+  if (!convRes.data) throw new Error("This chat doesn't exist or you're not a member.");
+  const memberRows = (memRes.data ?? []) as ConversationMember[];
+  const profiles = await fetchProfiles(memberRows.map((m) => m.profile_id));
+  const byId = new Map(profiles.map((p) => [p.id, p]));
+  return {
+    conversation: convRes.data as Conversation,
+    members: memberRows.map((m) => byId.get(m.profile_id) ?? unknownProfile(m.profile_id)),
+  };
+}
+
 /** Loads a conversation row plus its members' profiles. */
 export function useConversation(conversationId: string | undefined, myId: string) {
   const [conversation, setConversation] = useState<Conversation | null>(null);
@@ -27,40 +47,42 @@ export function useConversation(conversationId: string | undefined, myId: string
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const apply = useCallback((d: ConversationData) => {
+    setConversation(d.conversation);
+    setMembers(d.members);
+    setError(null);
+    setLoading(false);
+  }, []);
+
+  const fail = useCallback((err: unknown) => {
+    setError(errorMessage(err));
+    setLoading(false);
+  }, []);
+
   const load = useCallback(async () => {
-    if (!conversationId) {
-      setError('Chat not found.');
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     setError(null);
     try {
-      const [convRes, memRes] = await Promise.all([
-        supabase.from('conversations').select('*').eq('id', conversationId).maybeSingle(),
-        supabase.from('conversation_members').select('*').eq('conversation_id', conversationId),
-      ]);
-      if (convRes.error) throw convRes.error;
-      if (memRes.error) throw memRes.error;
-      if (!convRes.data) {
-        setError("This chat doesn't exist or you're not a member.");
-        return;
-      }
-      const memberRows = (memRes.data ?? []) as ConversationMember[];
-      const profiles = await fetchProfiles(memberRows.map((m) => m.profile_id));
-      const byId = new Map(profiles.map((p) => [p.id, p]));
-      setConversation(convRes.data as Conversation);
-      setMembers(memberRows.map((m) => byId.get(m.profile_id) ?? unknownProfile(m.profile_id)));
+      apply(await fetchConversation(conversationId));
     } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setLoading(false);
+      fail(err);
     }
-  }, [conversationId]);
+  }, [conversationId, apply, fail]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let live = true;
+    fetchConversation(conversationId).then(
+      (d) => {
+        if (live) apply(d);
+      },
+      (err: unknown) => {
+        if (live) fail(err);
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [conversationId, apply, fail]);
 
   const membersById = useMemo(() => new Map(members.map((m) => [m.id, m])), [members]);
 

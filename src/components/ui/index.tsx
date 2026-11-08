@@ -2,10 +2,12 @@
 // so screens built from these switch look instantly when the player changes theme.
 // Feature code should compose these instead of styling raw React Native views.
 import { Ionicons } from '@expo/vector-icons';
-import type { ComponentProps, ReactNode } from 'react';
+import { HeaderHeightContext } from 'expo-router/react-navigation';
+import { useContext, type ComponentProps, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Image,
+  KeyboardAvoidingView,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -88,14 +90,20 @@ export function Screen({
   style?: StyleProp<ViewStyle>;
 }) {
   const t = useTheme();
+  // undefined outside a navigator screen, 0 when the header is hidden.
+  const headerHeight = useContext(HeaderHeightContext) ?? 0;
   const inner = [padded && { paddingHorizontal: spacing.lg }, style];
   return (
     <SafeAreaView edges={edges} style={{ flex: 1, backgroundColor: t.colors.bg }}>
       <ScreenTexture />
       {scroll ? (
-        <ScrollView contentContainerStyle={[inner, { paddingBottom: spacing.xxl }]} keyboardShouldPersistTaps="handled">
-          {children}
-        </ScrollView>
+        // Android is edge-to-edge (the window no longer resizes for the keyboard), so pad on
+        // both platforms; under a navigator header, offset by its height.
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={headerHeight}>
+          <ScrollView contentContainerStyle={[inner, { paddingBottom: spacing.xxl }]} keyboardShouldPersistTaps="handled">
+            {children}
+          </ScrollView>
+        </KeyboardAvoidingView>
       ) : (
         <View style={[{ flex: 1 }, inner]}>{children}</View>
       )}

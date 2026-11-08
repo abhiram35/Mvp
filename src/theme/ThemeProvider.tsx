@@ -129,10 +129,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // A saved custom theme that is gone from the player's list (deleted elsewhere, other
   // account) falls back to Protocol for good. While signed out / loading / on error we
   // only show Protocol and keep the saved choice.
+  // (Not logged as theme_changed: the player didn't choose it. Protocol already shows meanwhile.)
   useEffect(() => {
     if (customStatus !== 'loaded' || !isCustomThemeId(savedId)) return;
-    if (!customThemes.some((c) => c.id === savedId)) setThemeId(DEFAULT_THEME);
-  }, [customStatus, customThemes, savedId, setThemeId]);
+    if (customThemes.some((c) => c.id === savedId)) return;
+    AsyncStorage.setItem(STORAGE_KEY, DEFAULT_THEME)
+      .catch(() => undefined)
+      .finally(() => setSavedId((cur) => (cur === savedId ? DEFAULT_THEME : cur)));
+  }, [customStatus, customThemes, savedId]);
 
   const addCustomTheme = useCallback((theme: AppTheme) => {
     setCustomThemes((prev) => [theme, ...prev.filter((c) => c.id !== theme.id)]);

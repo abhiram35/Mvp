@@ -74,7 +74,7 @@ export default function ReportScreen() {
     <Screen scroll edges={['bottom']}>
       <Text variant="title" style={{ marginTop: spacing.lg }}>Report {TARGET_LABELS[type]}</Text>
       <Text muted style={{ marginTop: spacing.xs, marginBottom: spacing.xl }}>
-        Reports are anonymous. Tell us what's wrong and our team will take a look.
+        Reports are anonymous. Tell us what&apos;s wrong and our team will take a look.
       </Text>
 
       <Text variant="label" style={{ marginBottom: spacing.sm }}>Reason</Text>

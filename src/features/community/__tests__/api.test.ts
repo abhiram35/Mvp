@@ -9,7 +9,7 @@ import {
   wasEdited,
 } from '../api';
 
-jest.mock('../../../lib/supabase', () => ({ supabase: {} }));
+jest.mock('../../../lib/supabase', () => ({ supabase: {}, pausedMessageFor: () => null }));
 jest.mock('../../safety/blocks', () => ({ useBlockedIds: () => new Set() }));
 
 describe('community error helpers', () => {

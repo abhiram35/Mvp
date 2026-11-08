@@ -3,7 +3,7 @@
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { AppState } from 'react-native';
-import { isSupabaseConfigured, supabase } from '../../lib/supabase';
+import { isSupabaseConfigured, registerBanHooks, supabase } from '../../lib/supabase';
 import type { MyStatus } from '../../lib/types';
 
 const NOT_BANNED: MyStatus = { banned_until: null, is_moderator: false };
@@ -102,6 +102,12 @@ export function isBannedNow(status: MyStatus, now: number = Date.now()): boolean
   const until = Date.parse(status.banned_until);
   return Number.isFinite(until) && until > now;
 }
+
+// Lets errorMessage() say "Your account is paused" for RLS refusals, and re-check the ban.
+registerBanHooks({
+  isBanned: () => isBannedNow(snapshot.status),
+  refresh: () => void fetchStatus(true),
+});
 
 export interface MyStatusState {
   status: MyStatus;

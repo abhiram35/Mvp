@@ -74,11 +74,11 @@ export default function ThemeScreen() {
         </View>
       ) : customStatus === 'error' && customThemes.length === 0 ? (
         <View style={{ gap: spacing.sm, alignItems: 'flex-start' }}>
-          <Text muted>Couldn't load your saved themes.</Text>
+          <Text muted>Couldn&apos;t load your saved themes.</Text>
           <Button title="Try again" variant="secondary" size="sm" onPress={() => void refreshCustomThemes()} />
         </View>
       ) : customThemes.length === 0 ? (
-        <Text muted>No AI themes yet. Describe a vibe below and we'll design one for you.</Text>
+        <Text muted>No AI themes yet. Describe a vibe below and we&apos;ll design one for you.</Text>
       ) : (
         <View style={{ gap: spacing.md }} accessibilityRole="radiogroup">
           {customThemes.map((ct) => (

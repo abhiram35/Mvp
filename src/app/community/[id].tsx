@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, KeyboardAvoidingView, Pressable, StyleSheet, View } from 'react-native';
 import { Avatar, Button, EmptyState, ErrorState, LoadingState, Screen, Text } from '../../components/ui';
 import { ActionMenu, type MenuAction } from '../../features/community/ActionMenu';
@@ -17,11 +17,14 @@ import {
 } from '../../features/community/api';
 import { plural, timeAgo } from '../../features/community/format';
 import { GgButton } from '../../features/community/GgButton';
+import { BannedBanner } from '../../features/moderation/BannedBanner';
+import { useMyStatus } from '../../features/moderation/useMyStatus';
 import { ReplyComposer } from '../../features/community/ReplyComposer';
 import { ReplyRow } from '../../features/community/ReplyRow';
 import { KindTag, SolvedTag } from '../../features/community/Tags';
 import { useGames } from '../../features/games/useGames';
 import { openReport } from '../../lib/actions';
+import { useLatestRef, useNow } from '../../lib/hooks';
 import { COMMUNITY_KIND_LABELS, type CommunityPostSummary, type CommunityReplyItem } from '../../lib/types';
 import { useUserId } from '../../providers/AuthProvider';
 import { fontSize, makeStyles, spacing, useTheme } from '../../theme';
@@ -40,12 +43,8 @@ export default function CommunityThreadScreen() {
   const headerHeight = useHeaderHeight();
   const listRef = useRef<FlatList<CommunityReplyItem>>(null);
   const [menu, setMenu] = useState<MenuState | null>(null);
-  const [now, setNow] = useState(Date.now());
-
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 60_000);
-    return () => clearInterval(id);
-  }, []);
+  const now = useNow();
+  const { banned } = useMyStatus();
 
   const { summary, loading, error, reload: reloadPost } = useCommunityPost(postId);
   const reloadPostQuietly = useCallback(() => void reloadPost(true), [reloadPost]);
@@ -61,16 +60,15 @@ export default function CommunityThreadScreen() {
 
   // Back from editing: pick up the changes.
   const focusedOnce = useRef(false);
-  const reloadRef = useRef<() => void>(() => undefined);
-  reloadRef.current = () => {
+  const reloadRef = useLatestRef(() => {
     void reloadPost(true);
     void reloadReplies(true);
-  };
+  });
   useFocusEffect(
     useCallback(() => {
       if (focusedOnce.current) reloadRef.current();
       focusedOnce.current = true;
-    }, []),
+    }, [reloadRef]),
   );
 
   const refreshAll = useCallback(async () => {
@@ -265,7 +263,7 @@ export default function CommunityThreadScreen() {
             ) : repliesError ? (
               <View style={s.state}>
                 <Text variant="label" style={{ textAlign: 'center' }}>
-                  Couldn't load replies. {repliesError}
+                  Couldn&apos;t load replies. {repliesError}
                 </Text>
                 <Button title="Try again" variant="ghost" size="sm" onPress={() => void reloadReplies()} />
               </View>
@@ -290,7 +288,11 @@ export default function CommunityThreadScreen() {
             ) : undefined
           }
         />
-        <ReplyComposer onSend={sendReply} placeholder={isQuestion ? 'Share a fix or a tip' : 'Add your reply'} />
+        {banned ? (
+          <BannedBanner force />
+        ) : (
+          <ReplyComposer onSend={sendReply} placeholder={isQuestion ? 'Share a fix or a tip' : 'Add your reply'} />
+        )}
       </KeyboardAvoidingView>
       <ActionMenu visible={!!menu} title={menu?.title} actions={menu?.actions ?? []} onClose={() => setMenu(null)} />
     </Screen>

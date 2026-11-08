@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { StyleSheet } from 'react-native';
 import { Button, Divider, ErrorState, LoadingState, Screen, Text } from '../../components/ui';
 import { updateProfile } from '../../features/profile/api';
@@ -31,10 +31,8 @@ export default function EditProfileScreen() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const usernameStatus = useUsernameAvailability(values?.username ?? '', profile?.username);
 
-  // Seed the form once the profile has loaded.
-  useEffect(() => {
-    if (profile && !values) setValues(formFromProfile(profile, games));
-  }, [profile, games, values]);
+  // Seed the form once the profile has loaded (state adjusted during render, not in an effect).
+  if (profile && !values) setValues(formFromProfile(profile, games));
 
   if (loading && !values) {
     return (

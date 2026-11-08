@@ -17,6 +17,8 @@ import {
   type LfgRequestWithRequester,
 } from '../../features/lfg/api';
 import { expiresIn, isExpired, LFG_LIMITS, regionLabel, timeAgo } from '../../features/lfg/format';
+import { BannedBanner } from '../../features/moderation/BannedBanner';
+import { useMyStatus } from '../../features/moderation/useMyStatus';
 import { RateSquadButton } from '../../features/reputation/RateSquadButton';
 import { useBlockedIds } from '../../features/safety/blocks';
 import { openDm, openReport } from '../../lib/actions';
@@ -108,6 +110,7 @@ function RequesterPanel({
   const t = useTheme();
   const styles = useStyles();
   const { request, loading, error, reload } = useMyLfgRequest(post.id, myId, true);
+  const { banned } = useMyStatus();
   const acceptedWithoutChat = request?.status === 'accepted' && !post.conversation_id;
 
   // Once I'm accepted the post gets its conversation_id; refetch the post to pick it up.
@@ -181,11 +184,11 @@ function RequesterPanel({
                 onPress={() => openChat(post.conversation_id!)}
                 style={{ marginTop: spacing.md }}
               />
-              <RateSquadButton lfgPostId={post.id} style={{ marginTop: spacing.sm }} />
+              <RateSquadButton lfgPostId={post.id} lobbyCreatedAt={post.created_at} style={{ marginTop: spacing.sm }} />
             </>
           ) : (
             <Text variant="caption" style={{ marginTop: spacing.sm }}>
-              You're in! The {t.words.squad} chat will appear here shortly.
+              You&apos;re in! The {t.words.squad} chat will appear here shortly.
             </Text>
           )
         ) : null}
@@ -201,7 +204,7 @@ function RequesterPanel({
   if (!joinable) {
     return (
       <View style={styles.section}>
-        <Text muted>This post isn't taking requests any more.</Text>
+        <Text muted>This post isn&apos;t taking requests any more.</Text>
       </View>
     );
   }
@@ -209,6 +212,7 @@ function RequesterPanel({
   return (
     <Section title="Want in?">
       <View style={{ height: spacing.md }} />
+      {banned ? <BannedBanner force /> : null}
       <TextField
         label="Message to the host (optional)"
         placeholder="e.g. Diamond IGL, mic on, free till midnight"
@@ -224,6 +228,7 @@ function RequesterPanel({
         icon="person-add-outline"
         onPress={send}
         loading={busy}
+        disabled={banned}
       />
     </Section>
   );
@@ -291,6 +296,7 @@ function AuthorPanel({ post, joinable, onChanged }: { post: LfgPostWithAuthor; j
   const t = useTheme();
   const styles = useStyles();
   const { requests, loading, error, reload } = useLfgRequests(post.id, true);
+  const { banned } = useMyStatus();
   const { blockedIds } = useBlockedIds();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [postBusy, setPostBusy] = useState(false);
@@ -376,7 +382,7 @@ function AuthorPanel({ post, joinable, onChanged }: { post: LfgPostWithAuthor; j
             onPress={() => openChat(post.conversation_id!)}
             style={{ marginTop: spacing.lg }}
           />
-          <RateSquadButton lfgPostId={post.id} style={{ marginTop: spacing.sm }} />
+          <RateSquadButton lfgPostId={post.id} lobbyCreatedAt={post.created_at} style={{ marginTop: spacing.sm }} />
         </>
       ) : null}
 
@@ -391,6 +397,7 @@ function AuthorPanel({ post, joinable, onChanged }: { post: LfgPostWithAuthor; j
         <View style={styles.segment}>
           <SegmentBar filled={Math.min(acceptedCount, post.slots_needed)} total={post.slots_needed} />
         </View>
+        {banned && pending.length > 0 ? <BannedBanner force /> : null}
         {loading ? (
           <View style={{ paddingVertical: spacing.xl }}>
             <LoadingState />
@@ -412,7 +419,7 @@ function AuthorPanel({ post, joinable, onChanged }: { post: LfgPostWithAuthor; j
                 key={r.id}
                 req={r}
                 busy={busyId === r.id}
-                canAccept={busyId === null && post.status === 'open' && !isExpired(post)}
+                canAccept={busyId === null && post.status === 'open' && !isExpired(post) && !banned}
                 onAccept={() => void accept(r)}
                 onDecline={() => void decline(r)}
               />

@@ -111,7 +111,13 @@ npx eas-cli@latest env:create --environment preview --name EXPO_PUBLIC_SUPABASE_
 (Or on **expo.dev → your project → Environment variables**.) The anon key is meant to be public, so
 "plaintext" is fine. If the installed app can never sign in (but works in Expo Go), this step was missed.
 
+Each build profile in `eas.json` names the environment it reads (`"environment": "preview"` for the
+`preview` profile, and so on), so variables created for `preview` end up in preview builds.
+
 ## 8. Android push notifications (optional, needs Firebase)
+
+Do this **before** step 9 if you want push in the first build: `google-services.json` is baked into the
+build, so adding it later means building again.
 
 Expo's guides: [push notifications setup](https://docs.expo.dev/push-notifications/push-notifications-setup/)
 and [FCM V1 credentials](https://docs.expo.dev/push-notifications/fcm-credentials/). Short version:
@@ -120,7 +126,9 @@ and [FCM V1 credentials](https://docs.expo.dev/push-notifications/fcm-credential
 2. **Add app → Android**, package name **`com.abhiram35.gg`** (must match `app.json`). Download
    **`google-services.json`** and put it in the project root.
 3. Tell the app about it: in `app.json`, inside `"android": { … }`, add
-   `"googleServicesFile": "./google-services.json"`. Commit both files.
+   `"googleServicesFile": "./google-services.json"`. Commit both files. Only add this line once the file is
+   really there: a build with the line but without the file fails. (`google-services.json` is not a secret;
+   it must be committed, because cloud builds only see committed files.)
 4. **Firebase → Project settings → Service accounts → Generate new private key**. This downloads a JSON key.
    **This one is secret.** Keep it outside the project folder and never commit it.
 5. Upload it to Expo:
@@ -152,8 +160,10 @@ are not on the Play Store, so this is expected.
 For changes to **JavaScript/TypeScript only** (screens, text, logic, styles):
 
 ```bash
-npx eas-cli@latest update --channel preview --message "Fix chat scroll"
+npx eas-cli@latest update --channel preview --environment preview --message "Fix chat scroll"
 ```
+
+`--environment preview` bundles the same Supabase keys the preview build uses (step 7).
 
 Friends get the fix the next time they open the app (it downloads in the background, then applies on the
 following launch, so ask them to close and reopen twice).

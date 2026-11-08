@@ -193,11 +193,25 @@ describe('validateSpec', () => {
 
   it('accepts non-Latin letters in names and words', () => {
     const s = goodSpec();
-    // Note: scripts that use combining marks (e.g. Devanagari matras in 'रणभूमि') are
-    // currently rejected because PLAIN_WORDS allows \p{L} but not \p{M}.
     s.name = 'Élan Noir';
     s.words.squad = '侍';
     expect(validateSpec(s)).not.toBeNull();
+  });
+
+  it('accepts scripts with combining marks (Devanagari matras)', () => {
+    const s = goodSpec();
+    s.name = 'रणभूमि';
+    s.words.squad = 'दस्ता';
+    const out = validateSpec(s);
+    expect(out).not.toBeNull();
+    expect(out!.name).toBe('रणभूमि');
+    // Decomposed accents (e + U+0301) are fine too.
+    expect(validateSpec({ ...goodSpec(), name: 'Cafe\u0301 Noir' })).not.toBeNull();
+  });
+
+  it('rejects stray or stacked combining marks', () => {
+    expect(validateSpec({ ...goodSpec(), name: '\u0301\u0301ab' })).toBeNull();
+    expect(validateSpec({ ...goodSpec(), name: 'Za\u0301\u0302\u0303\u0304lgo' })).toBeNull();
   });
 });
 

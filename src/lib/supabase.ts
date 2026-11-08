@@ -32,8 +32,37 @@ if (Platform.OS !== 'web') {
   });
 }
 
+// ── Friendly copy for server refusals ───────────────────────────────────────
+// The moderation status store registers itself here (lib must not import features).
+let banHooks: { isBanned: () => boolean; refresh: () => void } = { isBanned: () => false, refresh: () => undefined };
+
+/** Called once by features/moderation/useMyStatus. */
+export function registerBanHooks(hooks: { isBanned: () => boolean; refresh: () => void }) {
+  banHooks = hooks;
+}
+
+export const PAUSED_MESSAGE = "Your account is paused, so you can't do that right now. You can still read and browse.";
+
+/** A raw RLS / privilege refusal ("new row violates row-level security policy …"). */
+export function isRlsRefusal(err: unknown): boolean {
+  const e = (err ?? {}) as { code?: unknown; message?: unknown };
+  const msg = typeof e.message === 'string' ? e.message : '';
+  return e.code === '42501' && /row-level security|permission denied/i.test(msg);
+}
+
+/**
+ * For a raw RLS refusal: the "account paused" copy when the player is banned, else null.
+ * Also re-checks the ban status, so the banner appears if a ban started meanwhile.
+ */
+export function pausedMessageFor(err: unknown): string | null {
+  if (!isRlsRefusal(err)) return null;
+  banHooks.refresh();
+  return banHooks.isBanned() ? PAUSED_MESSAGE : null;
+}
+
 /** Turns any Supabase / unknown error into a short message safe to show users. */
 export function errorMessage(err: unknown): string {
+  if (isRlsRefusal(err)) return pausedMessageFor(err) ?? "You can't do that right now.";
   if (err && typeof err === 'object' && 'message' in err && typeof (err as { message: unknown }).message === 'string') {
     return (err as { message: string }).message;
   }

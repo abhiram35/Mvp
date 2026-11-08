@@ -24,7 +24,6 @@ export function useFriendships(options: { withProfiles?: boolean } = {}) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const mounted = useRef(true);
-  const loadedOnce = useRef(false);
 
   useEffect(() => {
     mounted.current = true;
@@ -33,33 +32,45 @@ export function useFriendships(options: { withProfiles?: boolean } = {}) {
     };
   }, []);
 
-  const load = useCallback(async () => {
-    if (!myId) return;
-    if (!loadedOnce.current) setLoading(true);
-    try {
-      const rows = await fetchMyFriendships(myId);
-      const otherIds = rows.map((f) => (f.requester_id === myId ? f.addressee_id : f.requester_id));
-      const profiles = withProfiles ? await fetchProfiles(otherIds) : [];
-      const byId = new Map(profiles.map((p) => [p.id, p]));
-      if (!mounted.current) return;
-      setItems(
-        rows.map((f, i) => {
-          const otherId = otherIds[i] ?? '';
-          return { friendship: f, profile: byId.get(otherId) ?? unknownProfile(otherId) };
-        }),
-      );
-      setError(null);
-      loadedOnce.current = true;
-    } catch (err) {
-      if (mounted.current) setError(errorMessage(err));
-    } finally {
-      if (mounted.current) setLoading(false);
-    }
+  const fetchAll = useCallback(async (): Promise<FriendshipWithProfile[]> => {
+    if (!myId) return [];
+    const rows = await fetchMyFriendships(myId);
+    const otherIds = rows.map((f) => (f.requester_id === myId ? f.addressee_id : f.requester_id));
+    const profiles = withProfiles ? await fetchProfiles(otherIds) : [];
+    const byId = new Map(profiles.map((p) => [p.id, p]));
+    return rows.map((f, i) => {
+      const otherId = otherIds[i] ?? '';
+      return { friendship: f, profile: byId.get(otherId) ?? unknownProfile(otherId) };
+    });
   }, [myId, withProfiles]);
 
+  const commit = useCallback((next: FriendshipWithProfile[]) => {
+    if (!mounted.current) return;
+    setItems(next);
+    setError(null);
+    setLoading(false);
+  }, []);
+
+  const fail = useCallback((err: unknown) => {
+    if (!mounted.current) return;
+    setError(errorMessage(err));
+    setLoading(false);
+  }, []);
+
+  /** Quiet reload (realtime, after mutations): the list stays on screen while it refreshes. */
+  const load = useCallback(async () => {
+    if (!myId) return;
+    try {
+      commit(await fetchAll());
+    } catch (err) {
+      fail(err);
+    }
+  }, [myId, fetchAll, commit, fail]);
+
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!myId) return;
+    fetchAll().then(commit, fail);
+  }, [myId, fetchAll, commit, fail]);
 
   useEffect(() => onFriendshipsChanged(() => void load()), [load]);
 
@@ -74,7 +85,8 @@ export function useFriendships(options: { withProfiles?: boolean } = {}) {
     };
   }, [myId, load]);
 
-  return { myId, items, loading, error, reload: load };
+  // Signed out: nothing to load, so never show a spinner.
+  return { myId, items, loading: loading && !!myId, error, reload: load };
 }
 
 /** Accepted friends with profiles, sorted by display name. */

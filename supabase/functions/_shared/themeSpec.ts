@@ -299,8 +299,10 @@ export function limitText(s: string, max: number): string {
   return (sp >= Math.floor(max / 2) ? cut.slice(0, sp) : cut).replace(/[\s,;:–-]+$/, '').trim();
 }
 
-// Plain words: letters (any script), digits, spaces and a little punctuation.
-const PLAIN_WORDS = /^[\p{L}\p{N} '’\-!&.]+$/u;
+// Plain words: letters (any script, each with up to 3 combining marks such as Devanagari
+// matras or accents), digits, spaces and a little punctuation. Marks must follow a letter or
+// digit, and the cap stops "zalgo" stacks. Keep identical to src/theme/custom.ts.
+const PLAIN_WORDS = /^(?:[\p{L}\p{N}]\p{M}{0,3}|[ '’\-!&.])+$/u;
 
 /** Cleans the player's prompt. Returns null if the length is out of range. */
 export function cleanPrompt(raw: unknown): string | null {

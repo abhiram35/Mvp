@@ -25,7 +25,11 @@ import { useConversation, type MemberProfile } from '../../features/chat/useConv
 import { useMessages, type ChatMessage } from '../../features/chat/useMessages';
 import { useBlockedIds } from '../../features/safety/blocks';
 import { ActionMenu } from '../../features/community/ActionMenu';
+import { BannedBanner } from '../../features/moderation/BannedBanner';
+import { useMyStatus } from '../../features/moderation/useMyStatus';
+import { isRatingWindowOpen } from '../../features/reputation/api';
 import { RateSquadSheet } from '../../features/reputation/RateSquadSheet';
+import { useNow } from '../../lib/hooks';
 
 export default function ChatScreen() {
   const params = useLocalSearchParams<{ id: string }>();
@@ -43,10 +47,15 @@ export default function ChatScreen() {
     useMessages(conversationId, myId, membersById);
 
   const isGroup = conversation?.is_group ?? false;
+  const now = useNow();
+  // The squad chat is created on the first accept, so it is never older than its lobby:
+  // once the chat is past the rating window, the lobby's window has closed too.
   const lfgPostId = conversation?.lfg_post_id ?? null;
+  const canRate = !!lfgPostId && isRatingWindowOpen(conversation?.created_at, now);
   const [menuOpen, setMenuOpen] = useState(false);
   const [rateOpen, setRateOpen] = useState(false);
   const partnerBlocked = !!partner && blockedIds.has(partner.id);
+  const { banned } = useMyStatus();
 
   const visible = useMemo(() => messages.filter((m) => !blockedIds.has(m.sender_id)), [messages, blockedIds]);
 
@@ -91,7 +100,7 @@ export default function ChatScreen() {
               ? () => <GroupHeader title={conversation?.title ?? groupFallback} memberCount={members.length} />
               : undefined,
         // Squad chats (from a lobby) get a menu with "Rate your squad".
-        headerRight: lfgPostId
+        headerRight: canRate
           ? () => (
               <Pressable
                 onPress={() => setMenuOpen(true)}
@@ -190,6 +199,8 @@ export default function ChatScreen() {
               You blocked this player. Unblock them in Settings → Blocked players to send messages.
             </Text>
           </View>
+        ) : banned ? (
+          <BannedBanner force />
         ) : (
           <Composer onSend={handleSend} />
         )}

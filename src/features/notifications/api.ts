@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLatestRef } from '../../lib/hooks';
 import { errorMessage, supabase } from '../../lib/supabase';
 import type { AppNotification, NotificationType } from '../../lib/types';
 import { decrementUnread, refreshUnread, setUnreadCount } from './unread';
@@ -77,41 +78,47 @@ export function useNotifications(userId: string) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const itemsRef = useRef(items);
-  useEffect(() => {
-    itemsRef.current = items;
-  }, [items]);
+  const itemsRef = useLatestRef(items);
   const reqId = useRef(0);
 
+  type Mode = 'initial' | 'refresh' | 'silent';
+
+  const commitFirstPage = useCallback((id: number, mode: Mode, page: AppNotification[]) => {
+    if (id !== reqId.current) return;
+    // Replace the first page but keep older pages already loaded.
+    setItems((prev) => {
+      if (mode !== 'silent') return page;
+      const oldest = page.length ? page[page.length - 1].created_at : null;
+      const older = oldest ? prev.filter((n) => n.created_at < oldest) : [];
+      return merge(older, page);
+    });
+    if (mode !== 'silent') setHasMore(page.length === NOTIFICATIONS_PAGE);
+    setError(null);
+    setLoading(false);
+    setRefreshing(false);
+    if (mode !== 'silent') void refreshUnread();
+  }, []);
+
+  const failFirstPage = useCallback((id: number, mode: Mode, e: unknown) => {
+    if (id !== reqId.current) return;
+    if (mode !== 'silent') setError(errorMessage(e));
+    setLoading(false);
+    setRefreshing(false);
+  }, []);
+
   const loadFirst = useCallback(
-    async (mode: 'initial' | 'refresh' | 'silent') => {
+    async (mode: Mode) => {
       if (!userId) return;
       const id = ++reqId.current;
       if (mode === 'initial') setLoading(true);
       if (mode === 'refresh') setRefreshing(true);
       try {
-        const page = await fetchPage(userId, null);
-        if (id !== reqId.current) return;
-        // Replace the first page but keep older pages already loaded.
-        setItems((prev) => {
-          if (mode !== 'silent') return page;
-          const oldest = page.length ? page[page.length - 1].created_at : null;
-          const older = oldest ? prev.filter((n) => n.created_at < oldest) : [];
-          return merge(older, page);
-        });
-        if (mode !== 'silent') setHasMore(page.length === NOTIFICATIONS_PAGE);
-        setError(null);
+        commitFirstPage(id, mode, await fetchPage(userId, null));
       } catch (e) {
-        if (id === reqId.current && mode !== 'silent') setError(errorMessage(e));
-      } finally {
-        if (id === reqId.current) {
-          setLoading(false);
-          setRefreshing(false);
-        }
+        failFirstPage(id, mode, e);
       }
-      if (mode !== 'silent') void refreshUnread();
     },
-    [userId],
+    [userId, commitFirstPage, failFirstPage],
   );
 
   const loadMore = useCallback(async () => {
@@ -127,11 +134,16 @@ export function useNotifications(userId: string) {
     } finally {
       setLoadingMore(false);
     }
-  }, [userId, loadingMore, hasMore]);
+  }, [userId, loadingMore, hasMore, itemsRef]);
 
   useEffect(() => {
-    void loadFirst('initial');
-  }, [loadFirst]);
+    if (!userId) return;
+    const id = ++reqId.current;
+    fetchPage(userId, null).then(
+      (page) => commitFirstPage(id, 'initial', page),
+      (e: unknown) => failFirstPage(id, 'initial', e),
+    );
+  }, [userId, commitFirstPage, failFirstPage]);
 
   // Live: new rows and collapsed message rows (UPDATE) appear without a pull.
   useEffect(() => {
@@ -162,7 +174,7 @@ export function useNotifications(userId: string) {
       setItems((prev) => prev.map((n) => (n.id === id ? { ...n, read_at: null } : n)));
     }
     void refreshUnread();
-  }, []);
+  }, [itemsRef]);
 
   /** Marks everything read. Returns an error message, or null on success. */
   const markAllRead = useCallback(async (): Promise<string | null> => {
@@ -178,7 +190,7 @@ export function useNotifications(userId: string) {
     }
     void refreshUnread();
     return null;
-  }, []);
+  }, [itemsRef]);
 
   return {
     items,

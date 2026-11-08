@@ -199,6 +199,14 @@ export async function deleteTheme(rowId: string): Promise<void> {
   if (error) throw new Error(errorMessage(error));
 }
 
+type QuotaResult = { quota: ThemeQuota } | { error: string };
+
+async function fetchThemeQuota(): Promise<QuotaResult> {
+  const { data, error } = await supabase.rpc('get_theme_quota');
+  if (error) return { error: errorMessage(error) };
+  return isQuota(data) ? { quota: data } : { error: "Couldn't load your AI theme allowance." };
+}
+
 /** The player's AI theme quota for this IST month. */
 export function useThemeQuota() {
   const [quota, setQuota] = useState<ThemeQuota | null>(null);
@@ -206,25 +214,27 @@ export function useThemeQuota() {
   const [error, setError] = useState<string | null>(null);
   const mounted = useRef(true);
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    const { data, error: err } = await supabase.rpc('get_theme_quota');
+  const apply = useCallback((r: QuotaResult) => {
     if (!mounted.current) return;
-    if (err) setError(errorMessage(err));
-    else if (isQuota(data)) {
-      setQuota(data);
+    if ('quota' in r) {
+      setQuota(r.quota);
       setError(null);
-    } else setError("Couldn't load your AI theme allowance.");
+    } else setError(r.error);
     setLoading(false);
   }, []);
 
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    apply(await fetchThemeQuota().catch((e: unknown) => ({ error: errorMessage(e) })));
+  }, [apply]);
+
   useEffect(() => {
     mounted.current = true;
-    void refresh();
+    fetchThemeQuota().then(apply, (e: unknown) => apply({ error: errorMessage(e) }));
     return () => {
       mounted.current = false;
     };
-  }, [refresh]);
+  }, [apply]);
 
   return { quota, loading, error, refresh, setQuota };
 }

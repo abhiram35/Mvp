@@ -1,6 +1,6 @@
 import { Link, router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Button, Screen, Text, TextField } from '../../components/ui';
 import { AuthHero } from '../../features/profile/AuthHero';
 import { errorMessage, supabase } from '../../lib/supabase';
@@ -38,7 +38,7 @@ export default function SignInScreen() {
 
   return (
     <Screen scroll>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View>
         <View style={styles.hero}>
           <AuthHero />
         </View>
@@ -91,7 +91,7 @@ export default function SignInScreen() {
             </Pressable>
           </Link>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Screen>
   );
 }

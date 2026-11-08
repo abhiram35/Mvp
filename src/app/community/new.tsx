@@ -1,12 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { Button, EmptyState, ErrorState, LoadingState, Screen, Text, TextField, type IconName } from '../../components/ui';
 import { communityErrorMessage, createPost, updatePost, useCommunityPost } from '../../features/community/api';
 import { COMMUNITY_LIMITS } from '../../features/community/format';
 import { useGames } from '../../features/games/useGames';
 import { HorizontalChips } from '../../features/lfg/HorizontalChips';
+import { BannedBanner } from '../../features/moderation/BannedBanner';
+import { useMyStatus } from '../../features/moderation/useMyStatus';
 import type { CommunityPostKind } from '../../lib/types';
 import { useUserId } from '../../providers/AuthProvider';
 import { fontSize, makeStyles, spacing, useTheme } from '../../theme';
@@ -51,17 +53,19 @@ export default function NewCommunityPostScreen() {
   const [touched, setTouched] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [prefilled, setPrefilled] = useState(false);
+  const { banned } = useMyStatus();
+  // Paused players can still edit their own posts, but not create new ones.
+  const blockedByBan = banned && !editing;
 
-  // Editing: fill the form once the post has loaded.
-  useEffect(() => {
-    if (!editing || prefilled || !existing.summary) return;
+  // Editing: fill the form once the post has loaded (state adjusted during render, not in an effect).
+  if (editing && !prefilled && existing.summary) {
     const p = existing.summary.post;
     setKind(p.kind);
     setGameId(p.game_id);
     setTitle(p.title);
     setBody(p.body);
     setPrefilled(true);
-  }, [editing, prefilled, existing.summary]);
+  }
 
   const trimmedTitle = title.trim();
   const trimmedBody = body.trim();
@@ -144,9 +148,10 @@ export default function NewCommunityPostScreen() {
   const submitLabel = editing ? 'Save changes' : kind === 'question' ? 'Ask question' : 'Post take';
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: t.colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <>
       <Screen scroll edges={['bottom']}>
         {header}
+        {blockedByBan ? <BannedBanner force /> : null}
         <View style={{ height: spacing.lg }} />
 
         {editing ? null : (
@@ -194,7 +199,7 @@ export default function NewCommunityPostScreen() {
             Game (optional)
           </Text>
           {gamesError ? (
-            <Text variant="caption">Couldn't load games. Your post will go under General.</Text>
+            <Text variant="caption">Couldn&apos;t load games. Your post will go under General.</Text>
           ) : (
             <HorizontalChips
               options={games.map((g) => ({ value: g.id, label: `${g.emoji} ${g.name}` }))}
@@ -232,9 +237,9 @@ export default function NewCommunityPostScreen() {
           Keep it respectful. Posts that target players get removed.
         </Text>
 
-        <Button title={submitLabel} onPress={() => void submit()} loading={submitting} disabled={touched && !valid} />
+        <Button title={submitLabel} onPress={() => void submit()} loading={submitting} disabled={(touched && !valid) || blockedByBan} />
       </Screen>
-    </KeyboardAvoidingView>
+    </>
   );
 }
 

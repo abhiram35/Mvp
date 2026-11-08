@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { supabase } from '../../lib/supabase';
+import { pausedMessageFor, supabase } from '../../lib/supabase';
 import type { LfgPost, LfgPostWithAuthor, LfgRequest, Profile, Region, UUID } from '../../lib/types';
 
 // Column-name hints (`!author_id`) disambiguate the profiles join without
@@ -49,33 +49,51 @@ export function useLfgPosts(filters: LfgFilters) {
   const requestId = useRef(0);
   const { gameId, region, language } = filters;
 
+  // Filters changed: show the spinner straight away (state adjusted during render).
+  const filterKey = `${gameId ?? ''}|${region ?? ''}|${language ?? ''}`;
+  const [activeKey, setActiveKey] = useState(filterKey);
+  if (activeKey !== filterKey) {
+    setActiveKey(filterKey);
+    setLoading(true);
+  }
+
+  const commit = useCallback((id: number, rows: LfgPostWithAuthor[]) => {
+    if (id !== requestId.current) return;
+    setPosts(rows);
+    setError(null);
+    setLoading(false);
+    setRefreshing(false);
+  }, []);
+
+  const fail = useCallback((id: number, mode: 'initial' | 'refresh' | 'silent', e: unknown) => {
+    if (id !== requestId.current) return;
+    // Keep showing stale posts on a failed background refresh.
+    if (mode !== 'silent') setError(e instanceof Error ? e.message : String((e as { message?: string })?.message ?? e));
+    setLoading(false);
+    setRefreshing(false);
+  }, []);
+
   const load = useCallback(
     async (mode: 'initial' | 'refresh' | 'silent' = 'initial') => {
       const id = ++requestId.current;
       if (mode === 'initial') setLoading(true);
       if (mode === 'refresh') setRefreshing(true);
       try {
-        const rows = await fetchOpenLfgPosts({ gameId, region, language });
-        if (id !== requestId.current) return;
-        setPosts(rows);
-        setError(null);
+        commit(id, await fetchOpenLfgPosts({ gameId, region, language }));
       } catch (e) {
-        if (id !== requestId.current) return;
-        // Keep showing stale posts on a failed background refresh.
-        if (mode !== 'silent') setError(e instanceof Error ? e.message : String((e as { message?: string })?.message ?? e));
-      } finally {
-        if (id === requestId.current) {
-          setLoading(false);
-          setRefreshing(false);
-        }
+        fail(id, mode, e);
       }
     },
-    [gameId, region, language],
+    [gameId, region, language, commit, fail],
   );
 
   useEffect(() => {
-    void load('initial');
-  }, [load]);
+    const id = ++requestId.current;
+    fetchOpenLfgPosts({ gameId, region, language }).then(
+      (rows) => commit(id, rows),
+      (e: unknown) => fail(id, 'initial', e),
+    );
+  }, [gameId, region, language, commit, fail]);
 
   return {
     posts,
@@ -122,29 +140,43 @@ export function useLfgPost(id: UUID | undefined) {
   const [post, setPost] = useState<LfgPostWithAuthor | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const requestId = useRef(0);
+
+  const commit = useCallback((reqId: number, row: LfgPostWithAuthor | null) => {
+    if (reqId !== requestId.current) return;
+    setPost(row);
+    setError(null);
+    setLoading(false);
+  }, []);
+
+  const fail = useCallback((reqId: number, silent: boolean, e: unknown) => {
+    if (reqId !== requestId.current) return;
+    if (!silent) setError((e as { message?: string })?.message ?? 'Something went wrong.');
+    setLoading(false);
+  }, []);
 
   const load = useCallback(
     async (silent = false) => {
-      if (!id) {
-        setLoading(false);
-        return;
-      }
+      if (!id) return;
+      const reqId = ++requestId.current;
       if (!silent) setLoading(true);
       try {
-        setPost(await fetchLfgPost(id));
-        setError(null);
+        commit(reqId, await fetchLfgPost(id));
       } catch (e) {
-        if (!silent) setError((e as { message?: string })?.message ?? 'Something went wrong.');
-      } finally {
-        setLoading(false);
+        fail(reqId, silent, e);
       }
     },
-    [id],
+    [id, commit, fail],
   );
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!id) return;
+    const reqId = ++requestId.current;
+    fetchLfgPost(id).then(
+      (row) => commit(reqId, row),
+      (e: unknown) => fail(reqId, false, e),
+    );
+  }, [id, commit, fail]);
 
   // Live status / conversation_id changes (e.g. the post fills up or the chat is created).
   useEffect(() => {
@@ -160,7 +192,7 @@ export function useLfgPost(id: UUID | undefined) {
     };
   }, [id, load]);
 
-  return { post, loading, error, reload: () => load(true), retry: () => load(false) };
+  return { post, loading: loading && !!id, error, reload: () => load(true), retry: () => load(false) };
 }
 
 export interface NewLfgPostInput {
@@ -200,36 +232,54 @@ export async function deleteLfgPost(id: UUID): Promise<void> {
 // ── Join requests ───────────────────────────────────────────────────────────
 
 /** All requests for a post (author view), live-updated. Pass enabled=false for non-authors. */
+async function fetchLfgRequests(postId: UUID): Promise<LfgRequestWithRequester[]> {
+  const { data, error } = await supabase
+    .from('lfg_requests')
+    .select(`*, ${REQUESTER_SELECT}`)
+    .eq('post_id', postId)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as unknown as LfgRequestWithRequester[];
+}
+
 export function useLfgRequests(postId: UUID | undefined, enabled: boolean) {
   const [requests, setRequests] = useState<LfgRequestWithRequester[]>([]);
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
+  const active = !!postId && enabled;
+
+  // Became enabled (e.g. the post loaded and I'm its author): spinner until the first load.
+  const key = `${postId ?? ''}|${active}`;
+  const [shownKey, setShownKey] = useState(key);
+  if (shownKey !== key) {
+    setShownKey(key);
+    setLoading(active);
+  }
+
+  const commit = useCallback((rows: LfgRequestWithRequester[]) => {
+    setRequests(rows);
+    setError(null);
+    setLoading(false);
+  }, []);
+
+  const fail = useCallback((e: unknown) => {
+    setError((e as { message?: string })?.message ?? 'Something went wrong.');
+    setLoading(false);
+  }, []);
 
   const load = useCallback(async () => {
-    if (!postId || !enabled) {
-      setLoading(false);
-      return;
-    }
+    if (!postId || !enabled) return;
     try {
-      const { data, error: err } = await supabase
-        .from('lfg_requests')
-        .select(`*, ${REQUESTER_SELECT}`)
-        .eq('post_id', postId)
-        .order('created_at', { ascending: true });
-      if (err) throw err;
-      setRequests((data ?? []) as unknown as LfgRequestWithRequester[]);
-      setError(null);
+      commit(await fetchLfgRequests(postId));
     } catch (e) {
-      setError((e as { message?: string })?.message ?? 'Something went wrong.');
-    } finally {
-      setLoading(false);
+      fail(e);
     }
-  }, [postId, enabled]);
+  }, [postId, enabled, commit, fail]);
 
   useEffect(() => {
-    setLoading(enabled);
-    void load();
-  }, [load, enabled]);
+    if (!postId || !enabled) return;
+    fetchLfgRequests(postId).then(commit, fail);
+  }, [postId, enabled, commit, fail]);
 
   useEffect(() => {
     if (!postId || !enabled) return;
@@ -244,41 +294,58 @@ export function useLfgRequests(postId: UUID | undefined, enabled: boolean) {
     };
   }, [postId, enabled, load]);
 
-  return { requests, loading, error, reload: load };
+  return { requests, loading: loading && active, error, reload: load };
 }
 
 /** The current user's own request for a post (requester view), live-updated. */
+async function fetchMyLfgRequest(postId: UUID, myId: UUID): Promise<LfgRequest | null> {
+  const { data, error } = await supabase
+    .from('lfg_requests')
+    .select('*')
+    .eq('post_id', postId)
+    .eq('requester_id', myId)
+    .maybeSingle();
+  if (error) throw error;
+  return (data as LfgRequest | null) ?? null;
+}
+
 export function useMyLfgRequest(postId: UUID | undefined, myId: UUID, enabled: boolean) {
   const [request, setRequest] = useState<LfgRequest | null>(null);
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
+  const active = !!postId && !!myId && enabled;
+
+  const key = `${postId ?? ''}|${myId}|${active}`;
+  const [shownKey, setShownKey] = useState(key);
+  if (shownKey !== key) {
+    setShownKey(key);
+    setLoading(active);
+  }
+
+  const commit = useCallback((row: LfgRequest | null) => {
+    setRequest(row);
+    setError(null);
+    setLoading(false);
+  }, []);
+
+  const fail = useCallback((e: unknown) => {
+    setError((e as { message?: string })?.message ?? 'Something went wrong.');
+    setLoading(false);
+  }, []);
 
   const load = useCallback(async () => {
-    if (!postId || !myId || !enabled) {
-      setLoading(false);
-      return;
-    }
+    if (!postId || !myId || !enabled) return;
     try {
-      const { data, error: err } = await supabase
-        .from('lfg_requests')
-        .select('*')
-        .eq('post_id', postId)
-        .eq('requester_id', myId)
-        .maybeSingle();
-      if (err) throw err;
-      setRequest((data as LfgRequest | null) ?? null);
-      setError(null);
+      commit(await fetchMyLfgRequest(postId, myId));
     } catch (e) {
-      setError((e as { message?: string })?.message ?? 'Something went wrong.');
-    } finally {
-      setLoading(false);
+      fail(e);
     }
-  }, [postId, myId, enabled]);
+  }, [postId, myId, enabled, commit, fail]);
 
   useEffect(() => {
-    setLoading(enabled);
-    void load();
-  }, [load, enabled]);
+    if (!postId || !myId || !enabled) return;
+    fetchMyLfgRequest(postId, myId).then(commit, fail);
+  }, [postId, myId, enabled, commit, fail]);
 
   useEffect(() => {
     if (!postId || !myId || !enabled) return;
@@ -294,7 +361,7 @@ export function useMyLfgRequest(postId: UUID | undefined, myId: UUID, enabled: b
     };
   }, [postId, myId, enabled, load]);
 
-  return { request, loading, error, reload: load };
+  return { request, loading: loading && active, error, reload: load };
 }
 
 export async function requestToJoin(postId: UUID, requesterId: UUID, message: string | null): Promise<void> {
@@ -302,7 +369,7 @@ export async function requestToJoin(postId: UUID, requesterId: UUID, message: st
   // 23505 = unique violation: a request already exists; the caller just reloads.
   if (!error || error.code === '23505') return;
   // 42501 = RLS rejected it: post closed/expired, your own post, or a block between you.
-  if (error.code === '42501') throw new Error("This squad isn't taking your request right now.");
+  if (error.code === '42501') throw new Error(pausedMessageFor(error) ?? "This squad isn't taking your request right now.");
   throw error;
 }
 

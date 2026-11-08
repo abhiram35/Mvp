@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { KeyboardAvoidingView, Modal, Pressable, StyleSheet, View } from 'react-native';
 import { Button, Text, TextField } from '../../components/ui';
 import { SPEC_LIMITS, makeStyles, spacing, useTheme } from '../../theme';
 
@@ -22,13 +22,17 @@ export function RenameThemeModal({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (visible) {
-      setName(initialName);
+  // Reset the field each time the dialog opens (state adjusted during render, not in an effect).
+  const [openFor, setOpenFor] = useState<string | null>(visible ? initialName : null);
+  const openKey = visible ? initialName : null;
+  if (openFor !== openKey) {
+    setOpenFor(openKey);
+    if (openKey !== null) {
+      setName(openKey);
       setError(null);
       setSaving(false);
     }
-  }, [visible, initialName]);
+  }
 
   const clean = name.replace(/\s+/g, ' ').trim();
   const valid = clean.length >= SPEC_LIMITS.nameMin && clean.length <= SPEC_LIMITS.nameMax;
@@ -47,7 +51,7 @@ export function RenameThemeModal({
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel} statusBarTranslucent>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.wrap}>
+      <KeyboardAvoidingView behavior="padding" style={s.wrap}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onCancel} accessibilityRole="button" accessibilityLabel="Close" />
         <View style={s.sheet} accessibilityViewIsModal>
           <Text variant="heading" accessibilityRole="header">Rename theme</Text>

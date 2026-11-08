@@ -1,12 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack } from 'expo-router';
-import { useEffect, useState, type ReactNode } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { Alert, Pressable, StyleSheet, Switch, View } from 'react-native';
 import { Button, Chip, Divider, ErrorState, LoadingState, Screen, Text, TextField } from '../../components/ui';
 import { useGames } from '../../features/games/useGames';
 import { createLfgPost } from '../../features/lfg/api';
 import { DURATION_OPTIONS, hostCta, LFG_LIMITS, REGIONS, regionLabel } from '../../features/lfg/format';
 import { GameChipScroller, HorizontalChips } from '../../features/lfg/HorizontalChips';
+import { BannedBanner } from '../../features/moderation/BannedBanner';
+import { useMyStatus } from '../../features/moderation/useMyStatus';
 import { errorMessage } from '../../lib/supabase';
 import { LANGUAGES, type Region } from '../../lib/types';
 import { useAuth, useUserId } from '../../providers/AuthProvider';
@@ -72,6 +74,7 @@ export default function NewLfgPostScreen() {
   const { profile } = useAuth();
   const myId = useUserId();
   const { byId, loading: gamesLoading, error: gamesError } = useGames();
+  const { banned } = useMyStatus();
 
   const [gameId, setGameId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
@@ -88,9 +91,10 @@ export default function NewLfgPostScreen() {
   const game = byId(gameId);
 
   // Rank options depend on the game; clear a rank that doesn't belong to the new game.
-  useEffect(() => {
-    setRank(null);
-  }, [gameId]);
+  const changeGame = (id: string | null) => {
+    if (id !== gameId) setRank(null);
+    setGameId(id);
+  };
 
   // My languages first, then the rest.
   const languageOptions = Array.from(new Set([...(profile?.languages ?? []), ...LANGUAGES])).map((l) => ({ value: l, label: l }));
@@ -138,13 +142,14 @@ export default function NewLfgPostScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: t.colors.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <>
       <Screen scroll edges={['bottom']}>
         <Stack.Screen options={{ title: hostCta(t.words) }} />
+        {banned ? <BannedBanner force /> : null}
         <View style={{ height: spacing.lg }} />
 
         <Section label="Game *">
-          <GameChipScroller value={gameId} onChange={setGameId} />
+          <GameChipScroller value={gameId} onChange={changeGame} />
           {gameError ? <Text variant="caption" style={styles.error}>{gameError}</Text> : null}
         </Section>
 
@@ -227,9 +232,9 @@ export default function NewLfgPostScreen() {
           Keep it friendly. Toxic, hateful or spam posts get removed and can lead to a ban.
         </Text>
 
-        <Button title={hostCta(t.words)} icon="flash" onPress={submit} loading={submitting} />
+        <Button title={hostCta(t.words)} icon="flash" onPress={submit} loading={submitting} disabled={banned} />
       </Screen>
-    </KeyboardAvoidingView>
+    </>
   );
 }
 

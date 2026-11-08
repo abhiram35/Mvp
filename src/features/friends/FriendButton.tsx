@@ -29,24 +29,28 @@ export function FriendButton({ profileId }: { profileId: string }) {
     };
   }, []);
 
+  /** `undefined` = the request failed: keep the previous state (the user can retry by tapping). */
+  const settle = useCallback((row: Friendship | null | undefined) => {
+    if (!mounted.current) return;
+    if (row !== undefined) setFriendship(row);
+    setLoading(false);
+  }, []);
+
   const load = useCallback(async () => {
-    if (!myId || !profileId || myId === profileId) {
-      setLoading(false);
-      return;
-    }
+    if (!myId || !profileId || myId === profileId) return;
+    let row: Friendship | null | undefined;
     try {
-      const row = await fetchFriendshipBetween(myId, profileId);
-      if (mounted.current) setFriendship(row);
+      row = await fetchFriendshipBetween(myId, profileId);
     } catch {
-      // Leave the previous state; the user can retry by tapping.
-    } finally {
-      if (mounted.current) setLoading(false);
+      row = undefined;
     }
-  }, [myId, profileId]);
+    settle(row);
+  }, [myId, profileId, settle]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!myId || !profileId || myId === profileId) return;
+    fetchFriendshipBetween(myId, profileId).then(settle, () => settle(undefined));
+  }, [myId, profileId, settle]);
 
   useEffect(() => onFriendshipsChanged(() => void load()), [load]);
 

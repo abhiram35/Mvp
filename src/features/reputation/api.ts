@@ -124,6 +124,16 @@ export function ratingErrorMessage(e: unknown): string {
   return "Couldn't save that rating. Please try again.";
 }
 
+/** Ratings are open for this many days after a lobby is created (same rule as rate_teammate). */
+export const RATING_WINDOW_DAYS = 7;
+
+/** True while players from a lobby created at `createdAt` can still rate each other. */
+export function isRatingWindowOpen(createdAt: string | null | undefined, now: number): boolean {
+  const start = createdAt ? Date.parse(createdAt) : NaN;
+  if (!Number.isFinite(start)) return false;
+  return now <= start + RATING_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+}
+
 /** Valid tag sets: 1–4 distinct praise tags, or exactly ['toxic']. */
 export function isValidTagSet(tags: RatingTag[]): boolean {
   const unique = new Set(tags);
@@ -140,38 +150,54 @@ export async function rateTeammate(postId: string, rateeId: string, tags: Rating
   return normaliseStats(data, rateeId);
 }
 
+async function fetchPlayerStats(profileId: string): Promise<PlayerStats> {
+  const { data, error } = await supabase.rpc('get_player_stats', { p_profile_id: profileId });
+  if (error) throw error;
+  return normaliseStats(data, profileId);
+}
+
+async function fetchRateableTeammates(lfgPostId: string): Promise<RateableTeammate[]> {
+  const { data, error } = await supabase.rpc('list_rateable_teammates', { p_lfg_post_id: lfgPostId });
+  if (error) throw error;
+  return normaliseTeammates(data);
+}
+
 /** Public stats for a player (level, XP, ratings, praise counts, solutions). Reloads quietly on focus. */
 export function usePlayerStats(profileId: string | null | undefined) {
   const [entry, setEntry] = useState<{ id: string; stats: PlayerStats } | null>(null);
   const stats = entry && entry.id === profileId ? entry.stats : null;
-  const [loading, setLoading] = useState(!!profileId);
   const [error, setError] = useState<string | null>(null);
   const reqId = useRef(0);
 
-  const load = useCallback(
-    async (silent = false) => {
-      if (!profileId) return;
-      const id = ++reqId.current;
-      if (!silent) setLoading(true);
-      try {
-        const { data, error: e } = await supabase.rpc('get_player_stats', { p_profile_id: profileId });
-        if (id !== reqId.current) return;
-        if (e) throw e;
-        setEntry({ id: profileId, stats: normaliseStats(data, profileId) });
-        setError(null);
-      } catch (e) {
-        if (id === reqId.current) setError(messageOf(e) || "Couldn't load stats.");
-      } finally {
-        if (id === reqId.current) setLoading(false);
-      }
-    },
-    [profileId],
-  );
+  const commit = useCallback((id: number, forProfile: string, next: PlayerStats) => {
+    if (id !== reqId.current) return;
+    setEntry({ id: forProfile, stats: next });
+    setError(null);
+  }, []);
+
+  const fail = useCallback((id: number, e: unknown) => {
+    if (id === reqId.current) setError(messageOf(e) || "Couldn't load stats.");
+  }, []);
+
+  /** Quiet reload: `loading` is derived (true until stats for this profile arrive). */
+  const load = useCallback(async () => {
+    if (!profileId) return;
+    const id = ++reqId.current;
+    try {
+      commit(id, profileId, await fetchPlayerStats(profileId));
+    } catch (e) {
+      fail(id, e);
+    }
+  }, [profileId, commit, fail]);
 
   useEffect(() => {
-    // Silent: `loading` is derived (true until stats for this profile arrive).
-    void load(true);
-  }, [load]);
+    if (!profileId) return;
+    const id = ++reqId.current;
+    fetchPlayerStats(profileId).then(
+      (next) => commit(id, profileId, next),
+      (e: unknown) => fail(id, e),
+    );
+  }, [profileId, commit, fail]);
 
   const first = useRef(true);
   useFocusEffect(
@@ -180,11 +206,15 @@ export function usePlayerStats(profileId: string | null | undefined) {
         first.current = false;
         return;
       }
-      void load(true);
+      void load();
     }, [load]),
   );
 
-  return { stats, loading: !!profileId && (loading || !stats) && !error, error, reload: () => load(true) };
+  return { stats, loading: !!profileId && !stats && !error, error, reload: load };
+}
+
+function teammatesErrorMessage(e: unknown): string {
+  return /network|fetch/i.test(messageOf(e)) ? 'No connection. Check your internet and try again.' : "Couldn't load your teammates.";
 }
 
 /** Teammates the caller can rate for a lobby. `enabled` lets a closed sheet skip the request. */
@@ -193,6 +223,30 @@ export function useRateableTeammates(lfgPostId: string | null | undefined, enabl
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const reqId = useRef(0);
+  const active = !!lfgPostId && enabled;
+
+  // Opened (or a different lobby): spinner + clear the old error straight away (adjusted during render).
+  const key = active ? lfgPostId : null;
+  const [shownKey, setShownKey] = useState<string | null | undefined>(undefined);
+  if (shownKey !== key) {
+    setShownKey(key);
+    if (key) {
+      setLoading(true);
+      setError(null);
+    }
+  }
+
+  const commit = useCallback((id: number, list: RateableTeammate[]) => {
+    if (id !== reqId.current) return;
+    setTeammates(list);
+    setLoading(false);
+  }, []);
+
+  const fail = useCallback((id: number, e: unknown) => {
+    if (id !== reqId.current) return;
+    setError(teammatesErrorMessage(e));
+    setLoading(false);
+  }, []);
 
   const load = useCallback(async () => {
     if (!lfgPostId) return;
@@ -200,20 +254,20 @@ export function useRateableTeammates(lfgPostId: string | null | undefined, enabl
     setLoading(true);
     setError(null);
     try {
-      const { data, error: e } = await supabase.rpc('list_rateable_teammates', { p_lfg_post_id: lfgPostId });
-      if (id !== reqId.current) return;
-      if (e) throw e;
-      setTeammates(normaliseTeammates(data));
+      commit(id, await fetchRateableTeammates(lfgPostId));
     } catch (e) {
-      if (id === reqId.current) setError(/network|fetch/i.test(messageOf(e)) ? 'No connection. Check your internet and try again.' : "Couldn't load your teammates.");
-    } finally {
-      if (id === reqId.current) setLoading(false);
+      fail(id, e);
     }
-  }, [lfgPostId]);
+  }, [lfgPostId, commit, fail]);
 
   useEffect(() => {
-    if (enabled) void load();
-  }, [enabled, load]);
+    if (!lfgPostId || !enabled) return;
+    const id = ++reqId.current;
+    fetchRateableTeammates(lfgPostId).then(
+      (list) => commit(id, list),
+      (e: unknown) => fail(id, e),
+    );
+  }, [lfgPostId, enabled, commit, fail]);
 
   return { teammates, loading, error, reload: load };
 }

@@ -153,7 +153,6 @@ function clamp(v: unknown, [lo, hi]: readonly [number, number], integer: boolean
 }
 
 function cleanText(s: string): string {
-  // eslint-disable-next-line no-control-regex
   return s.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
@@ -163,8 +162,12 @@ function limited(raw: unknown, min: number, max: number): string | null {
   return s.length >= min ? s : null;
 }
 
-/** Name and words: letters (any script), digits, spaces and ' ’ - ! & . only (same as the server). */
-const PLAIN_WORDS = /^[\p{L}\p{N} '’\-!&.]+$/u;
+/**
+ * Name and words: letters (any script, each with up to 3 combining marks such as Devanagari
+ * matras or accents), digits, spaces and ' ’ - ! & . only. Keep identical to the server's copy
+ * in supabase/functions/_shared/themeSpec.ts.
+ */
+const PLAIN_WORDS = /^(?:[\p{L}\p{N}]\p{M}{0,3}|[ '’\-!&.])+$/u;
 
 /**
  * Checks an untrusted ThemeSpec (from the database or the Edge Function). Returns a

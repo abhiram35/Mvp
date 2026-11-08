@@ -62,7 +62,7 @@ export function GameChipScroller({
 }) {
   const { games, loading, error } = useGames();
   if (loading) return <Text muted style={styles.label}>Loading games…</Text>;
-  if (error) return <Text style={styles.label} muted>Couldn't load games: {error}</Text>;
+  if (error) return <Text style={styles.label} muted>Couldn&apos;t load games: {error}</Text>;
   return (
     <HorizontalChips
       label={label}

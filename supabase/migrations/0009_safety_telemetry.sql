@@ -3,7 +3,8 @@
 --
 --   • moderators            – who can use the Moderation screen. Owner adds rows in the SQL editor.
 --   • profiles.banned_until – banned players can read but not post, message, host, reply,
---                             add friends or rate (restrictive RLS policies below).
+--                             add friends, rate or accept join requests (restrictive RLS
+--                             policies + triggers below), and are hidden from find_squadmates.
 --   • gg_clean_text()       – masks abuse/slurs (English + Hindi/Hinglish) in user text.
 --   • list_reports / resolve_report / unban_user / get_beta_metrics – moderators only.
 --   • app_events            – product events (client: app_open, theme_changed, onboarding_completed;
@@ -101,6 +102,124 @@ drop trigger if exists teammate_ratings_before_write_ban on public.teammate_rati
 create trigger teammate_ratings_before_write_ban
   before insert or update on public.teammate_ratings
   for each row execute function public.handle_rating_ban_guard();
+
+-- Accepting a join request goes through accept_lfg_request (SECURITY DEFINER, so the
+-- restrictive policies above don't apply). Guard the accepted transition itself: a paused
+-- host cannot accept, and a paused player cannot be pulled into a squad chat. The raise
+-- rolls back the whole RPC (chat + members) because it runs in the same transaction.
+create or replace function public.handle_lfg_accept_ban_guard()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if exists (select 1 from public.lfg_posts lp
+             join public.profiles p on p.id = lp.author_id
+             where lp.id = new.post_id and p.banned_until > now()) then
+    raise exception 'Your account is paused, so you can''t accept players right now'
+      using errcode = '42501';
+  end if;
+  if exists (select 1 from public.profiles p where p.id = new.requester_id and p.banned_until > now()) then
+    raise exception 'This player can''t join squads right now' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+revoke all on function public.handle_lfg_accept_ban_guard() from public, anon, authenticated;
+
+drop trigger if exists lfg_requests_before_accept_ban on public.lfg_requests;
+create trigger lfg_requests_before_accept_ban
+  before update of status on public.lfg_requests
+  for each row
+  when (new.status = 'accepted' and old.status is distinct from 'accepted')
+  execute function public.handle_lfg_accept_ban_guard();
+
+-- Squad finder: same as 0008 (signature, filters, shape, scoring) but players who are
+-- currently paused are not listed.
+create or replace function public.find_squadmates(
+  p_game_id     text,
+  p_region      text,
+  p_language    text,
+  p_play_style  text,
+  p_limit       integer default 30
+)
+returns setof jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  me uuid := auth.uid();
+begin
+  if me is null then
+    raise exception 'Not signed in' using errcode = '42501';
+  end if;
+  if p_game_id is null then
+    raise exception 'Choose a game' using errcode = '22023';
+  end if;
+
+  return query
+  with caller as (
+    select p.region, p.languages, p.play_style, p.has_mic, p.play_times
+    from public.profiles p where p.id = me
+  ),
+  candidates as (
+    select pr, pg,
+      coalesce(ps.xp, 0)               as xp,
+      coalesce(ps.ratings_received, 0) as ratings_received,
+      coalesce(ps.positive_ratings, 0) as positive_ratings,
+      public.gg_top_tags(ps.good_comms, ps.chill, ps.clutch, ps.shotcaller) as top_tags,
+      coalesce(array(
+        select l from unnest(pr.languages) l
+        where l = any (coalesce((select c.languages from caller c), '{}'::text[]))
+        order by l
+      ), '{}'::text[]) as shared,
+      (
+        case when pr.region = (select c.region from caller c) then 30 else 0 end
+        + least(15 * cardinality(array(
+            select l from unnest(pr.languages) l
+            where l = any (coalesce((select c.languages from caller c), '{}'::text[])))), 30)
+        + case when pr.play_style = (select c.play_style from caller c)
+                 or 'both' in (pr.play_style, (select c.play_style from caller c))
+               then 20 else 0 end
+        + 5 * cardinality(array(
+            select t from unnest(pr.play_times) t
+            where t = any (coalesce((select c.play_times from caller c), '{}'::text[]))))
+        + case when pr.has_mic and coalesce((select c.has_mic from caller c), false) then 10 else 0 end
+        + least(15, coalesce(ps.positive_ratings, 0) * 2)
+      ) as raw_score
+    from public.profile_games pg
+    join public.profiles pr on pr.id = pg.profile_id
+    left join public.player_stats ps on ps.profile_id = pr.id
+    where pg.game_id = p_game_id
+      and pr.id <> me
+      and (p_region is null or pr.region = p_region)
+      and (p_language is null or p_language = any (pr.languages))
+      and (p_play_style is null or pr.play_style = p_play_style or pr.play_style = 'both')
+      and (pr.banned_until is null or pr.banned_until <= now())   -- 0009: hide paused players
+      and not exists (
+        select 1 from public.blocks b
+        where (b.blocker_id = me and b.blocked_id = pr.id)
+           or (b.blocker_id = pr.id and b.blocked_id = me)
+      )
+  )
+  select jsonb_build_object(
+           'profile', to_jsonb(c.pr) - 'banned_until',
+           'game', to_jsonb(c.pg),
+           'match_score', least(c.raw_score, 100),
+           'shared_languages', to_jsonb(c.shared),
+           'reputation', jsonb_build_object(
+             'level', public.gg_level(c.xp),
+             'ratings_received', c.ratings_received,
+             'top_tags', c.top_tags)
+         )
+  from candidates c
+  order by least(c.raw_score, 100) desc, (c.pr).created_at desc
+  limit greatest(1, least(coalesce(p_limit, 30), 100));
+end;
+$$;
 
 -- ── get_my_status() → { banned_until, is_moderator } ─────────────────────────
 create or replace function public.get_my_status()

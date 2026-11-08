@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { Button, Screen, Text, TextField } from '../../components/ui';
 import { Checkbox } from '../../features/profile/Checkbox';
 import { AuthHero } from '../../features/profile/AuthHero';
@@ -111,7 +111,7 @@ export default function SignUpScreen() {
     const resendDisabled = cooldown > 0 || resending;
     return (
       <Screen scroll>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View>
           <View style={styles.codeTop}>
             <Ionicons name="mail-unread-outline" size={44} color={t.colors.textFaint} />
           </View>
@@ -151,14 +151,14 @@ export default function SignUpScreen() {
             onPress={() => router.replace('/(auth)/sign-in')}
             style={{ marginTop: spacing.xl }}
           />
-        </KeyboardAvoidingView>
+        </View>
       </Screen>
     );
   }
 
   return (
     <Screen scroll>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View>
         <Pressable
           onPress={() => (router.canGoBack() ? router.back() : router.replace('/(auth)/sign-in'))}
           accessibilityRole="button"
@@ -240,7 +240,7 @@ export default function SignUpScreen() {
             <Text variant="strong" style={{ color: t.colors.primary }}>Sign in</Text>
           </Pressable>
         </View>
-      </KeyboardAvoidingView>
+      </View>
     </Screen>
   );
 }

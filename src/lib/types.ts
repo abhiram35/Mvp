@@ -236,82 +236,16 @@ export interface ThemeQuota {
   saved_limit: number; // 6
 }
 
-// ── Database functions (Supabase RPC) ───────────────────────────────────────
-// Call with: supabase.rpc('<name>', { ...args })
+// RpcFunctions (all Supabase RPCs) is declared once, at the end of this file.
 
-export interface RpcFunctions {
-  /** Returns the id of the 1-to-1 conversation with other_id, creating it if needed. Fails if either side blocked the other. */
-  get_or_create_dm: { args: { other_id: UUID }; returns: UUID };
-
-  /** Author accepts a join request: marks it accepted, adds requester to the post's group chat
-   *  (creating the chat on first accept), and sets post status to 'full' when slots run out. Returns the conversation id. */
-  accept_lfg_request: { args: { request_id: UUID }; returns: UUID };
-
-  /** Squad finder. Returns other users who play game_id, excluding blocked users either way and the caller.
-   *  Optional filters may be null. Sorted by match_score desc. */
-  find_squadmates: {
-    args: {
-      p_game_id: string;
-      p_region: Region | null;
-      p_language: string | null;
-      p_play_style: PlayStyle | null;
-      p_limit?: number; // default 30
-    };
-    returns: SquadmateMatch[];
-  };
-
-  /** Conversations for the current user with last message and unread count, newest first. */
-  list_my_conversations: { args: Record<string, never>; returns: ConversationSummary[] };
-
-  /** Marks a conversation as read for the current user. */
-  mark_conversation_read: { args: { p_conversation_id: UUID }; returns: null };
-
-  /** Permanently deletes the caller's account and all their data (required by app stores). */
-  delete_my_account: { args: Record<string, never>; returns: null };
-
-  /** True if username is free (case-insensitive) and valid. Callable before a profile exists. */
-  is_username_available: { args: { p_username: string }; returns: boolean };
-
-  // ── Community ──
-  /** Feed. Excludes posts by users blocked in EITHER direction (server-side). Pagination: offset paging with
-   *  p_limit / p_offset. Returns setof jsonb, so supabase-js gives an array of CommunityPostSummary objects. */
-  list_community_posts: {
-    args: {
-      p_sort: CommunitySort; // hot = score by GGs + replies decayed by age; new = newest; unanswered = questions with 0 replies, newest first
-      p_kind: CommunityPostKind | null; // null = both
-      p_game_id: string | null; // null = all games
-      p_search: string | null; // case-insensitive match on title/body, null = none
-      p_limit?: number; // default 20, max 50
-      p_offset?: number; // default 0 (simple offset paging)
-    };
-    returns: CommunityPostSummary[];
-  };
-
-  /** One post with author. Returns no row if missing or the author is blocked either way. */
-  get_community_post: { args: { p_post_id: UUID }; returns: CommunityPostSummary[] };
-
-  /** Replies oldest-first, solution pinned first. Excludes blocked authors either way. */
-  list_community_replies: { args: { p_post_id: UUID; p_limit?: number; p_offset?: number }; returns: CommunityReplyItem[] };
-
-  /** Gives or removes the caller's GG on a post. Cannot GG your own post. */
-  toggle_post_gg: { args: { p_post_id: UUID }; returns: GgToggleResult };
-
-  /** Gives or removes the caller's GG on a reply. Cannot GG your own reply. */
-  toggle_reply_gg: { args: { p_reply_id: UUID }; returns: GgToggleResult };
-
-  /** Post author marks a reply on their QUESTION as the solution (p_reply_id), or clears it (null). */
-  set_solution: { args: { p_post_id: UUID; p_reply_id: UUID | null }; returns: null };
-
-  // ── Custom themes ──
-  /** The caller's AI theme quota for the current IST month and saved-theme count. */
-  get_theme_quota: { args: Record<string, never>; returns: ThemeQuota };
-}
 
 export interface SquadmateMatch {
   profile: Profile;
   game: ProfileGame;
   match_score: number; // 0–100
   shared_languages: string[];
+  /** Squad finder results now include reputation and rank good teammates higher. */
+  reputation?: ReputationSummary;
 }
 
 export interface ConversationSummary {
@@ -463,11 +397,6 @@ export interface ReputationSummary {
   top_tags: PublicRatingTag[]; // up to 2, most received first
 }
 
-/** Squad finder results now include reputation and rank good teammates higher. */
-export interface SquadmateMatch {
-  reputation?: ReputationSummary;
-}
-
 /** One teammate the caller can rate for a lobby (list_rateable_teammates). */
 export interface RateableTeammate {
   profile: Pick<Profile, 'id' | 'username' | 'display_name' | 'avatar_url'>;
@@ -529,7 +458,76 @@ export interface BetaMetrics {
   errors_last_24h: number;
 }
 
+// ── Database functions (Supabase RPC) ───────────────────────────────────────
+// Call with: supabase.rpc('<name>', { ...args })
+
 export interface RpcFunctions {
+  /** Returns the id of the 1-to-1 conversation with other_id, creating it if needed. Fails if either side blocked the other. */
+  get_or_create_dm: { args: { other_id: UUID }; returns: UUID };
+
+  /** Author accepts a join request: marks it accepted, adds requester to the post's group chat
+   *  (creating the chat on first accept), and sets post status to 'full' when slots run out. Returns the conversation id. */
+  accept_lfg_request: { args: { request_id: UUID }; returns: UUID };
+
+  /** Squad finder. Returns other users who play game_id, excluding blocked users either way and the caller.
+   *  Optional filters may be null. Sorted by match_score desc. */
+  find_squadmates: {
+    args: {
+      p_game_id: string;
+      p_region: Region | null;
+      p_language: string | null;
+      p_play_style: PlayStyle | null;
+      p_limit?: number; // default 30
+    };
+    returns: SquadmateMatch[];
+  };
+
+  /** Conversations for the current user with last message and unread count, newest first. */
+  list_my_conversations: { args: Record<string, never>; returns: ConversationSummary[] };
+
+  /** Marks a conversation as read for the current user. */
+  mark_conversation_read: { args: { p_conversation_id: UUID }; returns: null };
+
+  /** Permanently deletes the caller's account and all their data (required by app stores). */
+  delete_my_account: { args: Record<string, never>; returns: null };
+
+  /** True if username is free (case-insensitive) and valid. Callable before a profile exists. */
+  is_username_available: { args: { p_username: string }; returns: boolean };
+
+  // ── Community ──
+  /** Feed. Excludes posts by users blocked in EITHER direction (server-side). Pagination: offset paging with
+   *  p_limit / p_offset. Returns setof jsonb, so supabase-js gives an array of CommunityPostSummary objects. */
+  list_community_posts: {
+    args: {
+      p_sort: CommunitySort; // hot = score by GGs + replies decayed by age; new = newest; unanswered = questions with 0 replies, newest first
+      p_kind: CommunityPostKind | null; // null = both
+      p_game_id: string | null; // null = all games
+      p_search: string | null; // case-insensitive match on title/body, null = none
+      p_limit?: number; // default 20, max 50
+      p_offset?: number; // default 0 (simple offset paging)
+    };
+    returns: CommunityPostSummary[];
+  };
+
+  /** One post with author. Returns no row if missing or the author is blocked either way. */
+  get_community_post: { args: { p_post_id: UUID }; returns: CommunityPostSummary[] };
+
+  /** Replies oldest-first, solution pinned first. Excludes blocked authors either way. */
+  list_community_replies: { args: { p_post_id: UUID; p_limit?: number; p_offset?: number }; returns: CommunityReplyItem[] };
+
+  /** Gives or removes the caller's GG on a post. Cannot GG your own post. */
+  toggle_post_gg: { args: { p_post_id: UUID }; returns: GgToggleResult };
+
+  /** Gives or removes the caller's GG on a reply. Cannot GG your own reply. */
+  toggle_reply_gg: { args: { p_reply_id: UUID }; returns: GgToggleResult };
+
+  /** Post author marks a reply on their QUESTION as the solution (p_reply_id), or clears it (null). */
+  set_solution: { args: { p_post_id: UUID; p_reply_id: UUID | null }; returns: null };
+
+  // ── Custom themes ──
+  /** The caller's AI theme quota for the current IST month and saved-theme count. */
+  get_theme_quota: { args: Record<string, never>; returns: ThemeQuota };
+
   // ── Notifications ──
   /** Unread count for the bell badge. */
   count_unread_notifications: { args: Record<string, never>; returns: number };

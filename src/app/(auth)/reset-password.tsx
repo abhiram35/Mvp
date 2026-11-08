@@ -1,6 +1,6 @@
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { Button, Screen, Text, TextField } from '../../components/ui';
 import { errorMessage, supabase } from '../../lib/supabase';
 import { makeStyles, spacing, useTheme } from '../../theme';
@@ -109,7 +109,7 @@ export default function ResetPasswordScreen() {
 
   return (
     <Screen scroll edges={['bottom']}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={s.wrap}>
+      <View style={s.wrap}>
         {!sentTo ? (
           <>
             <Text variant="heading" style={s.title}>Forgot your password?</Text>
@@ -202,7 +202,7 @@ export default function ResetPasswordScreen() {
             </View>
           </>
         )}
-      </KeyboardAvoidingView>
+      </View>
     </Screen>
   );
 }

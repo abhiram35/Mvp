@@ -2,7 +2,8 @@
 // Counters (gg_count, reply_count), solved_reply_id and last_activity_at are maintained
 // by the server: this file never writes them directly — only through the RPCs.
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { supabase } from '../../lib/supabase';
+import { useLatestRef } from '../../lib/hooks';
+import { pausedMessageFor, supabase } from '../../lib/supabase';
 import type {
   CommunityPost,
   CommunityPostKind,
@@ -174,9 +175,9 @@ export function communityErrorMessage(e: unknown): string {
     case '23503': // foreign key: the post / reply was deleted meanwhile
       return 'This was deleted or is no longer available.';
     case '42501':
-      // Also the code for RLS refusals (e.g. replying across a block), not just set_solution.
+      // Also the code for RLS refusals (a paused account, replying across a block), not just set_solution.
       return /row-level security|permission denied/i.test(messageOf(e))
-        ? "You can't do that on this post."
+        ? (pausedMessageFor(e) ?? "You can't do that on this post.")
         : messageOf(e);
     default:
       return messageOf(e);
@@ -332,6 +333,38 @@ export function useCommunityFeed({ sort, kind, gameId, search }: CommunityFeedPa
   const loadingMoreRef = useRef(false);
   const searchKey = search?.trim() || null;
 
+  // Filters changed: show the spinner and drop the old rows straight away (adjusting state
+  // during render, so the request itself can live in an effect without a synchronous reset).
+  const queryKey = [sort, kind ?? '', gameId ?? '', searchKey ?? ''].join('|');
+  const [activeKey, setActiveKey] = useState(queryKey);
+  if (activeKey !== queryKey) {
+    setActiveKey(queryKey);
+    setLoading(true);
+    setItems([]);
+    setError(null);
+    setLoadingMore(false);
+  }
+
+  const commitFirstPage = useCallback((gen: number, rows: CommunityPostSummary[]) => {
+    if (gen !== generation.current) return;
+    setItems(rows);
+    offset.current = rows.length;
+    setHasMore(rows.length >= FEED_PAGE_SIZE);
+    setError(null);
+    setLoadMoreError(null);
+    setLoading(false);
+    setRefreshing(false);
+  }, []);
+
+  const failFirstPage = useCallback((gen: number, mode: 'initial' | 'refresh' | 'silent', e: unknown) => {
+    if (gen !== generation.current) return;
+    // Keep stale rows on a failed background refresh.
+    if (mode !== 'silent') setError(messageOf(e));
+    setLoading(false);
+    setRefreshing(false);
+  }, []);
+
+  /** Retry (spinner), pull-to-refresh, or a quiet background reload. */
   const load = useCallback(
     async (mode: 'initial' | 'refresh' | 'silent') => {
       const gen = ++generation.current;
@@ -344,30 +377,23 @@ export function useCommunityFeed({ sort, kind, gameId, search }: CommunityFeedPa
       }
       if (mode === 'refresh') setRefreshing(true);
       try {
-        const rows = await fetchCommunityPosts({ sort, kind, gameId, search: searchKey }, 0);
-        if (gen !== generation.current) return;
-        setItems(rows);
-        offset.current = rows.length;
-        setHasMore(rows.length >= FEED_PAGE_SIZE);
-        setError(null);
-        setLoadMoreError(null);
+        commitFirstPage(gen, await fetchCommunityPosts({ sort, kind, gameId, search: searchKey }, 0));
       } catch (e) {
-        if (gen !== generation.current) return;
-        // Keep stale rows on a failed background refresh.
-        if (mode !== 'silent') setError(messageOf(e));
-      } finally {
-        if (gen === generation.current) {
-          setLoading(false);
-          setRefreshing(false);
-        }
+        failFirstPage(gen, mode, e);
       }
     },
-    [sort, kind, gameId, searchKey],
+    [sort, kind, gameId, searchKey, commitFirstPage, failFirstPage],
   );
 
+  // First page for the current filters. State is only set once the request settles.
   useEffect(() => {
-    void load('initial');
-  }, [load]);
+    const gen = ++generation.current;
+    loadingMoreRef.current = false;
+    fetchCommunityPosts({ sort, kind, gameId, search: searchKey }, 0).then(
+      (rows) => commitFirstPage(gen, rows),
+      (e: unknown) => failFirstPage(gen, 'initial', e),
+    );
+  }, [sort, kind, gameId, searchKey, commitFirstPage, failFirstPage]);
 
   const loadMore = useCallback(async () => {
     if (loadingMoreRef.current || !hasMore || loading || refreshing) return;
@@ -431,6 +457,32 @@ export function useCommunityPost(id: UUID | undefined) {
   const [error, setError] = useState<string | null>(null);
   const requestId = useRef(0);
 
+  // A different post: forget the old one right away (state adjusted during render).
+  const [shownId, setShownId] = useState(id);
+  if (shownId !== id) {
+    setShownId(id);
+    setSummary(null);
+    setError(null);
+    setLoading(!!id);
+  }
+
+  const commit = useCallback((reqId: number, row: CommunityPostSummary | null) => {
+    if (reqId !== requestId.current) return;
+    setSummary(row);
+    setError(null);
+    setLoading(false);
+  }, []);
+
+  const fail = useCallback((reqId: number, silent: boolean, e: unknown) => {
+    if (reqId !== requestId.current) return;
+    if (isNotFoundError(e)) {
+      // Deleted / hidden: show the not-found state rather than an error.
+      setSummary(null);
+      setError(null);
+    } else if (!silent) setError(communityErrorMessage(e));
+    setLoading(false);
+  }, []);
+
   const reload = useCallback(
     async (silent = false) => {
       const reqId = ++requestId.current;
@@ -441,27 +493,22 @@ export function useCommunityPost(id: UUID | undefined) {
       }
       if (!silent) setLoading(true);
       try {
-        const row = await fetchCommunityPost(id);
-        if (reqId !== requestId.current) return;
-        setSummary(row);
-        setError(null);
+        commit(reqId, await fetchCommunityPost(id));
       } catch (e) {
-        if (reqId !== requestId.current) return;
-        if (isNotFoundError(e)) {
-          // Deleted / hidden: show the not-found state rather than an error.
-          setSummary(null);
-          setError(null);
-        } else if (!silent) setError(communityErrorMessage(e));
-      } finally {
-        if (reqId === requestId.current) setLoading(false);
+        fail(reqId, silent, e);
       }
     },
-    [id],
+    [id, commit, fail],
   );
 
   useEffect(() => {
-    void reload();
-  }, [reload]);
+    const reqId = ++requestId.current;
+    if (!id) return;
+    fetchCommunityPost(id).then(
+      (row) => commit(reqId, row),
+      (e: unknown) => fail(reqId, false, e),
+    );
+  }, [id, commit, fail]);
 
   const visible = summary && !blockedIds.has(summary.post.author_id) ? summary : null;
   return { summary: visible, loading, error, reload };
@@ -502,10 +549,36 @@ export function useCommunityReplies(postId: UUID | undefined, onChange?: () => v
   const [hasMore, setHasMore] = useState(false);
   const generation = useRef(0);
   const loadedCount = useRef(0);
-  const itemsRef = useRef<CommunityReplyItem[]>([]);
-  itemsRef.current = items;
-  const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
+  const itemsRef = useLatestRef(items);
+  const onChangeRef = useLatestRef(onChange);
+
+  // A different post: forget the old replies right away (state adjusted during render).
+  const [shownPostId, setShownPostId] = useState(postId);
+  if (shownPostId !== postId) {
+    setShownPostId(postId);
+    setItems([]);
+    setError(null);
+    setHasMore(false);
+    setLoading(!!postId);
+  }
+
+  const commit = useCallback((gen: number, rows: CommunityReplyItem[], limit: number) => {
+    if (gen !== generation.current) return;
+    loadedCount.current = rows.length;
+    setHasMore(rows.length >= limit);
+    setItems(orderReplies(rows));
+    setError(null);
+    setLoading(false);
+  }, []);
+
+  const fail = useCallback((gen: number, silent: boolean, e: unknown) => {
+    if (gen !== generation.current) return;
+    if (isNotFoundError(e)) {
+      setItems([]);
+      setError(null);
+    } else if (!silent) setError(communityErrorMessage(e));
+    setLoading(false);
+  }, []);
 
   /** (Re)loads everything shown so far, in one request. */
   const reload = useCallback(
@@ -517,31 +590,25 @@ export function useCommunityReplies(postId: UUID | undefined, onChange?: () => v
         return;
       }
       if (!silent) setLoading(true);
+      const limit = Math.max(REPLIES_PAGE_SIZE, loadedCount.current + 5);
       try {
-        const limit = Math.max(REPLIES_PAGE_SIZE, loadedCount.current + 5);
-        const rows = await fetchCommunityReplies(postId, 0, limit);
-        if (gen !== generation.current) return;
-        loadedCount.current = rows.length;
-        setHasMore(rows.length >= limit);
-        setItems(orderReplies(rows));
-        setError(null);
+        commit(gen, await fetchCommunityReplies(postId, 0, limit), limit);
       } catch (e) {
-        if (gen !== generation.current) return;
-        if (isNotFoundError(e)) {
-          setItems([]);
-          setError(null);
-        } else if (!silent) setError(communityErrorMessage(e));
-      } finally {
-        if (gen === generation.current) setLoading(false);
+        fail(gen, silent, e);
       }
     },
-    [postId],
+    [postId, commit, fail],
   );
 
   useEffect(() => {
+    const gen = ++generation.current;
     loadedCount.current = 0;
-    void reload();
-  }, [reload]);
+    if (!postId) return;
+    fetchCommunityReplies(postId, 0, REPLIES_PAGE_SIZE).then(
+      (rows) => commit(gen, rows, REPLIES_PAGE_SIZE),
+      (e: unknown) => fail(gen, false, e),
+    );
+  }, [postId, commit, fail]);
 
   const loadMore = useCallback(async () => {
     if (!postId || loadingMore || !hasMore || loading) return;
@@ -587,7 +654,7 @@ export function useCommunityReplies(postId: UUID | undefined, onChange?: () => v
       if (timer) clearTimeout(timer);
       void supabase.removeChannel(channel);
     };
-  }, [postId, reload]);
+  }, [postId, reload, itemsRef, onChangeRef]);
 
   const replies = useMemo(() => items.filter((r) => !blockedIds.has(r.reply.author_id)), [items, blockedIds]);
 

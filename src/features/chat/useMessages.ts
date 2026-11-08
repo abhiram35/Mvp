@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useLatestRef } from '../../lib/hooks';
 import { errorMessage, supabase } from '../../lib/supabase';
 import type { Message, MessageWithSender } from '../../lib/types';
 import { fetchProfiles, PROFILE_FIELDS, unknownProfile, type MemberProfile } from './useConversation';
@@ -42,11 +43,9 @@ export function useMessages(conversationId: string | undefined, myId: string, me
   const [error, setError] = useState<string | null>(null);
 
   // Refs so realtime callbacks always see the latest values without resubscribing.
-  const membersRef = useRef(membersById);
-  membersRef.current = membersById;
+  const membersRef = useLatestRef(membersById);
   const extraProfiles = useRef(new Map<string, MemberProfile>());
-  const messagesRef = useRef<ChatMessage[]>([]);
-  messagesRef.current = messages;
+  const messagesRef = useLatestRef(messages);
   const mounted = useRef(true);
   const readTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -58,9 +57,10 @@ export function useMessages(conversationId: string | undefined, myId: string, me
     };
   }, []);
 
-  const lookupProfile = useCallback((id: string): MemberProfile | undefined => {
-    return membersRef.current.get(id) ?? extraProfiles.current.get(id);
-  }, []);
+  const lookupProfile = useCallback(
+    (id: string): MemberProfile | undefined => membersRef.current.get(id) ?? extraProfiles.current.get(id),
+    [membersRef],
+  );
 
   /** Attaches sender profiles to plain message rows, fetching any we don't know yet. */
   const withSenders = useCallback(
@@ -112,28 +112,56 @@ export function useMessages(conversationId: string | undefined, myId: string, me
     readTimer.current = setTimeout(() => void markConversationRead(conversationId), 500);
   }, [conversationId]);
 
+  /** Shows the newest page, keeping anything that arrived over realtime while it loaded. */
+  const applyFirstPage = useCallback(
+    (page: ChatMessage[]) => {
+      if (!mounted.current) return;
+      setMessages((prev) =>
+        mergeUnique(
+          sortNewestFirst(page.slice()),
+          prev.filter((m) => m.conversation_id === conversationId),
+        ),
+      );
+      setHasMore(page.length === PAGE_SIZE);
+      setError(null);
+      setLoading(false);
+      if (conversationId) void markConversationRead(conversationId);
+    },
+    [conversationId],
+  );
+
+  const failFirstPage = useCallback((err: unknown) => {
+    if (!mounted.current) return;
+    setError(errorMessage(err));
+    setLoading(false);
+  }, []);
+
+  /** Retry / reload: shows the spinner again. */
   const loadInitial = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const page = await fetchPage(null);
-      if (!mounted.current) return;
-      // Keep anything that arrived over realtime while we were loading.
-      setMessages((prev) => mergeUnique(sortNewestFirst(page.slice()), prev));
-      setHasMore(page.length === PAGE_SIZE);
-      if (conversationId) void markConversationRead(conversationId);
+      applyFirstPage(await fetchPage(null));
     } catch (err) {
-      if (mounted.current) setError(errorMessage(err));
-    } finally {
-      if (mounted.current) setLoading(false);
+      failFirstPage(err);
     }
-  }, [fetchPage, conversationId]);
+  }, [fetchPage, applyFirstPage, failFirstPage]);
 
+  // First page (and again if the conversation changes). State is set only when the request settles.
   useEffect(() => {
-    setMessages([]);
-    setHasMore(true);
-    void loadInitial();
-  }, [loadInitial]);
+    let live = true;
+    fetchPage(null).then(
+      (page) => {
+        if (live) applyFirstPage(page);
+      },
+      (err: unknown) => {
+        if (live) failFirstPage(err);
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, [fetchPage, applyFirstPage, failFirstPage]);
 
   const loadOlder = useCallback(async () => {
     if (loading || loadingOlder || !hasMore) return;
@@ -151,7 +179,7 @@ export function useMessages(conversationId: string | undefined, myId: string, me
     } finally {
       if (mounted.current) setLoadingOlder(false);
     }
-  }, [fetchPage, hasMore, loading, loadingOlder]);
+  }, [fetchPage, hasMore, loading, loadingOlder, messagesRef]);
 
   // Realtime inserts for this conversation.
   useEffect(() => {

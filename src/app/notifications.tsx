@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { EmptyState, ErrorState, LoadingState, Screen, Text, type IconName } from '../components/ui';
 import { useNotifications } from '../features/notifications/api';
 import { openNotificationRoute, routeFromData } from '../features/notifications/routes';
 import { useUnreadNotifications } from '../features/notifications/unread';
 import type { AppNotification, NotificationType } from '../lib/types';
+import { useNow } from '../lib/hooks';
 import { useUserId } from '../providers/AuthProvider';
 import { fontSize, makeStyles, spacing, useTheme } from '../theme';
 
@@ -38,15 +39,6 @@ function relativeTime(iso: string, now: number): string {
   if (diff < DAY) return `${Math.floor(diff / HOUR)}h ago`;
   if (diff < 7 * DAY) return `${Math.floor(diff / DAY)}d ago`;
   return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
-}
-
-function useNow(intervalMs = 60_000) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), intervalMs);
-    return () => clearInterval(id);
-  }, [intervalMs]);
-  return now;
 }
 
 const NotificationRow = memo(function NotificationRow({

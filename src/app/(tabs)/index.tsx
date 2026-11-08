@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { Button, EmptyState, ErrorState, LoadingState, Screen, ScreenHeader, Text } from '../../components/ui';
 import { useGames } from '../../features/games/useGames';
@@ -9,6 +9,7 @@ import { hostCta, REGIONS, regionLabel } from '../../features/lfg/format';
 import { GameChipScroller, HorizontalChips } from '../../features/lfg/HorizontalChips';
 import { LfgPostCard } from '../../features/lfg/LfgPostCard';
 import { NotificationBell } from '../../features/notifications/NotificationBell';
+import { useLatestRef, useNow } from '../../lib/hooks';
 import { useBlockedIds } from '../../features/safety/blocks';
 import { LANGUAGES, type LfgPostWithAuthor, type Region } from '../../lib/types';
 import { useUserId } from '../../providers/AuthProvider';
@@ -16,16 +17,6 @@ import { fontSize, makeStyles, spacing, useTheme } from '../../theme';
 
 const REGION_OPTIONS = REGIONS.map((r) => ({ value: r, label: regionLabel(r) }));
 const LANGUAGE_OPTIONS = LANGUAGES.map((l) => ({ value: l as string, label: l as string }));
-
-/** Re-render every minute so "12m ago" / "expires in 3h" stay accurate. */
-function useNow(intervalMs = 60_000) {
-  const [now, setNow] = useState(Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), intervalMs);
-    return () => clearInterval(t);
-  }, [intervalMs]);
-  return now;
-}
 
 export default function LfgBoardScreen() {
   const t = useTheme();
@@ -46,13 +37,12 @@ export default function LfgBoardScreen() {
   // Coming back from creating / closing / deleting a post: refresh quietly so the
   // board isn't stale. Skip the first focus (the initial load already runs).
   const focusedOnce = useRef(false);
-  const reloadRef = useRef(reloadSilently);
-  reloadRef.current = reloadSilently;
+  const reloadRef = useLatestRef(reloadSilently);
   useFocusEffect(
     useCallback(() => {
       if (focusedOnce.current) void reloadRef.current();
       focusedOnce.current = true;
-    }, []),
+    }, [reloadRef]),
   );
 
   const visible = useMemo(

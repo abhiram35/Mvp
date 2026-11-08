@@ -1,4 +1,4 @@
-import { router } from 'expo-router';
+import { router, type Href } from 'expo-router';
 import type { NotificationRoute } from '../../lib/types';
 
 type Pathname = NotificationRoute['pathname'];
@@ -60,7 +60,8 @@ export function routeFromData(data: unknown): NotificationRoute | null {
 /** Opens a validated notification route. */
 export function openNotificationRoute(route: NotificationRoute) {
   if (route.params && Object.keys(route.params).length > 0) {
-    router.push({ pathname: route.pathname, params: route.params });
+    // pathname and params were validated together in parseNotificationRoute.
+    router.push({ pathname: route.pathname, params: route.params } as Href);
   } else {
     router.push(route.pathname);
   }

@@ -109,7 +109,7 @@ export default function LfgBoardScreen() {
       <View style={styles.filters}>
         <View style={styles.filterLine}>
           <View style={{ flex: 1 }}>
-            <GameChipScroller value={gameId} onChange={setGameId} allowAll />
+            <GameChipScroller value={gameId} onChange={setGameId} allowAll squadOnly />
           </View>
           <Pressable
             onPress={() => setShowFilters((v) => !v)}

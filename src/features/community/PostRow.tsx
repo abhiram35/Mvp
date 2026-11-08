@@ -6,7 +6,7 @@ import { COMMUNITY_KIND_LABELS, type CommunityPostSummary, type Game } from '../
 import { fontSize, makeStyles, spacing, useTheme } from '../../theme';
 import { useGgState, wasEdited } from './api';
 import { compactCount, plural, timeAgo } from './format';
-import { KindTag, SolvedTag } from './Tags';
+import { KindTag, SolvedTag, SpoilerTag } from './Tags';
 
 /** One post in the Community feed: a ruled row, not a card. */
 export const PostRow = memo(function PostRow({
@@ -26,10 +26,10 @@ export const PostRow = memo(function PostRow({
   const gg = useGgState('post', post.id, { has_gg: item.has_gg, gg_count: post.gg_count });
   const name = author.display_name || author.username || 'Player';
   const ago = timeAgo(post.created_at, now) + (wasEdited(post) ? ' · edited' : '');
-  const preview = post.body.replace(/\s+/g, ' ').trim();
+  const preview = post.is_spoiler ? '' : post.body.replace(/\s+/g, ' ').trim();
 
   const a11y = [
-    `${COMMUNITY_KIND_LABELS[post.kind]}${is_solved ? ', solved' : ''}${game ? `, ${game.name}` : ''}`,
+    `${COMMUNITY_KIND_LABELS[post.kind]}${is_solved ? ', solved' : ''}${post.is_spoiler ? ', contains spoilers' : ''}${game ? `, ${game.name}` : ''}`,
     post.title,
     `By ${name}, ${ago}`,
     `${gg.gg_count} ${t.words.gg}, ${plural(post.reply_count, 'reply', 'replies')}`,
@@ -45,6 +45,7 @@ export const PostRow = memo(function PostRow({
       <View style={s.top}>
         <KindTag kind={post.kind} />
         {is_solved ? <SolvedTag /> : null}
+        {post.is_spoiler ? <SpoilerTag /> : null}
         <Text style={s.game} numberOfLines={1}>
           {game ? `${game.emoji} ${game.name}` : 'General'}
         </Text>
@@ -59,6 +60,10 @@ export const PostRow = memo(function PostRow({
       {preview ? (
         <Text style={s.preview} numberOfLines={2}>
           {preview}
+        </Text>
+      ) : post.is_spoiler ? (
+        <Text style={[s.preview, { fontStyle: 'italic' }]} numberOfLines={1}>
+          Spoilers hidden. Open to read.
         </Text>
       ) : null}
 

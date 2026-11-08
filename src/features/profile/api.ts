@@ -48,7 +48,27 @@ function gameRows(userId: string, v: ProfileFormValues): ProfileGame[] {
     game_id: g.game_id,
     rank: g.rank,
     role: g.role.trim() ? g.role.trim() : null,
+    play_status: g.play_status,
   }));
+}
+
+function gameIdRows(userId: string, v: ProfileFormValues) {
+  return v.games
+    .filter((g) => g.in_game_id.trim())
+    .map((g) => ({ profile_id: userId, game_id: g.game_id, in_game_id: g.in_game_id.trim() }));
+}
+
+/** Writes profile_games, then the private in-game IDs (which reference them). */
+async function insertGames(userId: string, v: ProfileFormValues): Promise<void> {
+  const rows = gameRows(userId, v);
+  if (!rows.length) return;
+  const { error: gErr } = await supabase.from('profile_games').insert(rows);
+  if (gErr) throw gErr;
+  const ids = gameIdRows(userId, v);
+  if (ids.length) {
+    const { error: iErr } = await supabase.from('profile_game_ids').insert(ids);
+    if (iErr) throw iErr;
+  }
 }
 
 async function resolveAvatar(userId: string, v: ProfileFormValues): Promise<string | null> {
@@ -74,11 +94,7 @@ export async function createProfile(userId: string, v: ProfileFormValues): Promi
     await updateProfile(userId, { ...v, localAvatarUri: null, avatar_url: avatarUrl });
     return;
   }
-  const rows = gameRows(userId, v);
-  if (rows.length) {
-    const { error: gErr } = await supabase.from('profile_games').insert(rows);
-    if (gErr) throw gErr;
-  }
+  await insertGames(userId, v);
 }
 
 /** Edit profile: update the profile row and replace the user's profile_games. */
@@ -90,11 +106,8 @@ export async function updateProfile(userId: string, v: ProfileFormValues): Promi
     if (error.code === '23505') throw new Error('That username is taken. Pick another one.');
     throw error;
   }
+  // Deleting profile_games also deletes their in-game IDs (cascade); insertGames writes both back.
   const { error: delErr } = await supabase.from('profile_games').delete().eq('profile_id', userId);
   if (delErr) throw delErr;
-  const rows = gameRows(userId, v);
-  if (rows.length) {
-    const { error: gErr } = await supabase.from('profile_games').insert(rows);
-    if (gErr) throw gErr;
-  }
+  await insertGames(userId, v);
 }

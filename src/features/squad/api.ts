@@ -35,6 +35,7 @@ function normaliseOne(raw: unknown): SquadmateMatch | null {
     game_id: '',
     rank: null,
     role: null,
+    play_status: null,
   };
   const score = Number(row.match_score);
   const shared = Array.isArray(row.shared_languages) ? row.shared_languages.filter((l): l is string => typeof l === 'string') : [];

@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import { Button, EmptyState, ErrorState, LoadingState, Screen, ScreenHeader, Text } from '../../components/ui';
-import { useGames } from '../../features/games/useGames';
+import { fetchGames, useGames } from '../../features/games/useGames';
 import { hostCta, REGIONS, regionLabel } from '../../features/lfg/format';
 import { GameChipScroller, HorizontalChips } from '../../features/lfg/HorizontalChips';
 import { useBlockedIds } from '../../features/safety/blocks';
@@ -37,9 +37,11 @@ export default function SquadFinderScreen() {
   useEffect(() => {
     if (!myId) return;
     let active = true;
-    fetchMyGameIds(myId)
-      .then((ids) => {
-        if (active && ids.length > 0) setGameId((cur) => cur ?? ids[0]);
+    Promise.all([fetchMyGameIds(myId), fetchGames()])
+      .then(([ids, all]) => {
+        // Skip single-player story games: there is nobody to squad up with.
+        const first = ids.find((id) => all.find((g) => g.id === id)?.squadable);
+        if (active && first) setGameId((cur) => cur ?? first);
       })
       .catch(() => {
         /* non-critical: user just picks a game */
@@ -73,7 +75,7 @@ export default function SquadFinderScreen() {
     <View style={styles.headerBlock}>
       <ScreenHeader title="Find a duo" subtitle={filterSummary} />
 
-      <GameChipScroller label="Game" value={gameId} onChange={setGameId} />
+      <GameChipScroller label="Game" value={gameId} onChange={setGameId} squadOnly />
       <View style={styles.filters}>
         <HorizontalChips label="Region" options={REGION_OPTIONS} value={region} onChange={setRegion} allLabel="Any" />
         <HorizontalChips label="Language" options={languageOptions} value={language} onChange={setLanguage} allLabel="Any" />

@@ -86,6 +86,7 @@ function normalisePost(raw: unknown): CommunityPost | null {
     game_id: typeof p.game_id === 'string' && p.game_id ? p.game_id : null,
     title: str(p.title),
     body: str(p.body),
+    is_spoiler: p.is_spoiler === true,
     solved_reply_id: typeof p.solved_reply_id === 'string' ? p.solved_reply_id : null,
     gg_count: num(p.gg_count),
     reply_count: num(p.reply_count),
@@ -668,6 +669,7 @@ export interface NewCommunityPost {
   game_id: string | null;
   title: string;
   body: string;
+  is_spoiler: boolean;
 }
 
 /** Creates a post and returns its id. */
@@ -675,19 +677,29 @@ export async function createPost(input: NewCommunityPost): Promise<UUID> {
   const me = await requireUserId();
   const { data, error } = await supabase
     .from('community_posts')
-    .insert({ author_id: me, kind: input.kind, game_id: input.game_id, title: input.title, body: input.body })
+    .insert({
+      author_id: me,
+      kind: input.kind,
+      game_id: input.game_id,
+      title: input.title,
+      body: input.body,
+      is_spoiler: input.is_spoiler,
+    })
     .select('id')
     .single();
   if (error) throw error;
   return (data as { id: UUID }).id;
 }
 
-/** Edits a post's title, body or game. The kind can't change. */
-export async function updatePost(id: UUID, patch: Partial<Pick<CommunityPost, 'title' | 'body' | 'game_id'>>): Promise<void> {
-  const clean: Partial<Pick<CommunityPost, 'title' | 'body' | 'game_id'>> = {};
+type EditablePost = Pick<CommunityPost, 'title' | 'body' | 'game_id' | 'is_spoiler'>;
+
+/** Edits a post's title, body, game or spoiler flag. The kind can't change. */
+export async function updatePost(id: UUID, patch: Partial<EditablePost>): Promise<void> {
+  const clean: Partial<EditablePost> = {};
   if (patch.title !== undefined) clean.title = patch.title;
   if (patch.body !== undefined) clean.body = patch.body;
   if (patch.game_id !== undefined) clean.game_id = patch.game_id;
+  if (patch.is_spoiler !== undefined) clean.is_spoiler = patch.is_spoiler;
   const { error } = await supabase.from('community_posts').update(clean).eq('id', id);
   if (error) throw error;
 }

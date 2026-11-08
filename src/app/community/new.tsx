@@ -6,6 +6,7 @@ import { Button, EmptyState, ErrorState, LoadingState, Screen, Text, TextField, 
 import { communityErrorMessage, createPost, updatePost, useCommunityPost } from '../../features/community/api';
 import { COMMUNITY_LIMITS } from '../../features/community/format';
 import { useGames } from '../../features/games/useGames';
+import { Checkbox } from '../../features/profile/Checkbox';
 import { HorizontalChips } from '../../features/lfg/HorizontalChips';
 import { BannedBanner } from '../../features/moderation/BannedBanner';
 import { useMyStatus } from '../../features/moderation/useMyStatus';
@@ -50,6 +51,7 @@ export default function NewCommunityPostScreen() {
   const [gameId, setGameId] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
+  const [spoiler, setSpoiler] = useState(false);
   const [touched, setTouched] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [prefilled, setPrefilled] = useState(false);
@@ -64,6 +66,7 @@ export default function NewCommunityPostScreen() {
     setGameId(p.game_id);
     setTitle(p.title);
     setBody(p.body);
+    setSpoiler(p.is_spoiler);
     setPrefilled(true);
   }
 
@@ -98,11 +101,11 @@ export default function NewCommunityPostScreen() {
     setSubmitting(true);
     try {
       if (editing && editId) {
-        await updatePost(editId, { title: trimmedTitle, body: trimmedBody, game_id: gameId });
+        await updatePost(editId, { title: trimmedTitle, body: trimmedBody, game_id: gameId, is_spoiler: spoiler });
         if (router.canGoBack()) router.back();
         else router.replace({ pathname: '/community/[id]', params: { id: editId } });
       } else {
-        const id = await createPost({ kind, game_id: gameId, title: trimmedTitle, body: trimmedBody });
+        const id = await createPost({ kind, game_id: gameId, title: trimmedTitle, body: trimmedBody, is_spoiler: spoiler });
         router.replace({ pathname: '/community/[id]', params: { id } });
       }
     } catch (e) {
@@ -204,7 +207,11 @@ export default function NewCommunityPostScreen() {
             <HorizontalChips
               options={games.map((g) => ({ value: g.id, label: `${g.emoji} ${g.name}` }))}
               value={gameId}
-              onChange={setGameId}
+              onChange={(id) => {
+                setGameId(id);
+                // Story posts are spoiler-tagged by default; the author can turn it off.
+                if (!editing && games.find((g) => g.id === id)?.category === 'story') setSpoiler(true);
+              }}
               allLabel="General"
             />
           )}
@@ -231,6 +238,18 @@ export default function NewCommunityPostScreen() {
           error={bodyError}
           hint={`${body.length}/${COMMUNITY_LIMITS.bodyMax}`}
           style={s.bodyInput}
+        />
+
+        <Checkbox
+          checked={spoiler}
+          onChange={setSpoiler}
+          accessibilityLabel="Contains spoilers"
+          label={
+            <View>
+              <Text>Contains spoilers</Text>
+              <Text variant="caption">The text is hidden until someone taps to read it. Keep spoilers out of the title.</Text>
+            </View>
+          }
         />
 
         <Text variant="caption" style={s.guideline}>

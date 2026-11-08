@@ -24,7 +24,7 @@ export default function EditProfileScreen() {
   const styles = useStyles();
   const userId = useUserId();
   const { refreshProfile } = useAuth();
-  const { profile, games, loading, error, reload } = useProfile(userId);
+  const { profile, games, gameIds, loading, error, reload } = useProfile(userId);
   const [values, setValues] = useState<ProfileFormValues | null>(null);
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saving, setSaving] = useState(false);
@@ -32,7 +32,7 @@ export default function EditProfileScreen() {
   const usernameStatus = useUsernameAvailability(values?.username ?? '', profile?.username);
 
   // Seed the form once the profile has loaded (state adjusted during render, not in an effect).
-  if (profile && !values) setValues(formFromProfile(profile, games));
+  if (profile && !values) setValues(formFromProfile(profile, games, gameIds));
 
   if (loading && !values) {
     return (

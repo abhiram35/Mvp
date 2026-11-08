@@ -29,6 +29,8 @@ export type FriendshipStatus = 'pending' | 'accepted';
 export type ReportTarget = 'profile' | 'message' | 'lfg_post' | 'community_post' | 'community_reply';
 export type CommunityPostKind = 'take' | 'question';
 export type CommunitySort = 'hot' | 'new' | 'unanswered';
+export type GameCategory = 'competitive' | 'story' | 'casual';
+export type PlayStatus = 'playing' | 'finished';
 export type ReportReason = 'harassment' | 'hate' | 'cheating' | 'spam' | 'scam' | 'inappropriate' | 'other';
 
 // ── Tables ──────────────────────────────────────────────────────────────────
@@ -39,7 +41,12 @@ export interface Game {
   name: string;
   platforms: string[]; // e.g. ['mobile'] | ['pc'] | ['pc','console']
   ranks: string[]; // ordered lowest → highest, may be empty
-  emoji: string; // simple visual until real artwork exists
+  emoji: string; // fallback visual when there is no artwork
+  category: GameCategory;
+  is_coop: boolean; // story games you can play together
+  steam_appid: number | null; // Steam store app id: artwork + library matching
+  logo_url: string | null; // optional self-hosted artwork (game-art bucket)
+  squadable: boolean; // generated: category <> 'story' or is_coop. Only these get LFG / Squad Finder
 }
 
 /** table: profiles — one row per auth user, id = auth.users.id */
@@ -63,6 +70,36 @@ export interface ProfileGame {
   game_id: string;
   rank: string | null;
   role: string | null; // e.g. 'IGL', 'Sniper', 'Duelist'
+  play_status: PlayStatus | null; // mostly for story games
+}
+
+/** table: profile_game_ids — private: visible to you, accepted friends and people you share a chat with */
+export interface ProfileGameId {
+  profile_id: UUID;
+  game_id: string;
+  in_game_id: string; // 1–64 chars, e.g. BGMI UID or Riot ID
+  updated_at: ISODate;
+}
+
+/** One game from a linked Steam library (top games by playtime). */
+export interface SteamGame {
+  appid: number;
+  name: string;
+  playtime_hours: number;
+}
+
+/** table: steam_accounts — written only by the steam-link Edge Function */
+export interface SteamAccount {
+  profile_id: UUID;
+  steam_id: string; // SteamID64
+  persona_name: string | null;
+  avatar_url: string | null;
+  profile_url: string | null;
+  library_public: boolean; // false = the player's Steam game details are private
+  game_count: number;
+  games: SteamGame[];
+  linked_at: ISODate;
+  synced_at: ISODate;
 }
 
 /** table: lfg_posts — "looking for group" posts */
@@ -159,6 +196,7 @@ export interface CommunityPost {
   game_id: string | null; // null = general / not about one game
   title: string; // 5–120 chars
   body: string; // 1–5000 chars, plain text (line breaks kept)
+  is_spoiler: boolean; // body hidden behind a tap
   solved_reply_id: UUID | null; // questions only: the reply the author marked as the answer
   gg_count: number; // maintained by the server, read-only for users
   reply_count: number; // maintained by the server, read-only for users
@@ -300,6 +338,17 @@ export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
   scam: 'Scam or fraud',
   inappropriate: 'Sexual or inappropriate content',
   other: 'Something else',
+};
+
+export const GAME_CATEGORY_LABELS: Record<GameCategory, string> = {
+  competitive: 'Competitive',
+  story: 'Story',
+  casual: 'Co-op & Casual',
+};
+
+export const PLAY_STATUS_LABELS: Record<PlayStatus, string> = {
+  playing: 'Playing now',
+  finished: 'Finished',
 };
 
 export const COMMUNITY_KIND_LABELS: Record<CommunityPostKind, string> = {

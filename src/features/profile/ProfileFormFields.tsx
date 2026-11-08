@@ -6,20 +6,25 @@ import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { Avatar, Button, Card, Chip, ChipRow, Text, TextField } from '../../components/ui';
 import {
   LANGUAGES,
+  PLAY_STATUS_LABELS,
   PLAY_STYLE_LABELS,
   PLAY_TIME_LABELS,
   REGION_LABELS,
+  type PlayStatus,
   type PlayStyle,
   type PlayTime,
   type Region,
 } from '../../lib/types';
 import { makeStyles, spacing, useTheme } from '../../theme';
+import { GameLogo } from '../games/GameLogo';
 import { GamePicker } from '../games/GamePicker';
 import { useGames } from '../games/useGames';
 import {
   BIO_MAX,
   DISPLAY_NAME_MAX,
+  IN_GAME_ID_MAX,
   ROLE_MAX,
+  newGameEntry,
   normaliseUsername,
   type AboutValues,
   type FieldErrors,
@@ -181,7 +186,7 @@ export function GamesFields({
   const ids = games.map((g) => g.game_id);
 
   const setIds = (next: string[]) => {
-    onChange(next.map((id) => games.find((g) => g.game_id === id) ?? { game_id: id, rank: null, role: '' }));
+    onChange(next.map((id) => games.find((g) => g.game_id === id) ?? newGameEntry(id)));
   };
   const patch = (id: string, p: Partial<GameEntry>) => onChange(games.map((g) => (g.game_id === id ? { ...g, ...p } : g)));
 
@@ -195,9 +200,10 @@ export function GamesFields({
         if (!game) return null;
         return (
           <Card key={entry.game_id} style={{ marginTop: spacing.md }}>
-            <Text variant="heading" style={{ marginBottom: spacing.md }}>
-              {game.emoji} {game.name}
-            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.md }}>
+              <GameLogo game={game} height={32} />
+              <Text variant="heading" style={{ flexShrink: 1 }}>{game.name}</Text>
+            </View>
             {game.ranks.length > 0 ? (
               <View style={{ marginBottom: spacing.lg }}>
                 <Text variant="label" style={{ marginBottom: spacing.sm }}>Rank (optional)</Text>
@@ -213,14 +219,44 @@ export function GamesFields({
                 </ChipRow>
               </View>
             ) : null}
-            <TextField
-              label="Role (optional)"
-              value={entry.role}
-              onChangeText={(t) => patch(entry.game_id, { role: t })}
-              placeholder="e.g. IGL, Sniper, Duelist"
-              maxLength={ROLE_MAX}
-              error={errors[`role_${entry.game_id}`]}
-            />
+            {game.category === 'story' ? (
+              <View style={{ marginBottom: spacing.lg }}>
+                <Text variant="label" style={{ marginBottom: spacing.sm }}>Progress (optional)</Text>
+                <ChipRow>
+                  {(Object.keys(PLAY_STATUS_LABELS) as PlayStatus[]).map((st) => (
+                    <Chip
+                      key={st}
+                      icon={st === 'playing' ? 'play-circle-outline' : 'checkmark-circle-outline'}
+                      label={PLAY_STATUS_LABELS[st]}
+                      selected={entry.play_status === st}
+                      onPress={() => patch(entry.game_id, { play_status: entry.play_status === st ? null : st })}
+                    />
+                  ))}
+                </ChipRow>
+              </View>
+            ) : (
+              <TextField
+                label="Role (optional)"
+                value={entry.role}
+                onChangeText={(t) => patch(entry.game_id, { role: t })}
+                placeholder="e.g. IGL, Sniper, Duelist"
+                maxLength={ROLE_MAX}
+                error={errors[`role_${entry.game_id}`]}
+              />
+            )}
+            {game.squadable ? (
+              <TextField
+                label="In-game ID (optional)"
+                value={entry.in_game_id}
+                onChangeText={(t) => patch(entry.game_id, { in_game_id: t })}
+                placeholder="e.g. UID 5123456789 or Name#TAG"
+                autoCapitalize="none"
+                autoCorrect={false}
+                maxLength={IN_GAME_ID_MAX}
+                error={errors[`igid_${entry.game_id}`]}
+                hint="Only your friends and people you chat with can see this"
+              />
+            ) : null}
           </Card>
         );
       })}

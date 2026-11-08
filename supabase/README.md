@@ -1,4 +1,4 @@
-# GG backend (Supabase)
+# Vinq backend (Supabase)
 
 Everything the app needs lives in `migrations/`. Run the files **in order**:
 
@@ -15,6 +15,7 @@ Everything the app needs lives in `migrations/`. Run the files **in order**:
 | `0009_safety_telemetry.sql` | Moderators + bans, profanity filter, report queue, product events, crash reports, beta metrics |
 | `0010_games_steam.sql` | Game categories (Competitive / Story / Co-op & Casual), story games, game artwork, private in-game IDs, "playing now", spoiler tags, Steam accounts |
 | `0011_review_fixes.sql` | Privacy and safety fixes for 0010: in-game IDs and Steam accounts only visible to friends / squad chats / DMs where the player wrote to you, safer Steam linking (2 steps), one-call profile game saving, Steam name filter, Genshin Impact moved to Co-op & Casual |
+| `0012_rename_vinq.sql` | The app is now called Vinq: updates the default squad-chat notification title and two moderation messages |
 
 All files are safe to run again. Re-running them will not create duplicates, and it will not undo your own edits
 to the game list.
@@ -33,8 +34,8 @@ to the game list.
 **Option A: SQL Editor (easiest)**
 1. In the dashboard open **SQL Editor → New query**.
 2. Open `migrations/0001_schema.sql`, copy the whole file, paste it, and click **Run**.
-3. Do the same for `0002`, `0003`, `0004`, `0005`, `0006`, `0007`, `0008`, `0009`, `0010` and `0011`, in that order
-   (so the full run order is **0001 → 0011**). Already ran some of them earlier? Just run the newer ones, in order.
+3. Do the same for `0002`, `0003`, `0004`, `0005`, `0006`, `0007`, `0008`, `0009`, `0010`, `0011` and `0012`, in that order
+   (so the full run order is **0001 → 0012**). Already ran some of them earlier? Just run the newer ones, in order.
 
 **Option B: Supabase CLI**
 ```bash
@@ -211,15 +212,15 @@ squads formed, messages, community posts, ratings, day-1 / day-7 retention and e
 ## 10. Email codes (sign-up and password reset without links)
 The app asks for the 6-digit code from the email, so the emails must contain it.
 1. **Authentication → Emails → Templates** (older dashboards: **Email Templates**).
-2. **Confirm signup**: add a line such as `Your GG code is {{ .Token }}`.
-3. **Reset password** (sometimes "Reset Password" / "Recovery"): add `Your GG reset code is {{ .Token }}`.
+2. **Confirm signup**: add a line such as `Your Vinq code is {{ .Token }}`.
+3. **Reset password** (sometimes "Reset Password" / "Recovery"): add `Your Vinq reset code is {{ .Token }}`.
 4. Save both. You can keep the links in the emails too; the app only needs the code.
 
 ## 11. Steam linking ("Sign in through Steam")
-Players link Steam on **Me** (profile) **→ Steam**. They sign in on Steam's own page (GG never sees their password), so a
-linked account is verified. GG then shows their most-played games and lets them add matching games in one tap.
+Players link Steam on **Me** (profile) **→ Steam**. They sign in on Steam's own page (Vinq never sees their password), so a
+linked account is verified. Vinq then shows their most-played games and lets them add matching games in one tap.
 
-1. Run `migrations/0010_games_steam.sql` and then `migrations/0011_review_fixes.sql` if you haven't yet.
+1. Run `migrations/0010_games_steam.sql`, then `0011_review_fixes.sql`, then `0012_rename_vinq.sql` if you haven't yet.
 2. Get a free Steam Web API key: <https://steamcommunity.com/dev/apikey>. Sign in, type any domain name (for
    example your Supabase project domain `xxxx.supabase.co`), accept the terms, and copy the key.
    Your Steam account must have spent at least US$5 on Steam to get a key.
@@ -228,20 +229,20 @@ linked account is verified. GG then shows their most-played games and lets them 
    supabase secrets set STEAM_API_KEY=<your key>
    supabase functions deploy steam-link --no-verify-jwt
    ```
-   The login (JWT) check must be off for this function: Steam sends the browser back to it without a GG login.
+   The login (JWT) check must be off for this function: Steam sends the browser back to it without a Vinq login.
    `supabase/config.toml` already turns it off for `steam-link`; `--no-verify-jwt` does the same and is a safety
-   net. The function checks the GG login itself for every other request and verifies every sign-in with Steam.
+   net. The function checks the Vinq login itself for every other request and verifies every sign-in with Steam.
    (`SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are provided by Supabase automatically; don't set them.)
 4. Try it in the app: **Me → Sign in through Steam**. The browser opens Steam's page, you sign in, then you come
-   back to GG and it finishes linking. Linking is two steps on purpose: Steam's answer only proves who you are on
-   Steam, and the app then confirms it from your own signed-in GG account (within 5 minutes). That way a forwarded
-   or stolen link can't attach someone's Steam account to a different GG profile. If linking doesn't finish (for
+   back to Vinq and it finishes linking. Linking is two steps on purpose: Steam's answer only proves who you are on
+   Steam, and the app then confirms it from your own signed-in Vinq account (within 5 minutes). That way a forwarded
+   or stolen link can't attach someone's Steam account to a different Vinq profile. If linking doesn't finish (for
    example you closed the browser), just tap the button again.
 
 Notes:
 - A player's library only shows if their Steam **Game details** privacy setting is **Public**. The app tells them how
   to change it.
-- One Steam account can be linked to one GG profile.
+- One Steam account can be linked to one Vinq profile.
 - A linked Steam account is private in the same way as in-game IDs: only the player, accepted friends, people in a
   squad chat with them, and people they have sent a DM to can see it. Nobody else (not strangers, not anyone across
   a block). Steam names go through the profanity filter.

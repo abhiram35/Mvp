@@ -180,13 +180,13 @@ async function callDesigner(apiKey: string, prompt: string): Promise<Record<stri
         system: THEME_SYSTEM_PROMPT,
         tools: [{
           name: 'create_theme',
-          description: 'Create one complete GG theme from the player\'s description.',
+          description: 'Create one complete Vinq theme from the player\'s description.',
           input_schema: CREATE_THEME_TOOL_SCHEMA,
         }],
         tool_choice: { type: 'tool', name: 'create_theme' },
         messages: [{
           role: 'user',
-          content: `Design a GG theme for this player description:\n<description>\n${prompt}\n</description>`,
+          content: `Design a Vinq theme for this player description:\n<description>\n${prompt}\n</description>`,
         }],
       }),
     });

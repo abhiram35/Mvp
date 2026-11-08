@@ -21,7 +21,7 @@ function friendlyAuthError(err: unknown): string {
   if (msg.includes('rate limit') || msg.includes('security purposes') || msg.includes('too many')) {
     return 'Too many attempts. Wait a minute, then try again.';
   }
-  if (msg.includes('different from the old password')) return 'Pick a password you haven\'t used on GG before.';
+  if (msg.includes('different from the old password')) return 'Pick a password you haven\'t used on Vinq before.';
   if (msg.includes('network') || msg.includes('fetch')) return 'Check your connection and try again.';
   return raw;
 }

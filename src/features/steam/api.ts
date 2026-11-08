@@ -26,7 +26,7 @@ const OFFLINE = "Couldn't reach the server. Check your connection.";
 export const REASON_MESSAGES: Record<string, string> = {
   expired: 'That took too long. Please try again.',
   invalid: "Steam couldn't confirm the sign-in. Please try again.",
-  already_linked: 'That Steam account is already linked to another GG profile.',
+  already_linked: 'That Steam account is already linked to another Vinq profile.',
   steam_unavailable: 'Steam is not responding right now. Try again in a few minutes.',
   internal: GENERIC_SERVER,
 };
@@ -38,11 +38,11 @@ export const ERROR_MESSAGES: Record<string, string> = {
   not_linked: 'No Steam account is linked any more. Link it again.',
   invalid_request: 'Something went wrong with that request. Please try again.',
   invalid_code: 'That Steam sign-in expired or was already used. Please try again.',
-  already_linked: 'That Steam account is already linked to another GG profile.',
+  already_linked: 'That Steam account is already linked to another Vinq profile.',
   steam_unavailable: 'Steam is not responding right now. Try again in a few minutes.',
   not_configured: "Steam linking isn't set up on the server yet.",
   internal: GENERIC_SERVER,
-  method_not_allowed: 'This version of GG is out of date. Please update the app.',
+  method_not_allowed: 'This version of Vinq is out of date. Please update the app.',
 };
 
 /** An error from the steam-link Edge Function, already turned into friendly copy. */
@@ -174,7 +174,7 @@ export function claimSteamOutcome(): boolean {
 
 /** Opens "Sign in through Steam", waits for it to come back and completes the link. */
 export async function linkSteam(): Promise<Exclude<SteamLinkResult, { status: 'verified' }>> {
-  if (!STEAM_LINK_SUPPORTED) return { status: 'error', message: 'Link Steam from the GG app on your phone.' };
+  if (!STEAM_LINK_SUPPORTED) return { status: 'error', message: 'Link Steam from the Vinq app on your phone.' };
   attempts.begin();
   const redirect = Linking.createURL(STEAM_RETURN_PATH);
   const { url } = await invokeSteam<{ url: string }>({ action: 'start', redirect_to: redirect });
@@ -203,7 +203,7 @@ export async function addProfileGames(profileId: string, gameIds: string[]): Pro
   if (error) throw error;
 }
 
-/** Steam games that are also GG catalog games, paired with the catalog entry. */
+/** Steam games that are also Vinq catalog games, paired with the catalog entry. */
 export function matchCatalog(steamGames: readonly SteamGame[], catalog: readonly Game[]): { steam: SteamGame; game: Game }[] {
   const byAppId = new Map<number, Game>();
   for (const g of catalog) if (g.steam_appid) byAppId.set(g.steam_appid, g);

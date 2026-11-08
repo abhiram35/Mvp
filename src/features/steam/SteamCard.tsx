@@ -59,7 +59,7 @@ function SteamArt({ appid }: { appid: number }) {
 
 /**
  * Steam section of a profile.
- * Own profile: link / refresh / unlink, and add matching games to your GG profile.
+ * Own profile: link / refresh / unlink, and add matching games to your Vinq profile.
  * Someone else's: their verified Steam account and top games (hidden when not linked).
  */
 export function SteamCard({
@@ -147,7 +147,7 @@ export function SteamCard({
         </View>
         <Text muted style={{ marginTop: spacing.sm }}>
           Link your Steam account to show your library and add your games in one tap. You sign in on Steam&apos;s own
-          page, so GG never sees your password.
+          page, so Vinq never sees your password.
         </Text>
         <Text variant="caption" muted style={{ marginTop: spacing.xs, marginBottom: spacing.sm }}>
           {STEAM_PRIVACY_COPY}
@@ -170,7 +170,7 @@ export function SteamCard({
   const profileUrl = safeSteamProfileUrl(account.profile_url);
 
   const unlink = () =>
-    Alert.alert('Unlink Steam?', 'Your Steam library will be removed from your GG profile.', [
+    Alert.alert('Unlink Steam?', 'Your Steam library will be removed from your Vinq profile.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Unlink',

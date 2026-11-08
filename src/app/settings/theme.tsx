@@ -58,7 +58,7 @@ export default function ThemeScreen() {
   return (
     <Screen scroll edges={['bottom']}>
       <Text muted style={{ marginTop: spacing.lg, marginBottom: spacing.lg }}>
-        Pick the look of your GG. Your choice is saved on this phone, and switching is always free.
+        Pick the look of your Vinq. Your choice is saved on this phone, and switching is always free.
       </Text>
 
       <Text variant="heading" accessibilityRole="header" style={{ marginBottom: spacing.md }}>Built-in</Text>

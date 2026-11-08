@@ -1,4 +1,4 @@
-# GG – fixes from the specialist review of "Story games + Steam" (PR #1)
+# Vinq – fixes from the specialist review of "Story games + Steam" (PR #1)
 
 Owner decisions:
 - **Steam info visibility = same rule as in-game IDs** (yourself, accepted friends, squad chats, and DMs where the

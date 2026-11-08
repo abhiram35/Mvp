@@ -8,7 +8,7 @@ import { fontSize, makeStyles, spacing, useTheme } from '../../theme';
 import { rateTeammate, useRateableTeammates } from './api';
 
 const MAX_PRAISE = 4;
-const SUCCESS = 'Thanks — ratings help keep GG chill.';
+const SUCCESS = 'Thanks — ratings help keep Vinq chill.';
 
 function sameTags(a: RatingTag[], b: RatingTag[]): boolean {
   if (a.length !== b.length) return false;

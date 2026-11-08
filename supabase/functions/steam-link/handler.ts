@@ -145,7 +145,7 @@ async function syncAccount(deps: Deps, profileId: string, steamId: string, mode:
   return data;
 }
 
-/** Is this Steam account linked to a different GG profile? */
+/** Is this Steam account linked to a different Vinq profile? */
 async function linkedElsewhere(deps: Deps, steamId: string, profileId: string): Promise<boolean> {
   const { data, error } = await deps.admin
     .from('steam_accounts')
@@ -207,10 +207,10 @@ async function handleCallback(req: Request, deps: Deps): Promise<Response> {
     .maybeSingle();
   if (claimErr) {
     console.error('steam-link: claim failed', describe(claimErr));
-    return new Response('Something went wrong. Try again in GG.', { status: 500 });
+    return new Response('Something went wrong. Try again in Vinq.', { status: 500 });
   }
   if (!reqRow || !isAllowedRedirect(reqRow.redirect_to)) {
-    return new Response('Link expired. Try again in GG.', { status: 400 });
+    return new Response('Link expired. Try again in Vinq.', { status: 400 });
   }
 
   const back = (q: Record<string, string>) =>

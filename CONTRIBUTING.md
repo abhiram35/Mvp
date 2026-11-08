@@ -1,6 +1,6 @@
-# Contributing to GG
+# Contributing to Vinq
 
-Thanks for helping build GG, a social app for gamers with no toxicity. This guide gets you from clone to pull
+Thanks for helping build Vinq, a social app for gamers with no toxicity. This guide gets you from clone to pull
 request.
 
 ## 1. Run it locally with your own Supabase
@@ -50,10 +50,10 @@ themes.
 - **TypeScript strict.** No `any` unless there is a comment explaining why. Prefer `unknown` and narrow it.
 - **Expo Router:** every file in `src/app/` is a screen. Components, hooks and helpers go in `src/features/…`,
   `src/components/…` or `src/lib/…`.
-- **Themes:** GG has several themes, including AI-made ones, so **never hard-code colours, fonts, font weights
+- **Themes:** Vinq has several themes, including AI-made ones, so **never hard-code colours, fonts, font weights
   or border radii**. Use `useTheme()` (`t.colors.*`, `t.fonts.*`, `t.radius.*`), `makeStyles`, and the kit in
   `src/components/ui`. Read the rules in [docs/THEME_MIGRATION.md](docs/THEME_MIGRATION.md) and
-  [docs/CUSTOM_THEMES.md](docs/CUSTOM_THEMES.md). Use theme words (`t.words.*`) for "GG", "squad", "lobbies"
+  [docs/CUSTOM_THEMES.md](docs/CUSTOM_THEMES.md). Use theme words (`t.words.*`) for "Vinq", "squad", "lobbies"
   and similar labels.
 - **Native libraries:** add them with `npx expo install <package>`, never plain `npm install`. Say in the PR if
   a library has native code, because it needs a new app build and can't ship as an over-the-air update.

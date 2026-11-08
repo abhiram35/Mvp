@@ -1,7 +1,7 @@
-# GG – Custom AI themes (spec)
+# Vinq – Custom AI themes (spec)
 
 Players describe a vibe ("cold Norse war, blood and gold", "overgrown ruined city, rust and moss") and an AI
-design agent turns it into a full GG theme. Layouts never change — only the look: colours, fonts, shapes,
+design agent turns it into a full Vinq theme. Layouts never change — only the look: colours, fonts, shapes,
 panel frames, background texture and theme words.
 
 ## Rules

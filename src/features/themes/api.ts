@@ -135,9 +135,9 @@ async function toGenerationError(err: unknown): Promise<ThemeGenerationError> {
     );
   }
   if (err instanceof FunctionsFetchError || err instanceof FunctionsRelayError) {
-    return new ThemeGenerationError('network', "Couldn't reach GG. Check your connection and try again.", null, true);
+    return new ThemeGenerationError('network', "Couldn't reach Vinq. Check your connection and try again.", null, true);
   }
-  return new ThemeGenerationError('network', "Couldn't reach GG. Check your connection and try again.", null, true);
+  return new ThemeGenerationError('network', "Couldn't reach Vinq. Check your connection and try again.", null, true);
 }
 
 export interface GeneratedTheme {
@@ -165,7 +165,7 @@ export async function generateTheme(prompt: string): Promise<GeneratedTheme> {
   const row = body?.theme;
   const spec = row ? validateSpec(row.spec) : null;
   if (!row || typeof row.id !== 'string' || !spec) {
-    throw new ThemeGenerationError('bad_response', 'Your theme was made but this version of GG can’t show it. Update the app and check Your themes.', null, true);
+    throw new ThemeGenerationError('bad_response', 'Your theme was made but this version of Vinq can’t show it. Update the app and check Your themes.', null, true);
   }
   return {
     theme: specToAppTheme(spec, customThemeId(row.id), typeof row.name === 'string' ? row.name : spec.name),

@@ -1,6 +1,6 @@
-# GG – Phase 2 spec (beta readiness)
+# Vinq – Phase 2 spec (beta readiness)
 
-Goal: make GG ready for a friends beta. Data contract: the "Phase 2" section at the end of `src/lib/types.ts`
+Goal: make Vinq ready for a friends beta. Data contract: the "Phase 2" section at the end of `src/lib/types.ts`
 (names there are exact). Video clips are intentionally NOT in this phase.
 
 ## 1. Notifications (in-app inbox + push)
@@ -43,7 +43,7 @@ Goal: make GG ready for a friends beta. Data contract: the "Phase 2" section at 
   latest rater, details "Auto: flagged toxic by 3+ teammates in 30 days") unless an open one exists.
 - XP (server-maintained `player_stats` table, read via `get_player_stats`):
   +10 per praise tag received (max 30 per rating), +5 when accepted into a lobby, +15 when your lobby gets its
-  first accepted player, +20 per community solution, +1 per GG received on community content (max 50/day).
+  first accepted player, +20 per community solution, +1 per Vinq received on community content (max 50/day).
   Removing/re-rating adjusts XP accordingly. level = floor(sqrt(xp/50)) + 1.
 - Squad finder: `find_squadmates` adds `reputation` to each match and boosts score by
   `least(15, positive_ratings * 2)` (still capped at 100); unrated players are not penalised.

@@ -84,9 +84,9 @@ export default function SignInScreen() {
         <Button title="Sign in" icon="log-in-outline" onPress={signIn} loading={loading} />
 
         <View style={styles.footer}>
-          <Text muted>New to GG? </Text>
+          <Text muted>New to Vinq? </Text>
           <Link href="/(auth)/sign-up" asChild>
-            <Pressable accessibilityRole="link" accessibilityLabel="New to GG? Create your player card" hitSlop={12} style={styles.linkTarget}>
+            <Pressable accessibilityRole="link" accessibilityLabel="New to Vinq? Create your player card" hitSlop={12} style={styles.linkTarget}>
               <Text variant="strong" style={{ color: t.colors.primary }}>Create your player card</Text>
             </Pressable>
           </Link>

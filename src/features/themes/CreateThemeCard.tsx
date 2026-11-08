@@ -119,7 +119,7 @@ export function CreateThemeCard({
         <Text variant="heading" accessibilityRole="header" style={{ flexShrink: 1 }}>Create with AI</Text>
       </View>
       <Text muted>
-        Describe a vibe and our AI designer builds a full GG look — colours, fonts, shapes and words. Layouts stay the same.
+        Describe a vibe and our AI designer builds a full Vinq look — colours, fonts, shapes and words. Layouts stay the same.
       </Text>
 
       <TextField

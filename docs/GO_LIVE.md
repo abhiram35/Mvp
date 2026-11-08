@@ -1,4 +1,4 @@
-# GG: go live (from zero to "my friends have the app")
+# Vinq: go live (from zero to "my friends have the app")
 
 This guide is for the owner. Follow the steps in order and copy-paste the commands. It assumes a computer with
 **Node.js 22** (LTS) and **git** installed, and an **Android phone**.
@@ -28,7 +28,7 @@ You can skip Firebase at first. The app works without it, except that phones won
 Follow **[supabase/README.md](../supabase/README.md)**. In short:
 
 1. Create a project (region: **Mumbai** if your players are in India).
-2. Run **every** file in `supabase/migrations/` **in order**: `0001` → `0002` → … → the last one (`0011` at the
+2. Run **every** file in `supabase/migrations/` **in order**: `0001` → `0002` → … → the last one (`0012` at the
    time of writing). Skipping or re-ordering breaks things. Running a file twice is safe.
    **Whenever the repo gets a new migration, run it before you publish a new build or update** — new app
    versions expect the new tables and columns and will fail (sign-up, Edit profile, game lists) without them.
@@ -200,7 +200,7 @@ keeps old builds from receiving updates that need the new native code.
 `app.json` is already at `1.1.0`, because this release added two native libraries (`expo-image` and
 `expo-web-browser`). That means:
 
-1. Run `0010_games_steam.sql` and `0011_review_fixes.sql` in Supabase first (step 2), if you haven't.
+1. Run `0010_games_steam.sql`, `0011_review_fixes.sql` and `0012_rename_vinq.sql` in Supabase first (step 2), if you haven't.
 2. Deploy `steam-link` (step 2.6) if you want Steam linking.
 3. Make a **new build**: `npx eas-cli@latest build -p android --profile preview` (step 9) and send friends the
    new link. They install it over the old app (same package name, their login stays).
@@ -278,7 +278,7 @@ month by the server.
 
 ## Beta checklist
 
-- [ ] All migrations run in order `0001` → `0011` (including `0010_games_steam.sql` and `0011_review_fixes.sql`),
+- [ ] All migrations run in order `0001` → `0012` (including `0010_games_steam.sql`, `0011_review_fixes.sql` and `0012_rename_vinq.sql`),
       `games` table has rows
 - [ ] Email confirm + reset templates contain `{{ .Token }}`; redirect URLs `gg://**`, `exp://**` added
 - [ ] `.env` filled; app works in Expo Go (sign up, lobby, chat, community post)

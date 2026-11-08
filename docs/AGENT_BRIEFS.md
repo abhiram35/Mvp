@@ -1,6 +1,6 @@
-# GG – build briefs for the agent team
+# Vinq – build briefs for the agent team
 
-GG is a mobile social app for gamers (India-first, many games): find teammates,
+Vinq is a mobile social app for gamers (India-first, many games): find teammates,
 post "looking for group" (LFG) requests, chat, add friends — with zero tolerance for
 toxicity (report, block, moderation built in from day one).
 

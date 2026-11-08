@@ -11,7 +11,7 @@ export const COMMUNITY_GUIDELINES = [
 ].join('\n');
 
 export const TERMS_SUMMARY =
-  'Placeholder Terms of Service. You must be 18+, or 13–17 with a parent’s permission, to use GG. You are responsible for what you post. We may remove content or accounts that break the Community Guidelines.';
+  'Placeholder Terms of Service. You must be 18+, or 13–17 with a parent’s permission, to use Vinq. You are responsible for what you post. We may remove content or accounts that break the Community Guidelines.';
 
 export function showCommunityGuidelines() {
   Alert.alert('Community guidelines', COMMUNITY_GUIDELINES);

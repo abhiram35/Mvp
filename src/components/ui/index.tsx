@@ -605,13 +605,13 @@ export function LiveDot({ label }: { label?: string }) {
 }
 
 // ── Wordmark ────────────────────────────────────────────────────────────────
-/** The GG logo in the active theme's style. Ronin adds the clan crest. */
+/** The Vinq logo in the active theme's style. Ronin adds the clan crest. */
 export function Wordmark({ size = 30 }: { size?: number }) {
   const t = useTheme();
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }} accessibilityRole="header" accessibilityLabel="GG">
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }} accessibilityRole="header" accessibilityLabel="Vinq">
       {t.id === 'ronin' ? <Crest size={size * 1.25} /> : null}
-      <RNText style={{ fontFamily: t.fonts.display, fontSize: size, color: t.colors.text, letterSpacing: t.id === 'ronin' ? 3 : 2 }}>GG</RNText>
+      <RNText style={{ fontFamily: t.fonts.display, fontSize: size, color: t.colors.text, letterSpacing: t.id === 'ronin' ? 3 : 2 }}>VINQ</RNText>
     </View>
   );
 }

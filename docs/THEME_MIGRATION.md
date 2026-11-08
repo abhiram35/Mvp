@@ -1,6 +1,6 @@
-# GG – theme migration brief
+# Vinq – theme migration brief
 
-The app is now called **GG** and has three player-selectable themes:
+The app is now called **Vinq** and has three player-selectable themes:
 
 | Theme | Feel | Key traits |
 | --- | --- | --- |

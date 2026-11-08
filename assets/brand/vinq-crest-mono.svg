@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Vinq">
+  <!-- Single-colour crest: the V and its slot are cut out (transparent). Use for monochrome / themed icons. -->
+  <defs>
+    <mask id="cut">
+      <rect width="100" height="100" fill="#fff"/>
+      <g transform="translate(22,21) scale(0.56)">
+        <polygon points="12,20 32,20 50,56 61,34 81,34 56,84 44,84" fill="#000"/>
+        <polygon points="68,20 88,20 83,30 63,30" fill="#000"/>
+      </g>
+    </mask>
+  </defs>
+  <path d="M50 6 L88 18 L88 50 C88 72 72 86 50 95 C28 86 12 72 12 50 L12 18 Z" fill="#000" mask="url(#cut)"/>
+</svg>

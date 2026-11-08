@@ -610,9 +610,27 @@ export function Wordmark({ size = 30 }: { size?: number }) {
   const t = useTheme();
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.sm }} accessibilityRole="header" accessibilityLabel="Vinq">
-      {t.id === 'ronin' ? <Crest size={size * 1.25} /> : null}
+      <VinqMark size={size * 1.25} />
       <RNText style={{ fontFamily: t.fonts.display, fontSize: size, color: t.colors.text, letterSpacing: t.id === 'ronin' ? 3 : 2 }}>VINQ</RNText>
     </View>
+  );
+}
+
+/**
+ * The Vinq crest (brand logo): a team badge with the "last slot" V carved out.
+ * Coloured from the active theme: light themes use a navy panel shield with a primary-colour slot,
+ * dark themes use a primary shield with an info-colour slot. Master files: assets/brand/vinq-crest*.svg.
+ */
+export function VinqMark({ size = 40 }: { size?: number }) {
+  const t = useTheme();
+  const shield = t.dark ? t.colors.primary : t.colors.panel;
+  const slot = t.dark ? t.colors.info : t.colors.primary;
+  return (
+    <Svg width={size} height={size} viewBox="0 0 100 100" accessibilityElementsHidden importantForAccessibility="no">
+      <Path d="M50 6 L88 18 L88 50 C88 72 72 86 50 95 C28 86 12 72 12 50 L12 18 Z" fill={shield} />
+      <Polygon points="28.72,32.2 39.92,32.2 50,52.36 56.16,40.04 67.36,40.04 53.36,68.04 46.64,68.04" fill={t.colors.bg} />
+      <Polygon points="60.08,32.2 71.28,32.2 68.48,37.8 57.28,37.8" fill={slot} />
+    </Svg>
   );
 }
 

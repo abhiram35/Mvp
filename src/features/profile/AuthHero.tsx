@@ -1,16 +1,15 @@
 import { StyleSheet, View } from 'react-native';
-import { Crest, Text } from '../../components/ui';
-import { makeStyles, spacing, useTheme } from '../../theme';
+import { Text, VinqMark } from '../../components/ui';
+import { makeStyles, spacing } from '../../theme';
 
 export const AUTH_TAGLINE = 'Find teammates who play like you. Leave the rage at the door.';
 
-/** Giant themed "VINQ" wordmark for the auth screens. Ronin adds the clan crest above it. */
+/** The Vinq crest plus a giant themed "VINQ" wordmark for the auth screens. */
 export function AuthHero({ size = 96 }: { size?: number }) {
-  const t = useTheme();
   const s = useStyles();
   return (
     <View style={s.wrap} accessible accessibilityRole="header" accessibilityLabel={`Vinq. ${AUTH_TAGLINE}`}>
-      {t.id === 'ronin' ? <Crest size={Math.round(size * 0.5)} /> : null}
+      <VinqMark size={Math.round(size * 0.8)} />
       <Text variant="display" numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.5} style={[s.word, { fontSize: size, lineHeight: size * 1.02 }]}>
         VINQ
       </Text>

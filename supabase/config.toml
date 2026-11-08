@@ -1,0 +1,24 @@
+# Supabase CLI config — only the settings GG needs; everything else uses CLI defaults.
+# https://supabase.com/docs/guides/local-development/cli/config
+
+# Local identifier for this project (used by `supabase start` to name local containers).
+# It is NOT your hosted project's ref: `supabase link --project-ref <ref>` picks that.
+project_id = "gg"
+
+# These functions check the caller themselves, so the gateway must not demand a user JWT:
+# - steam-link: Steam redirects the browser back here with no GG login; the POST actions
+#   verify the JWT inside the function.
+# - send-push: called by the database (pg_net), protected by x-gg-push-secret.
+[functions.steam-link]
+verify_jwt = false
+
+[functions.send-push]
+verify_jwt = false
+
+# generate-theme is only called by signed-in players, so the gateway keeps checking the JWT (the default).
+# Written out so nobody "simplifies" it to false.
+[functions.generate-theme]
+verify_jwt = true
+
+# Deploy from the project folder (the one that contains supabase/) so the CLI reads this file:
+#   supabase functions deploy            (all functions)   or   supabase functions deploy steam-link

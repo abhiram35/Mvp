@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import { Button, EmptyState, ErrorState, LoadingState, Screen, ScreenHeader, Text } from '../../components/ui';
+import { isSquadable } from '../../features/games/art';
 import { fetchGames, useGames } from '../../features/games/useGames';
 import { hostCta, REGIONS, regionLabel } from '../../features/lfg/format';
 import { GameChipScroller, HorizontalChips } from '../../features/lfg/HorizontalChips';
@@ -9,7 +10,7 @@ import { useBlockedIds } from '../../features/safety/blocks';
 import { fetchMyGameIds, useSquadSearch } from '../../features/squad/api';
 import { SquadmateCard } from '../../features/squad/SquadmateCard';
 import { openDm } from '../../lib/actions';
-import { LANGUAGES, PLAY_STYLE_LABELS, type PlayStyle, type Region, type SquadmateMatch } from '../../lib/types';
+import { LANGUAGES, PLAY_STYLE_LABELS, type Game, type PlayStyle, type Region, type SquadmateMatch } from '../../lib/types';
 import { useAuth, useUserId } from '../../providers/AuthProvider';
 import { makeStyles, spacing, useTheme } from '../../theme';
 
@@ -33,19 +34,32 @@ export default function SquadFinderScreen() {
   const [playStyle, setPlayStyle] = useState<PlayStyle | null>(null);
   const [searchedGameId, setSearchedGameId] = useState<string | null>(null);
 
-  // Default the game to the first one on my profile.
+  // Default the game to the first one on my profile. A failed games-catalog fetch must not
+  // drop the preselect (it only filters out story games), so the two are not coupled.
   useEffect(() => {
     if (!myId) return;
     let active = true;
-    Promise.all([fetchMyGameIds(myId), fetchGames()])
-      .then(([ids, all]) => {
-        // Skip single-player story games: there is nobody to squad up with.
-        const first = ids.find((id) => all.find((g) => g.id === id)?.squadable);
-        if (active && first) setGameId((cur) => cur ?? first);
-      })
-      .catch(() => {
-        /* non-critical: user just picks a game */
+    void (async () => {
+      let ids: string[];
+      try {
+        ids = await fetchMyGameIds(myId);
+      } catch {
+        return; // non-critical: user just picks a game
+      }
+      let all: Game[] | null = null;
+      try {
+        all = await fetchGames();
+      } catch {
+        all = null;
+      }
+      // Skip single-player story games: there is nobody to squad up with.
+      const first = ids.find((id) => {
+        if (!all) return true;
+        const g = all.find((x) => x.id === id);
+        return !!g && isSquadable(g);
       });
+      if (active && first) setGameId((cur) => cur ?? first);
+    })();
     return () => {
       active = false;
     };

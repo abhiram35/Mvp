@@ -62,7 +62,7 @@ export const PostRow = memo(function PostRow({
           {preview}
         </Text>
       ) : post.is_spoiler ? (
-        <Text style={[s.preview, { fontStyle: 'italic' }]} numberOfLines={1}>
+        <Text variant="caption" muted numberOfLines={1} style={s.spoilerNote}>
           Spoilers hidden. Open to read.
         </Text>
       ) : null}
@@ -124,6 +124,7 @@ const useStyles = makeStyles((t) =>
       color: t.colors.textMuted,
       marginTop: spacing.xs,
     },
+    spoilerNote: { marginTop: spacing.xs },
     meta: { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginTop: spacing.sm },
     author: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 1, marginRight: 'auto' },
     authorName: { flexShrink: 1 },

@@ -1,4 +1,5 @@
 import type { CommunityPostKind } from '../../lib/types';
+import { gameCategory } from '../games/art';
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -39,3 +40,17 @@ export const KIND_FILTER_OPTIONS: readonly { value: CommunityPostKind; label: st
   { value: 'take', label: 'Takes' },
   { value: 'question', label: 'Questions' },
 ];
+
+/**
+ * Spoiler box value after the author picks a game in the composer: story games are tagged by
+ * default and un-tagged again when switching away, unless the author set the box themselves
+ * (or is editing an existing post), in which case it is left alone.
+ */
+export function spoilerForGame(
+  current: boolean,
+  game: { category?: unknown } | null | undefined,
+  opts: { editing: boolean; touched: boolean },
+): boolean {
+  if (opts.editing || opts.touched) return current;
+  return !!game && gameCategory(game) === 'story';
+}

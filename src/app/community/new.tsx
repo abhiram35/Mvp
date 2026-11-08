@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { Button, EmptyState, ErrorState, LoadingState, Screen, Text, TextField, type IconName } from '../../components/ui';
 import { communityErrorMessage, createPost, updatePost, useCommunityPost } from '../../features/community/api';
-import { COMMUNITY_LIMITS } from '../../features/community/format';
+import { COMMUNITY_LIMITS, spoilerForGame } from '../../features/community/format';
 import { useGames } from '../../features/games/useGames';
 import { Checkbox } from '../../features/profile/Checkbox';
 import { HorizontalChips } from '../../features/lfg/HorizontalChips';
@@ -52,6 +52,8 @@ export default function NewCommunityPostScreen() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [spoiler, setSpoiler] = useState(false);
+  /** The author flipped the spoiler box themselves: stop auto-setting it from the game. */
+  const [spoilerTouched, setSpoilerTouched] = useState(false);
   const [touched, setTouched] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [prefilled, setPrefilled] = useState(false);
@@ -209,8 +211,11 @@ export default function NewCommunityPostScreen() {
               value={gameId}
               onChange={(id) => {
                 setGameId(id);
-                // Story posts are spoiler-tagged by default; the author can turn it off.
-                if (!editing && games.find((g) => g.id === id)?.category === 'story') setSpoiler(true);
+                // Story posts are spoiler-tagged by default, and un-tagged again when the game changes
+                // away from a story game, unless the author set the box themselves.
+                setSpoiler((cur) =>
+                  spoilerForGame(cur, games.find((x) => x.id === id), { editing, touched: spoilerTouched }),
+                );
               }}
               allLabel="General"
             />
@@ -242,7 +247,10 @@ export default function NewCommunityPostScreen() {
 
         <Checkbox
           checked={spoiler}
-          onChange={setSpoiler}
+          onChange={(v) => {
+            setSpoiler(v);
+            setSpoilerTouched(true);
+          }}
           accessibilityLabel="Contains spoilers"
           label={
             <View>

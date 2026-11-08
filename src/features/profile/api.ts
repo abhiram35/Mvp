@@ -1,6 +1,6 @@
 import { supabase } from '../../lib/supabase';
-import type { Profile, ProfileGame } from '../../lib/types';
-import type { ProfileFormValues } from './form';
+import type { Profile } from '../../lib/types';
+import { buildSaveGamesInput, type ProfileFormValues } from './form';
 
 /** Calls the `is_username_available` RPC. */
 export async function checkUsernameAvailable(username: string): Promise<boolean> {
@@ -42,41 +42,26 @@ function profileRow(userId: string, v: ProfileFormValues, avatarUrl: string | nu
   } satisfies Omit<Profile, 'created_at'>;
 }
 
-function gameRows(userId: string, v: ProfileFormValues): ProfileGame[] {
-  return v.games.map((g) => ({
-    profile_id: userId,
-    game_id: g.game_id,
-    rank: g.rank,
-    role: g.role.trim() ? g.role.trim() : null,
-    play_status: g.play_status,
-  }));
-}
-
-function gameIdRows(userId: string, v: ProfileFormValues) {
-  return v.games
-    .filter((g) => g.in_game_id.trim())
-    .map((g) => ({ profile_id: userId, game_id: g.game_id, in_game_id: g.in_game_id.trim() }));
-}
-
-/** Writes profile_games, then the private in-game IDs (which reference them). */
-async function insertGames(userId: string, v: ProfileFormValues): Promise<void> {
-  const rows = gameRows(userId, v);
-  if (!rows.length) return;
-  const { error: gErr } = await supabase.from('profile_games').insert(rows);
-  if (gErr) throw gErr;
-  const ids = gameIdRows(userId, v);
-  if (ids.length) {
-    const { error: iErr } = await supabase.from('profile_game_ids').insert(ids);
-    if (iErr) throw iErr;
-  }
+/**
+ * Replaces my games and in-game IDs in one transaction (RPC `save_profile_games`).
+ * With keepInGameIds every in_game_id is sent as null, meaning "keep what's stored".
+ */
+export async function saveProfileGames(v: Pick<ProfileFormValues, 'games'>, opts: { keepInGameIds?: boolean } = {}): Promise<void> {
+  const { error } = await supabase.rpc('save_profile_games', { p_games: buildSaveGamesInput(v.games, opts) });
+  if (error) throw error;
 }
 
 async function resolveAvatar(userId: string, v: ProfileFormValues): Promise<string | null> {
   return v.localAvatarUri ? uploadAvatar(userId, v.localAvatarUri) : v.avatar_url;
 }
 
+export interface SaveOptions {
+  /** In-game IDs couldn't be loaded: leave the stored ones untouched. */
+  keepInGameIds?: boolean;
+}
+
 /**
- * Onboarding: insert the profile row, then the profile_games rows.
+ * Onboarding: insert the profile row, then the games (save_profile_games).
  * If a previous attempt already created the profile row (e.g. the games insert failed),
  * fall back to updating it so the user can simply retry.
  */
@@ -94,11 +79,11 @@ export async function createProfile(userId: string, v: ProfileFormValues): Promi
     await updateProfile(userId, { ...v, localAvatarUri: null, avatar_url: avatarUrl });
     return;
   }
-  await insertGames(userId, v);
+  await saveProfileGames(v);
 }
 
-/** Edit profile: update the profile row and replace the user's profile_games. */
-export async function updateProfile(userId: string, v: ProfileFormValues): Promise<void> {
+/** Edit profile: update the profile row, then atomically replace the games and in-game IDs. */
+export async function updateProfile(userId: string, v: ProfileFormValues, opts: SaveOptions = {}): Promise<void> {
   const avatarUrl = await resolveAvatar(userId, v);
   const { id: _id, ...fields } = profileRow(userId, v, avatarUrl);
   const { error } = await supabase.from('profiles').update(fields).eq('id', userId);
@@ -106,8 +91,5 @@ export async function updateProfile(userId: string, v: ProfileFormValues): Promi
     if (error.code === '23505') throw new Error('That username is taken. Pick another one.');
     throw error;
   }
-  // Deleting profile_games also deletes their in-game IDs (cascade); insertGames writes both back.
-  const { error: delErr } = await supabase.from('profile_games').delete().eq('profile_id', userId);
-  if (delErr) throw delErr;
-  await insertGames(userId, v);
+  await saveProfileGames(v, opts);
 }

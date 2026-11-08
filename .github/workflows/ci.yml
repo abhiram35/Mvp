@@ -35,7 +35,7 @@ jobs:
         run: npm test -- --ci
 
   functions:
-    name: Edge Functions (Deno check + lint)
+    name: Edge Functions (Deno check, lint, test)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -52,3 +52,9 @@ jobs:
       - name: Lint functions
         working-directory: supabase/functions
         run: deno lint
+
+      # Runs every *_test.ts under supabase/functions (e.g. steam-link/handler_test.ts).
+      # Jest and tsc never see these files: Jest only matches src/**/__tests__, tsconfig excludes supabase/functions.
+      - name: Test functions
+        working-directory: supabase/functions
+        run: deno test --permit-no-files

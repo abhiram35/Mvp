@@ -28,14 +28,15 @@ export function SolvedTag({ label = 'Solved' }: { label?: string }) {
   );
 }
 
-/** Warning tag on posts marked as containing spoilers. */
+/** Warning-bordered tag on posts marked as containing spoilers. */
 export function SpoilerTag() {
   const t = useTheme();
   const s = useStyles();
   return (
     <View style={[s.tag, s.row, { borderColor: t.colors.warning }]}>
       <Ionicons name="eye-off-outline" size={12} color={t.colors.warning} />
-      <Text style={[s.text, { color: t.colors.warning }]}>Spoiler</Text>
+      {/* Text uses the text colour: warning on bg/surface isn't guaranteed to be readable at this size. */}
+      <Text style={[s.text, { color: t.colors.text }]}>Spoiler</Text>
     </View>
   );
 }

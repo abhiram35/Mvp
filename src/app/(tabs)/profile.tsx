@@ -20,7 +20,7 @@ export default function MyProfileScreen() {
   const styles = useStyles();
   const userId = useUserId();
   const { signOut } = useAuth();
-  const { profile, games, gameIds, steam, loading, error, reload } = useProfile(userId);
+  const { profile, games, gameIds, steam, steamError, loading, error, reload } = useProfile(userId);
   const { isModerator } = useMyStatus();
   const [deleting, setDeleting] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -130,6 +130,8 @@ export default function MyProfileScreen() {
             profileId={userId}
             myGameIds={games.map((g) => g.game_id)}
             onChanged={() => void reload()}
+            loadError={steamError}
+            onRetry={() => void reload()}
           />
         ) : null}
       </View>

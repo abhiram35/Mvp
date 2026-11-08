@@ -34,6 +34,15 @@ themes.
    npm run lint
    npm test
    ```
+   Changed anything in `supabase/functions/` (Edge Functions, Deno code)? Also run these with
+   [Deno 2](https://docs.deno.com/runtime/getting_started/installation/). CI runs them in a separate job:
+   ```bash
+   cd supabase/functions
+   deno check */index.ts
+   deno lint
+   deno test            # e.g. steam-link/handler_test.ts; needs internet the first time (npm: imports)
+   ```
+   Deno tests are named `*_test.ts` and live next to the function. Jest and `tsc` ignore `supabase/functions`.
 5. Open the PR against `main` and fill in the template. The owner reviews and merges.
 
 ## 3. Code style

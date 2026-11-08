@@ -59,12 +59,20 @@ export const SPEC_LIMITS = {
   promptMax: 300,
 } as const;
 
-/** Same pairs and thresholds as the server (docs/CUSTOM_THEMES.md → Validation). */
-const CONTRAST_RULES: { fg: SpecColorKey; bgs: SpecColorKey[]; min: number }[] = [
+/**
+ * Same pairs and thresholds as the server (docs/CUSTOM_THEMES.md → Validation).
+ * `legacyRepair`: rules added after themes were already being saved. A stored theme that
+ * predates them is repaired here (same algorithm as the server) instead of being rejected,
+ * so a player's existing theme never disappears; the server repairs every new theme.
+ */
+const CONTRAST_RULES: { fg: SpecColorKey; bgs: SpecColorKey[]; min: number; legacyRepair?: true }[] = [
   { fg: 'text', bgs: ['bg', 'surface'], min: 4.5 },
   { fg: 'textMuted', bgs: ['bg', 'surface'], min: 4.5 },
   { fg: 'textFaint', bgs: ['bg'], min: 3 },
   { fg: 'primary', bgs: ['bg'], min: 3 },
+  // Status icons / borders (spoiler tag, "Verified", online dots) sit on bg and surface.
+  { fg: 'accent', bgs: ['bg', 'surface'], min: 3, legacyRepair: true },
+  { fg: 'warning', bgs: ['bg', 'surface'], min: 3, legacyRepair: true },
   { fg: 'onPrimary', bgs: ['primary'], min: 4.5 },
   { fg: 'onPanel', bgs: ['panel'], min: 4.5 },
 ];
@@ -134,6 +142,38 @@ export function contrastRatio(a: RGB, b: RGB): number {
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
 
+function toHex([r, g, b]: RGB): string {
+  const h = (x: number) => Math.round(Math.min(255, Math.max(0, x))).toString(16).padStart(2, '0');
+  return `#${h(r)}${h(g)}${h(b)}`.toUpperCase();
+}
+
+function mix(a: RGB, b: RGB, t: number): RGB {
+  return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+}
+
+/**
+ * Port of the server's repairAgainst (supabase/functions/_shared/themeSpec.ts): nudge `fg`
+ * toward white or black (2.5% steps) until it reaches `min` on every bg; smallest change wins.
+ */
+function repairAgainst(fg: RGB, bgs: RGB[], min: number): RGB | null {
+  const passes = (c: RGB) => {
+    const rounded = parseHex(toHex(c))!;
+    return bgs.every((bg) => contrastRatio(rounded, bg) >= min);
+  };
+  if (passes(fg)) return fg;
+  let best: { steps: number; color: RGB } | null = null;
+  for (const target of [[255, 255, 255], [0, 0, 0]] as RGB[]) {
+    for (let i = 1; i <= 40; i++) {
+      const c = mix(fg, target, i / 40);
+      if (passes(c)) {
+        if (!best || i < best.steps) best = { steps: i, color: c };
+        break;
+      }
+    }
+  }
+  return best ? parseHex(toHex(best.color)) : null;
+}
+
 function hexToRgba(hex: string, alpha: number): string {
   const [r, g, b] = parseHex(hex) ?? [0, 0, 0];
   return `rgba(${r},${g},${b},${alpha})`;
@@ -173,7 +213,8 @@ const PLAIN_WORDS = /^(?:[\p{L}\p{N}]\p{M}{0,3}|[ '’\-!&.])+$/u;
  * Checks an untrusted ThemeSpec (from the database or the Edge Function). Returns a
  * clean spec, or null if anything required is missing, out of the allowed lists, or fails
  * contrast. Numbers are clamped and strings trimmed / length-limited; colours are never
- * repaired here (the server repairs).
+ * repaired here (the server repairs), except accent / warning on themes saved before those
+ * rules existed (see CONTRAST_RULES).
  */
 export function validateSpec(raw: unknown): ThemeSpec | null {
   if (!isObj(raw)) return null;
@@ -189,7 +230,11 @@ export function validateSpec(raw: unknown): ThemeSpec | null {
     colors[k] = (raw.colors[k] as string).trim().toUpperCase();
   }
   for (const rule of CONTRAST_RULES) {
-    if (!rule.bgs.every((b) => contrastRatio(rgb[rule.fg], rgb[b]) >= rule.min)) return null;
+    if (rule.bgs.every((b) => contrastRatio(rgb[rule.fg], rgb[b]) >= rule.min)) continue;
+    const fixed = rule.legacyRepair ? repairAgainst(rgb[rule.fg], rule.bgs.map((b) => rgb[b]), rule.min) : null;
+    if (!fixed) return null;
+    rgb[rule.fg] = fixed;
+    colors[rule.fg] = toHex(fixed);
   }
   // `dark` always follows the actual background.
   const dark = luminance(rgb.bg) < 0.2;

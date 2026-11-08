@@ -1,11 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
-import { useMemo } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../../components/ui';
 import { GAME_CATEGORY_LABELS, PLAY_STATUS_LABELS, type Game, type ProfileGame } from '../../lib/types';
 import { makeStyles, spacing, useTheme } from '../../theme';
-import { CATEGORY_ORDER } from '../games/art';
+import { CATEGORY_ORDER, gameCategory } from '../games/art';
 import { GameLogo } from '../games/GameLogo';
 import { useGames } from '../games/useGames';
 
@@ -23,7 +23,7 @@ export function ProfileGamesList({ games, gameIds = {} }: { games: ProfileGame[]
     rows.sort((a, b) => Number(b.pg.play_status === 'playing') - Number(a.pg.play_status === 'playing'));
     return CATEGORY_ORDER.map((category) => ({
       category,
-      rows: rows.filter((r) => (r.game?.category ?? 'competitive') === category),
+      rows: rows.filter((r) => gameCategory(r.game) === category),
     })).filter((g) => g.rows.length > 0);
   }, [games, byId]);
 
@@ -57,10 +57,26 @@ function GameRow({ pg, game, inGameId }: { pg: ProfileGame; game: Game | undefin
   const details = [pg.rank, pg.role].filter(Boolean).join(' · ');
   const status = pg.play_status ? PLAY_STATUS_LABELS[pg.play_status] : null;
 
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (timer.current) clearTimeout(timer.current);
+    },
+    [],
+  );
+
   const copy = async () => {
     if (!inGameId) return;
-    await Clipboard.setStringAsync(inGameId);
-    Alert.alert('Copied', `${name} ID copied.`);
+    let ok = false;
+    try {
+      ok = await Clipboard.setStringAsync(inGameId);
+    } catch {
+      ok = false;
+    }
+    setCopyState(ok ? 'copied' : 'failed');
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => setCopyState('idle'), 2000);
   };
 
   const a11y = [name, status, details, inGameId ? `ID ${inGameId}` : null].filter(Boolean).join(', ');
@@ -75,11 +91,24 @@ function GameRow({ pg, game, inGameId }: { pg: ProfileGame; game: Game | undefin
             onPress={() => void copy()}
             accessibilityRole="button"
             accessibilityLabel={`${name} ID ${inGameId}. Tap to copy`}
-            hitSlop={8}
-            style={s.idRow}
+            accessibilityHint={copyState === 'copied' ? 'Copied' : undefined}
+            style={({ pressed }) => [s.idRow, pressed && { backgroundColor: t.colors.surfaceRaised }]}
           >
             <Text variant="caption" muted numberOfLines={1} style={{ flexShrink: 1 }}>ID {inGameId}</Text>
-            <Ionicons name="copy-outline" size={12} color={t.colors.textMuted} />
+            <Ionicons
+              name={copyState === 'copied' ? 'checkmark' : 'copy-outline'}
+              size={14}
+              color={copyState === 'copied' ? t.colors.accent : t.colors.textMuted}
+            />
+            {copyState !== 'idle' ? (
+              <Text
+                variant="caption"
+                accessibilityLiveRegion="polite"
+                style={{ color: copyState === 'copied' ? t.colors.accent : t.colors.danger }}
+              >
+                {copyState === 'copied' ? 'Copied' : "Couldn't copy"}
+              </Text>
+            ) : null}
           </Pressable>
         ) : null}
       </View>
@@ -113,7 +142,18 @@ const useStyles = makeStyles((t) =>
     },
     text: { flexShrink: 1, flexGrow: 1 },
     name: { flexShrink: 1 },
-    idRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 2, alignSelf: 'flex-start' },
+    // ≥44pt tall tap target; negative margin keeps the row visually compact.
+    idRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      minHeight: 44,
+      minWidth: 44,
+      marginVertical: -8,
+      paddingRight: spacing.sm,
+      alignSelf: 'flex-start',
+      borderRadius: t.radius.sm,
+    },
     details: { marginLeft: 'auto', paddingLeft: spacing.sm, flexShrink: 1, textAlign: 'right' },
     badge: {
       marginLeft: 'auto',

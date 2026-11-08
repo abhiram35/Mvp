@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import type { Game } from '../../lib/types';
 
@@ -39,6 +39,7 @@ export function useGames() {
     };
   }, []);
 
-  const byId = (id: string | null | undefined) => games.find((g) => g.id === id);
+  // Stable while the list is unchanged, so it can be a memo / effect dependency.
+  const byId = useCallback((id: string | null | undefined) => games.find((g) => g.id === id), [games]);
   return { games, byId, loading, error };
 }

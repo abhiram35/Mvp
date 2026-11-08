@@ -192,6 +192,8 @@ export default function CommunityThreadScreen() {
         Alert.alert('Reply not posted', communityErrorMessage(e));
         throw e;
       }
+      // Replying to a hidden spoiler thread means you're in the conversation: show it.
+      setRevealed(true);
       await refreshAll();
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 150);
     },
@@ -263,10 +265,19 @@ export default function CommunityThreadScreen() {
               onMenu={openPostMenu}
               spoilerHidden={spoilerHidden}
               onReveal={() => setRevealed(true)}
+              onHide={!isAuthor && post.is_spoiler && revealed ? () => setRevealed(false) : undefined}
             />
           }
           ListEmptyComponent={
-            spoilerHidden ? undefined : repliesLoading ? (
+            spoilerHidden ? (
+              post.reply_count > 0 ? (
+                <View style={s.state}>
+                  <Text variant="label" style={{ textAlign: 'center' }}>
+                    Replies hidden — tap Show spoilers above
+                  </Text>
+                </View>
+              ) : undefined
+            ) : repliesLoading ? (
               <View style={s.state}>
                 <ActivityIndicator color={t.colors.primary} />
               </View>
@@ -316,6 +327,7 @@ function PostBlock({
   onMenu,
   spoilerHidden,
   onReveal,
+  onHide,
 }: {
   summary: CommunityPostSummary;
   myId: string;
@@ -323,6 +335,8 @@ function PostBlock({
   onMenu: () => void;
   spoilerHidden: boolean;
   onReveal: () => void;
+  /** Set once a reader revealed a spoiler post, to cover it again. */
+  onHide?: () => void;
 }) {
   const t = useTheme();
   const s = useStyles();
@@ -372,18 +386,33 @@ function PostBlock({
         <Pressable
           onPress={onReveal}
           accessibilityRole="button"
-          accessibilityLabel="Contains spoilers. Tap to show the post and replies"
+          accessibilityLabel={`Contains spoilers${game ? ` for ${game.name}` : ''}. Show spoilers`}
+          accessibilityHint="Shows the post and its replies"
           style={({ pressed }) => [s.spoiler, pressed && { backgroundColor: t.colors.surfaceRaised }]}
         >
           <Ionicons name="eye-off-outline" size={22} color={t.colors.warning} />
-          <Text style={{ flex: 1 }}>
-            Contains spoilers{game ? ` for ${game.name}` : ''}. Tap to show the post and replies.
-          </Text>
+          <View style={{ flex: 1 }}>
+            <Text>Contains spoilers{game ? ` for ${game.name}` : ''}.</Text>
+            <Text variant="strong" style={{ marginTop: spacing.xs }}>Show spoilers</Text>
+          </View>
         </Pressable>
       ) : (
-        <Text style={s.body} selectable>
-          {post.body}
-        </Text>
+        <>
+          <Text style={s.body} selectable>
+            {post.body}
+          </Text>
+          {onHide ? (
+            <Pressable
+              onPress={onHide}
+              accessibilityRole="button"
+              accessibilityLabel="Hide spoilers again"
+              style={({ pressed }) => [s.hideSpoilers, pressed && { backgroundColor: t.colors.surfaceRaised }]}
+            >
+              <Ionicons name="eye-off-outline" size={16} color={t.colors.textMuted} />
+              <Text variant="label">Hide spoilers again</Text>
+            </Pressable>
+          ) : null}
+        </>
       )}
 
       <View style={s.actionBar}>
@@ -442,6 +471,17 @@ const useStyles = makeStyles((t) =>
       borderRadius: t.radius.md,
       backgroundColor: t.colors.surface,
       minHeight: 44,
+    },
+    hideSpoilers: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.xs,
+      alignSelf: 'flex-start',
+      minHeight: 44,
+      paddingHorizontal: spacing.sm,
+      marginTop: spacing.sm,
+      marginLeft: -spacing.sm,
+      borderRadius: t.radius.sm,
     },
     body: {
       fontFamily: t.fonts.body,

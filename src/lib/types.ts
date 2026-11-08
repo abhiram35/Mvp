@@ -73,12 +73,15 @@ export interface ProfileGame {
   play_status: PlayStatus | null; // mostly for story games
 }
 
-/** table: profile_game_ids — private: visible to you, accepted friends and people you share a chat with */
+/** table: profile_game_ids — private: visible to you and, unless either side blocked the other, to accepted
+ *  friends, members of a squad (group) chat you are in, and people you have sent at least one DM message to
+ *  (an empty DM someone opened with you is not enough).
+ *  Write it with the save_profile_games RPC. */
 export interface ProfileGameId {
   profile_id: UUID;
   game_id: string;
-  in_game_id: string; // 1–64 chars, e.g. BGMI UID or Riot ID
-  updated_at: ISODate;
+  in_game_id: string; // 1–64 chars (raw length, no control characters), e.g. BGMI UID or Riot ID
+  updated_at: ISODate; // set by the server on insert/update (clients cannot write it)
 }
 
 /** One game from a linked Steam library (top games by playtime). */
@@ -88,13 +91,14 @@ export interface SteamGame {
   playtime_hours: number;
 }
 
-/** table: steam_accounts — written only by the steam-link Edge Function */
+/** table: steam_accounts — written only by the steam-link Edge Function. Readable by the same people who can
+ *  see in-game IDs (see ProfileGameId); the owner can delete (unlink) their own row. */
 export interface SteamAccount {
   profile_id: UUID;
-  steam_id: string; // SteamID64
-  persona_name: string | null;
-  avatar_url: string | null;
-  profile_url: string | null;
+  steam_id: string; // SteamID64 (17 digits)
+  persona_name: string | null; // max 64 chars, profanity-masked by the server
+  avatar_url: string | null; // always https:// (or null)
+  profile_url: string | null; // always https://steamcommunity.com/… (or null)
   library_public: boolean; // false = the player's Steam game details are private
   game_count: number;
   games: SteamGame[];
@@ -510,7 +514,8 @@ export interface BetaMetrics {
 // ── Database functions (Supabase RPC) ───────────────────────────────────────
 // Call with: supabase.rpc('<name>', { ...args })
 
-/** One game in save_profile_games. in_game_id: null = keep existing, '' = remove, string = set. */
+/** One game in save_profile_games. rank / role: max 40 chars, null or '' = none.
+ *  in_game_id: null = keep existing, '' = remove, string = set (trimmed; max 64 chars, no control characters). */
 export interface SaveProfileGameInput {
   game_id: string;
   rank: string | null;
@@ -520,7 +525,9 @@ export interface SaveProfileGameInput {
 }
 
 export interface RpcFunctions {
-  /** Atomically replaces the caller's games and in-game IDs (docs/REVIEW_FIXES.md §3). */
+  /** Atomically replaces the caller's games and in-game IDs (docs/REVIEW_FIXES.md §3). Games not in p_games are
+   *  removed (with their IDs). At most 30 games, no duplicates. Invalid input raises (code 22023) and changes nothing;
+   *  not signed in / no profile raises 42501. */
   save_profile_games: { args: { p_games: SaveProfileGameInput[] }; returns: null };
 
   /** Returns the id of the 1-to-1 conversation with other_id, creating it if needed. Fails if either side blocked the other. */
@@ -530,7 +537,8 @@ export interface RpcFunctions {
    *  (creating the chat on first accept), and sets post status to 'full' when slots run out. Returns the conversation id. */
   accept_lfg_request: { args: { request_id: UUID }; returns: UUID };
 
-  /** Squad finder. Returns other users who play game_id, excluding blocked users either way and the caller.
+  /** Squad finder. Returns other users who play game_id, excluding blocked users either way, paused (banned)
+   *  players and the caller. Returns nothing for games that are not squadable (single-player story games).
    *  Optional filters may be null. Sorted by match_score desc. */
   find_squadmates: {
     args: {
@@ -563,7 +571,7 @@ export interface RpcFunctions {
       p_sort: CommunitySort; // hot = score by GGs + replies decayed by age; new = newest; unanswered = questions with 0 replies, newest first
       p_kind: CommunityPostKind | null; // null = both
       p_game_id: string | null; // null = all games
-      p_search: string | null; // case-insensitive match on title/body, null = none
+      p_search: string | null; // case-insensitive match on title, or body for non-spoiler posts only; null = none
       p_limit?: number; // default 20, max 50
       p_offset?: number; // default 0 (simple offset paging)
     };

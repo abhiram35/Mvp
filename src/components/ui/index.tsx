@@ -628,8 +628,8 @@ export function VinqMark({ size = 40 }: { size?: number }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 100 100" accessibilityElementsHidden importantForAccessibility="no">
       <Path d="M50 6 L88 18 L88 50 C88 72 72 86 50 95 C28 86 12 72 12 50 L12 18 Z" fill={shield} />
-      <Polygon points="28.72,32.2 39.92,32.2 50,52.36 56.16,40.04 67.36,40.04 53.36,68.04 46.64,68.04" fill={t.colors.bg} />
-      <Polygon points="60.08,32.2 71.28,32.2 68.48,37.8 57.28,37.8" fill={slot} />
+      <Polygon points="28.72,32.2 39.92,32.2 50,52.36 54.73,42.91 63.69,47.39 53.36,68.04 46.64,68.04" fill={t.colors.bg} />
+      <Polygon points="60.08,32.2 71.28,32.2 64.56,45.64 55.6,41.16" fill={slot} />
     </Svg>
   );
 }

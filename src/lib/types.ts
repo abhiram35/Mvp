@@ -510,7 +510,19 @@ export interface BetaMetrics {
 // ── Database functions (Supabase RPC) ───────────────────────────────────────
 // Call with: supabase.rpc('<name>', { ...args })
 
+/** One game in save_profile_games. in_game_id: null = keep existing, '' = remove, string = set. */
+export interface SaveProfileGameInput {
+  game_id: string;
+  rank: string | null;
+  role: string | null;
+  play_status: PlayStatus | null;
+  in_game_id: string | null;
+}
+
 export interface RpcFunctions {
+  /** Atomically replaces the caller's games and in-game IDs (docs/REVIEW_FIXES.md §3). */
+  save_profile_games: { args: { p_games: SaveProfileGameInput[] }; returns: null };
+
   /** Returns the id of the 1-to-1 conversation with other_id, creating it if needed. Fails if either side blocked the other. */
   get_or_create_dm: { args: { other_id: UUID }; returns: UUID };
 

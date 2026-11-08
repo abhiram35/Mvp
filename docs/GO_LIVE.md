@@ -28,7 +28,7 @@ You can skip Firebase at first. The app works without it, except that phones won
 Follow **[supabase/README.md](../supabase/README.md)**. In short:
 
 1. Create a project (region: **Mumbai** if your players are in India).
-2. Run **every** file in `supabase/migrations/` **in order**: `0001` → `0002` → … → the last one (`0012` at the
+2. Run **every** file in `supabase/migrations/` **in order**: `0001` → `0002` → … → the last one (`0013` at the
    time of writing). Skipping or re-ordering breaks things. Running a file twice is safe.
    **Whenever the repo gets a new migration, run it before you publish a new build or update** — new app
    versions expect the new tables and columns and will fail (sign-up, Edit profile, game lists) without them.
@@ -278,7 +278,7 @@ month by the server.
 
 ## Beta checklist
 
-- [ ] All migrations run in order `0001` → `0012` (including `0010_games_steam.sql`, `0011_review_fixes.sql` and `0012_rename_vinq.sql`),
+- [ ] All migrations run in order `0001` → `0013` (including `0010_games_steam.sql`, `0011_review_fixes.sql`, `0012_rename_vinq.sql` and `0013_feedback.sql`),
       `games` table has rows
 - [ ] Email confirm + reset templates contain `{{ .Token }}`; redirect URLs `gg://**`, `exp://**` added
 - [ ] `.env` filled; app works in Expo Go (sign up, lobby, chat, community post)
@@ -297,3 +297,4 @@ month by the server.
 - [ ] Community guidelines visible; you know how to ban and remove content
 - [ ] Build link shared with friends; a feedback channel (e.g. Discord) set up
 - [ ] Check `app_errors` and reports every day or two; open Supabase at least weekly so it doesn't pause
+- [ ] Your Discord invite is set to never expire, and Me → Join our Discord opens it. Read new feedback in Supabase → Table Editor → `feedback`.

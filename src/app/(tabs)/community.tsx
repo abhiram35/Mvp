@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'react-native';
 import { Button, EmptyState, ErrorState, LoadingState, Screen, ScreenHeader, Text } from '../../components/ui';
 import { useLatestRef, useNow } from '../../lib/hooks';
+import { openDiscord } from '../../lib/links';
 import { useCommunityFeed } from '../../features/community/api';
 import { KIND_FILTER_OPTIONS } from '../../features/community/format';
 import { PostRow } from '../../features/community/PostRow';
@@ -166,6 +167,18 @@ export default function CommunityScreen() {
           subtitle="Takes, questions and fixes from players"
           right={<Button title="Post" icon="add" size="sm" onPress={() => openNew()} style={s.postButton} accessibilityLabel="New post" />}
         />
+        <Pressable
+          onPress={() => void openDiscord()}
+          accessibilityRole="link"
+          accessibilityLabel="Got an idea for Vinq? Suggest it on our Discord"
+          hitSlop={8}
+          style={s.discordHint}
+        >
+          <Ionicons name="logo-discord" size={16} color={t.colors.textMuted} />
+          <Text variant="label">
+            Got an idea for Vinq? <Text variant="label" style={s.discordLink}>Suggest it on Discord</Text>
+          </Text>
+        </Pressable>
         <UnderlineTabs options={SORT_OPTIONS} value={sort} onChange={setSort} />
       </View>
 
@@ -203,6 +216,8 @@ const useStyles = makeStyles((t) =>
   StyleSheet.create({
     header: { paddingHorizontal: spacing.lg },
     postButton: { minHeight: 44 },
+    discordHint: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, minHeight: 44, marginBottom: spacing.xs },
+    discordLink: { color: t.colors.primary, textDecorationLine: 'underline' },
     controls: {
       paddingLeft: spacing.lg,
       paddingTop: spacing.md,

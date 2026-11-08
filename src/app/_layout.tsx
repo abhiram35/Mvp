@@ -85,6 +85,7 @@ function RootNavigator() {
         {/* Chat & Friends agent */}
         <Stack.Screen name="chat/[id]" options={{ title: 'Chat' }} />
         <Stack.Screen name="friends" options={{ title: 'Friends' }} />
+        <Stack.Screen name="feedback" options={{ title: 'Send feedback', presentation: 'modal' }} />
         {/* Engagement agent */}
         <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
         {/* Safety agent: moderators only (screen checks get_my_status) */}

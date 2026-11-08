@@ -16,6 +16,7 @@ Everything the app needs lives in `migrations/`. Run the files **in order**:
 | `0010_games_steam.sql` | Game categories (Competitive / Story / Co-op & Casual), story games, game artwork, private in-game IDs, "playing now", spoiler tags, Steam accounts |
 | `0011_review_fixes.sql` | Privacy and safety fixes for 0010: in-game IDs and Steam accounts only visible to friends / squad chats / DMs where the player wrote to you, safer Steam linking (2 steps), one-call profile game saving, Steam name filter, Genshin Impact moved to Co-op & Casual |
 | `0012_rename_vinq.sql` | The app is now called Vinq: updates the default squad-chat notification title and two moderation messages |
+| `0013_feedback.sql` | In-app **Send feedback** (ideas, bugs, other). Players can only send; you read it in Table Editor → `feedback`. 10 per player per day |
 
 All files are safe to run again. Re-running them will not create duplicates, and it will not undo your own edits
 to the game list.
@@ -34,8 +35,8 @@ to the game list.
 **Option A: SQL Editor (easiest)**
 1. In the dashboard open **SQL Editor → New query**.
 2. Open `migrations/0001_schema.sql`, copy the whole file, paste it, and click **Run**.
-3. Do the same for `0002`, `0003`, `0004`, `0005`, `0006`, `0007`, `0008`, `0009`, `0010`, `0011` and `0012`, in that order
-   (so the full run order is **0001 → 0012**). Already ran some of them earlier? Just run the newer ones, in order.
+3. Do the same for `0002`, `0003`, `0004`, `0005`, `0006`, `0007`, `0008`, `0009`, `0010`, `0011`, `0012` and `0013`, in that order
+   (so the full run order is **0001 → 0013**). Already ran some of them earlier? Just run the newer ones, in order.
 
 **Option B: Supabase CLI**
 ```bash
@@ -308,3 +309,12 @@ Notes:
 - `app_events` / `app_errors` are insert-only for clients (no `.select()`). `profiles.banned_until` cannot be written
   by users. `reports.target_user_id` is filled by the server.
 
+
+
+## Player feedback and the Discord link
+- **Read feedback:** Table Editor → `feedback` (newest first: sort by `created_at`). Each row has the category
+  (idea / bug / other), the message, app version and platform. Set `status` to `read` or `done` as you work through it.
+  Players can only send feedback; nobody can read it from the app.
+- **Discord invite:** the app opens `https://discord.gg/sQa6fnPhw` from Me → Feedback & community and the Community tab.
+  To change it, set `EXPO_PUBLIC_DISCORD_INVITE` (in `.env` locally and as an Expo environment variable for builds),
+  then ship an update. Make the invite **never expire** in Discord (Server → Invite People → Edit invite link).

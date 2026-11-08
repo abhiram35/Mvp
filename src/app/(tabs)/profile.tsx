@@ -6,6 +6,7 @@ import { unregisterPush } from '../../features/notifications/push';
 import { BannedBanner } from '../../features/moderation/BannedBanner';
 import { useMyStatus } from '../../features/moderation/useMyStatus';
 import { ActionRow } from '../../features/profile/ActionRow';
+import { openDiscord } from '../../lib/links';
 import { ProfileGamesList } from '../../features/profile/ProfileGamesList';
 import { SteamCard } from '../../features/steam/SteamCard';
 import { ProfileHeader } from '../../features/profile/ProfileHeader';
@@ -144,6 +145,12 @@ export default function MyProfileScreen() {
         <ActionRow icon="ban-outline" label="Blocked players" onPress={() => router.push('/settings/blocked')} />
         <ActionRow icon="shield-checkmark-outline" label="Community guidelines" onPress={showCommunityGuidelines} last={!isModerator} />
         {isModerator ? <ActionRow icon="hammer-outline" label="Moderation" onPress={() => router.push('/moderation')} last /> : null}
+      </View>
+
+      <Text variant="heading" style={styles.groupTitle}>Feedback & community</Text>
+      <View style={styles.group}>
+        <ActionRow icon="logo-discord" label="Join our Discord" value="Suggestions" onPress={() => void openDiscord()} />
+        <ActionRow icon="chatbox-ellipses-outline" label="Send feedback" onPress={() => router.push('/feedback')} last />
       </View>
 
       <View style={[styles.group, { marginTop: spacing.xl }]}>

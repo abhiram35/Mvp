@@ -26,7 +26,7 @@ post_scrim ──► open ──request_scrim──► (requests) ──respond_
 
 An `open` scrim whose `scheduled_at` has passed is shown as expired (not stored).
 
-## Tables (migration 0014_scrims.sql)
+## Tables (migration 0015_scrims.sql)
 
 | table | purpose |
 |---|---|
@@ -70,7 +70,7 @@ Notification times use the region's main time zone (IST, GST, SGT) or UTC for re
 many zones; the app always shows the player's local time. Notifications use the new types `team_invite`, `scrim_request`, `scrim_update`, routed to
 `/teams/[id]` or `/scrims/[id]`.
 
-## Streaming (migration 0015_scrim_streams.sql)
+## Streaming (migration 0016_scrim_streams.sql)
 
 Opt-in per scrim. New columns on `scrims`: `stream_allowed`, `stream_url` (https YouTube / Twitch
 only), `featured_at`.

@@ -47,7 +47,7 @@ export interface Game {
   steam_appid: number | null; // Steam store app id: artwork + library matching
   logo_url: string | null; // optional self-hosted artwork (game-art bucket)
   squadable: boolean; // generated: category <> 'story' or is_coop. Only these get LFG / Squad Finder
-  scrims_enabled?: boolean; // 0014: team scrims are available (VALORANT, CS2). Missing on older databases.
+  scrims_enabled?: boolean; // 0015: team scrims are available (VALORANT, CS2). Missing on older databases.
 }
 
 /** table: profiles — one row per auth user, id = auth.users.id */

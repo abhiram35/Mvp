@@ -310,7 +310,7 @@ export async function fetchFeaturedScrims(): Promise<Scrim[]> {
     .gte('scheduled_at', since)
     .order('featured_at', { ascending: false })
     .limit(3);
-  // Older databases without 0015 have no featured_at column: just show nothing.
+  // Older databases without 0016 have no featured_at column: just show nothing.
   if (error) return [];
   return (data ?? []) as Scrim[];
 }

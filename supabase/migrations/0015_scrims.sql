@@ -1,5 +1,5 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- 0014 – Scrims (Phase 1: free scrims). Contract: docs/SCRIMS.md.
+-- 0015 – Scrims (Phase 1: free scrims). Contract: docs/SCRIMS.md.
 --
 --   • games.scrims_enabled          – which games support scrims (valorant, cs2)
 --   • teams / team_members / team_invites
@@ -10,7 +10,7 @@
 -- SECURITY DEFINER RPCs at the bottom of this file (clients have no insert/update/delete).
 -- Error messages raised here are shown to players as-is.
 --
--- Requires 0001–0013. Safe to run more than once.
+-- Requires 0001–0014. Safe to run more than once.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- ═════════════════════════════════════════════════════════════════════════════

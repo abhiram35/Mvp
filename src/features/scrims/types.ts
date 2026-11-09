@@ -1,4 +1,4 @@
-// Scrims (Phase 1). Mirrors supabase/migrations/0014_scrims.sql — see docs/SCRIMS.md.
+// Scrims (Phase 1). Mirrors supabase/migrations/0015_scrims.sql — see docs/SCRIMS.md.
 import type { MemberProfile } from '../chat/useConversation';
 import type { Region } from '../../lib/types';
 
@@ -62,11 +62,11 @@ export interface Scrim {
   cancelled_by_team_id: string | null;
   late_cancel: boolean;
   conversation_id: string | null;
-  /** 0015: both teams agreed it may be streamed (host opts in before any request). */
+  /** 0016: both teams agreed it may be streamed (host opts in before any request). */
   stream_allowed?: boolean;
-  /** 0015: YouTube / Twitch link added by a captain once booked. */
+  /** 0016: YouTube / Twitch link added by a captain once booked. */
   stream_url?: string | null;
-  /** 0015: featured at the top of the board by a moderator. */
+  /** 0016: featured at the top of the board by a moderator. */
   featured_at?: string | null;
   created_by: string | null;
   created_at: string;

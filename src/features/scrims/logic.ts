@@ -1,5 +1,5 @@
 // Pure scrim rules shared by the screens (no React, no network) — unit-tested.
-// The server enforces the same rules (0014_scrims.sql); these only drive the UI.
+// The server enforces the same rules (0015_scrims.sql); these only drive the UI.
 
 import type { Scrim, ScrimFormat, ScrimStatus, TeamRole } from './types';
 
@@ -185,7 +185,7 @@ export function reliabilityLabel(reliability: number | null | undefined): string
   return reliability === null || reliability === undefined ? 'New team' : `${reliability}% reliable`;
 }
 
-/** Games with scrims. Falls back to VALORANT + CS2 on databases without the 0014 column. */
+/** Games with scrims. Falls back to VALORANT + CS2 on databases without the 0015 column. */
 export function isScrimGame(game: { id: string; scrims_enabled?: boolean | null }): boolean {
   return typeof game.scrims_enabled === 'boolean' ? game.scrims_enabled : game.id === 'valorant' || game.id === 'cs2';
 }
@@ -205,7 +205,7 @@ export function sideTeamLabel(
   return team ? `${team.name} [${team.tag}]` : 'A disbanded team';
 }
 
-// ── Streaming (0015) ────────────────────────────────────────────────────────
+// ── Streaming (0016) ────────────────────────────────────────────────────────
 const STREAM_URL = /^https:\/\/((www|m)\.)?(youtube\.com|youtu\.be|twitch\.tv)\/\S+$/i;
 
 /** Trims the link and checks it's a YouTube / Twitch https URL (same rule as the server). null = invalid. */

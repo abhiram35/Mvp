@@ -1,4 +1,4 @@
--- 0015: streaming scrims on YouTube (or Twitch).
+-- 0016: streaming scrims on YouTube (or Twitch).
 --
 -- * Streaming is opt-in per scrim: the host captain marks a scrim "OK to stream" while it is open
 --   and before any team has requested it, so every requesting team agrees knowingly.

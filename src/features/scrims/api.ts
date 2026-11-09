@@ -182,6 +182,9 @@ export const reportScrimResult = (scrimId: string, hostScore: number, oppScore: 
   rpc<ScrimStatus>('report_scrim_result', { p_scrim_id: scrimId, p_host_score: hostScore, p_opp_score: oppScore, p_screenshot_url: screenshotUrl });
 export const claimScrimNoShow = (scrimId: string) => rpc<void>('claim_scrim_no_show', { p_scrim_id: scrimId });
 export const escalateScrim = (scrimId: string) => rpc<void>('escalate_scrim', { p_scrim_id: scrimId });
+export const setScrimStreaming = (scrimId: string, allowed: boolean) => rpc<void>('set_scrim_streaming', { p_scrim_id: scrimId, p_allowed: allowed });
+export const setScrimStreamUrl = (scrimId: string, url: string | null) => rpc<void>('set_scrim_stream_url', { p_scrim_id: scrimId, p_url: url });
+export const setScrimFeatured = (scrimId: string, featured: boolean) => rpc<void>('set_scrim_featured', { p_scrim_id: scrimId, p_featured: featured });
 export const resolveScrimDispute = (scrimId: string, hostScore: number, oppScore: number) =>
   rpc<void>('resolve_scrim_dispute', { p_scrim_id: scrimId, p_host_score: hostScore, p_opp_score: oppScore });
 
@@ -294,4 +297,20 @@ export function watchScrim(scrimId: string, onChange: () => void, pollMs = 30_00
     clearInterval(timer);
     void supabase.removeChannel(channel);
   };
+}
+
+/** Featured scrims that are still upcoming or playing now (newest feature first). */
+export async function fetchFeaturedScrims(): Promise<Scrim[]> {
+  const since = new Date(Date.now() - 4 * 3600_000).toISOString();
+  const { data, error } = await supabase
+    .from('scrims')
+    .select(SCRIM_SELECT)
+    .not('featured_at', 'is', null)
+    .in('status', ['open', 'booked', 'completed'])
+    .gte('scheduled_at', since)
+    .order('featured_at', { ascending: false })
+    .limit(3);
+  // Older databases without 0015 have no featured_at column: just show nothing.
+  if (error) return [];
+  return (data ?? []) as Scrim[];
 }

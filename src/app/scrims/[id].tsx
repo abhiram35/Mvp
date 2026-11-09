@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Linking, RefreshControl, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { Button, Card, Chip, ChipRow, EmptyState, ErrorState, LoadingState, Screen, Text, TextField } from '../../components/ui';
 import { useGames } from '../../features/games/useGames';
 import { regionLabel } from '../../features/lfg/format';
@@ -20,28 +20,34 @@ import {
   reportScrimResult,
   requestScrim,
   resolveScrimDispute,
+  setScrimFeatured,
   respondScrimRequest,
   setScrimLobby,
+  setScrimStreaming,
+  setScrimStreamUrl,
   useLoader,
   watchScrim,
   withdrawScrimRequest,
 } from '../../features/scrims/api';
-import { StatusPill, TeamTag, teamLabel } from '../../features/scrims/components';
+import { LivePill, StatusPill, TeamTag, teamLabel } from '../../features/scrims/components';
 import {
   canClaimNoShow,
   canEscalate,
   checkInWindow,
+  cleanStreamUrl,
   displayStatus,
   FORMAT_LABELS,
   formatScrimTime,
   hasStarted,
   isLateCancel,
+  isStreamingNow,
   reliabilityLabel,
   scoreOptions,
   sideTeamLabel,
   SCRIM_RULES,
   sides,
   startsIn,
+  streamPlatform,
 } from '../../features/scrims/logic';
 import type { Scrim, Team } from '../../features/scrims/types';
 import { useNow } from '../../lib/hooks';
@@ -126,6 +132,7 @@ export default function ScrimRoomScreen() {
   const [message, setMessage] = useState('');
   const [lobbyDraft, setLobbyDraft] = useState<string | null>(null);
   const [score, setScore] = useState<string | null>(null);
+  const [streamDraft, setStreamDraft] = useState<string | null>(null);
 
   const d = room.data;
   const scrim = d?.scrim ?? null;
@@ -230,7 +237,43 @@ export default function ScrimRoomScreen() {
           </Text>
           <Text style={[s.heroSub, { color: t.colors.onPanel }]}>{[FORMAT_LABELS[scrim.format], regionLabel(scrim.region), ranks].join(' · ')}</Text>
           {scrim.notes ? <Text style={[s.heroSub, { color: t.colors.onPanel }]}>“{scrim.notes}”</Text> : null}
+          {scrim.stream_url ? (
+            <View style={{ alignItems: 'center', gap: spacing.sm }}>
+              {isStreamingNow(scrim, now) ? <LivePill url={scrim.stream_url} /> : null}
+              <Button
+                title={`Watch on ${streamPlatform(scrim.stream_url)}`}
+                icon="play-circle"
+                size="sm"
+                backdrop={t.colors.panel}
+                onPress={() => void Linking.openURL(String(scrim.stream_url)).catch(() => Alert.alert("Couldn't open the stream", String(scrim.stream_url)))}
+              />
+            </View>
+          ) : scrim.stream_allowed ? (
+            <Text style={[s.heroSub, { color: t.colors.onPanel }]}>Streamed scrim · link appears here when it goes live</Text>
+          ) : null}
         </Card>
+
+        {/* ── Streaming opt-in (host, open, before any request) ──────── */}
+        {scrim.status === 'open' && isHostCaptain && status !== 'expired' ? (
+          <View style={s.streamRow}>
+            <View style={{ flex: 1 }}>
+              <Text variant="strong">OK to stream</Text>
+              <Text variant="caption">
+                {scrim.stream_allowed
+                  ? 'Requesting teams agree this scrim may be streamed.'
+                  : 'Turn on before any team requests, so they know it will be streamed.'}
+              </Text>
+            </View>
+            <Switch
+              value={!!scrim.stream_allowed}
+              disabled={busy === 'stream' || banned}
+              onValueChange={(v) => void run('stream', () => setScrimStreaming(scrim.id, v), "Couldn't change streaming")}
+              accessibilityLabel="OK to stream this scrim"
+              trackColor={{ true: t.colors.primary, false: t.colors.surfaceRaised }}
+              thumbColor={t.colors.surface}
+            />
+          </View>
+        ) : null}
 
         {/* ── Open: host sees requests ───────────────────────────────── */}
         {scrim.status === 'open' && isHostCaptain ? (
@@ -267,6 +310,14 @@ export default function ScrimRoomScreen() {
         {/* ── Open: other captains can request ───────────────────────── */}
         {scrim.status === 'open' && status !== 'expired' && !inScrim ? (
           <Section title="Play this scrim">
+            {scrim.stream_allowed && !myDeclined ? (
+              <View style={s.streamNotice}>
+                <Ionicons name="videocam" size={18} color={t.colors.primary} />
+                <Text variant="caption" style={{ flex: 1 }}>
+                  This scrim may be streamed on YouTube or Twitch. By requesting, your team agrees. Team voice stays off stream unless your players agree.
+                </Text>
+              </View>
+            ) : null}
             {myDeclined ? (
               <Text muted>
                 {`The host declined ${teamLabel(eligible.find((e) => e.id === myDeclined.team_id) ?? null)} for this scrim. Find another one on the board.`}
@@ -341,7 +392,7 @@ export default function ScrimRoomScreen() {
             <Section title="Lobby">
               {isCaptain && lobbyDraft !== null ? (
                 <>
-                  <TextField value={lobbyDraft} onChangeText={setLobbyDraft} maxLength={SCRIM_RULES.lobbyMax} multiline placeholder="Party code, server IP and password, who creates the lobby…" />
+                  <TextField value={lobbyDraft} onChangeText={setLobbyDraft} maxLength={SCRIM_RULES.lobbyMax} multiline placeholder={scrim.stream_allowed ? 'Party code or server, who creates the lobby, and an observer slot for the streamer…' : 'Party code, server IP and password, who creates the lobby…'} />
                   <View style={s.btnRow}>
                     <Button
                       title="Save"
@@ -428,6 +479,67 @@ export default function ScrimRoomScreen() {
           </>
         ) : null}
 
+        {/* ── Stream link (either captain, once booked) ──────────────── */}
+        {scrim.stream_allowed && inScrim && isCaptain && (scrim.status === 'booked' || scrim.status === 'completed' || scrim.status === 'disputed') ? (
+          <Section title="Stream">
+            {streamDraft !== null ? (
+              <>
+                <TextField
+                  value={streamDraft}
+                  onChangeText={setStreamDraft}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="url"
+                  placeholder="https://youtube.com/live/…"
+                  error={streamDraft.trim() && !cleanStreamUrl(streamDraft) ? 'Use a YouTube or Twitch link (https://…)' : null}
+                />
+                <View style={s.btnRow}>
+                  <Button
+                    title="Save link"
+                    size="sm"
+                    style={{ flex: 1 }}
+                    disabled={!cleanStreamUrl(streamDraft) || banned}
+                    loading={busy === 'streamurl'}
+                    onPress={() =>
+                      void run('streamurl', async () => {
+                        await setScrimStreamUrl(scrim.id, cleanStreamUrl(streamDraft));
+                        setStreamDraft(null);
+                      })
+                    }
+                  />
+                  <Button title="Cancel" size="sm" variant="secondary" style={{ flex: 1 }} onPress={() => setStreamDraft(null)} />
+                </View>
+              </>
+            ) : (
+              <>
+                <Text muted>
+                  {scrim.stream_url
+                    ? 'Your stream link is live on this page and on the scrim board.'
+                    : 'Streaming? Paste the YouTube or Twitch link so both teams and viewers can find it. Use a 2–5 minute stream delay and stream from an observer slot.'}
+                </Text>
+                <View style={s.btnRow}>
+                  <Button title={scrim.stream_url ? 'Change link' : 'Add stream link'} size="sm" icon="videocam" style={{ flex: 1 }} disabled={banned} onPress={() => setStreamDraft(scrim.stream_url ?? '')} />
+                  {scrim.stream_url ? (
+                    <Button title="Remove" size="sm" variant="secondary" style={{ flex: 1 }} loading={busy === 'streamclear'} onPress={() => void run('streamclear', () => setScrimStreamUrl(scrim.id, null))} />
+                  ) : null}
+                </View>
+              </>
+            )}
+          </Section>
+        ) : null}
+
+        {/* ── Moderators: feature on the board ───────────────────────── */}
+        {isModerator && (scrim.status === 'open' || scrim.status === 'booked' || scrim.status === 'completed') ? (
+          <Button
+            title={scrim.featured_at ? 'Remove from Featured' : 'Feature on the scrim board'}
+            icon={scrim.featured_at ? 'star' : 'star-outline'}
+            variant="secondary"
+            style={{ marginTop: spacing.xl }}
+            loading={busy === 'feature'}
+            onPress={() => void run('feature', () => setScrimFeatured(scrim.id, !scrim.featured_at))}
+          />
+        ) : null}
+
         {/* ── Finished states ────────────────────────────────────────── */}
         {scrim.status === 'disputed' ? (
           <Section title="Disputed">
@@ -510,6 +622,16 @@ const useStyles = makeStyles((t) =>
     heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     heroMeta: { fontFamily: t.fonts.bodyBold, fontSize: fontSize.sm },
     heroSub: { fontFamily: t.fonts.body, fontSize: fontSize.xs, opacity: 0.85, textAlign: 'center' },
+    streamRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginTop: spacing.xl },
+    streamNotice: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      padding: spacing.md,
+      marginBottom: spacing.md,
+      borderRadius: t.radius.md,
+      backgroundColor: t.colors.surfaceRaised,
+    },
     vsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
     vs: { fontFamily: t.fonts.display, fontSize: 30 },
     teamCol: { flex: 1, alignItems: 'center', gap: spacing.xs },

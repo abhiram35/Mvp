@@ -62,6 +62,12 @@ export interface Scrim {
   cancelled_by_team_id: string | null;
   late_cancel: boolean;
   conversation_id: string | null;
+  /** 0015: both teams agreed it may be streamed (host opts in before any request). */
+  stream_allowed?: boolean;
+  /** 0015: YouTube / Twitch link added by a captain once booked. */
+  stream_url?: string | null;
+  /** 0015: featured at the top of the board by a moderator. */
+  featured_at?: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;

@@ -6,7 +6,7 @@ import { Button, Card, EmptyState, ErrorState, LoadingState, Screen, Text } from
 import { useGames } from '../../features/games/useGames';
 import { REGIONS, regionLabel } from '../../features/lfg/format';
 import { HorizontalChips } from '../../features/lfg/HorizontalChips';
-import { fetchMyInvites, fetchMyScrims, fetchMyTeams, fetchOpenScrims, useLoader } from '../../features/scrims/api';
+import { fetchFeaturedScrims, fetchMyInvites, fetchMyScrims, fetchMyTeams, fetchOpenScrims, useLoader } from '../../features/scrims/api';
 import { ScrimCard } from '../../features/scrims/components';
 import { isScrimGame } from '../../features/scrims/logic';
 import type { Scrim } from '../../features/scrims/types';
@@ -38,6 +38,7 @@ export default function ScrimBoardScreen() {
     }, [myId]),
     `mine-${myId}`,
   );
+  const featured = useLoader(fetchFeaturedScrims, 'featured');
   const board = useLoader(
     useCallback(() => fetchOpenScrims(gameId, region), [gameId, region]),
     `board-${gameId}-${region}`,
@@ -49,21 +50,28 @@ export default function ScrimBoardScreen() {
 
   const rows = useMemo<Row[]>(() => {
     const out: Row[] = [];
+    const feat = (featured.data ?? []).filter((x) => !gameId || x.game_id === gameId);
+    const featIds = new Set(feat.map((x) => x.id));
+    if (feat.length > 0) {
+      out.push({ kind: 'header', title: 'Featured', key: 'h-feat' });
+      feat.forEach((x) => out.push({ kind: 'scrim', scrim: x, mine: !!(x.host_team_id && myTeamIds.has(x.host_team_id)), key: `f-${x.id}` }));
+    }
     const myScrims = (mine.data?.scrims ?? []).filter((x) => !gameId || x.game_id === gameId);
     if (myScrims.length > 0) {
       out.push({ kind: 'header', title: 'Your scrims', key: 'h-mine' });
       myScrims.forEach((x) => out.push({ kind: 'scrim', scrim: x, mine: true, key: `m-${x.id}` }));
     }
-    const open = (board.data ?? []).filter((x) => !x.host_team_id || !myTeamIds.has(x.host_team_id));
+    const open = (board.data ?? []).filter((x) => (!x.host_team_id || !myTeamIds.has(x.host_team_id)) && !featIds.has(x.id));
     out.push({ kind: 'header', title: 'Open scrims', key: 'h-open' });
     open.forEach((x) => out.push({ kind: 'scrim', scrim: x, mine: false, key: `o-${x.id}` }));
     return out;
-  }, [mine.data, board.data, gameId, myTeamIds]);
+  }, [mine.data, board.data, featured.data, gameId, myTeamIds]);
 
-  const openCount = rows.filter((r) => r.kind === 'scrim' && !r.mine).length;
+  const openCount = rows.filter((r) => r.kind === 'scrim' && r.key.startsWith('o-')).length;
   const refresh = () => {
     void mine.refresh();
     void board.refresh();
+    void featured.refresh();
   };
 
   const header = (

@@ -1,10 +1,10 @@
 import { router, Stack } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { Alert, StyleSheet, View } from 'react-native';
+import { Alert, StyleSheet, Switch, View } from 'react-native';
 import { Button, Chip, ChipRow, EmptyState, LoadingState, Screen, Text, TextField } from '../../components/ui';
 import { useGames } from '../../features/games/useGames';
 import { HorizontalChips } from '../../features/lfg/HorizontalChips';
-import { fetchMyTeams, postScrim, useLoader } from '../../features/scrims/api';
+import { fetchMyTeams, postScrim, setScrimStreaming, useLoader } from '../../features/scrims/api';
 import {
   buildScheduledAt,
   defaultSlot,
@@ -18,13 +18,14 @@ import {
 import type { ScrimFormat } from '../../features/scrims/types';
 import { useMyStatus } from '../../features/moderation/useMyStatus';
 import { useUserId } from '../../providers/AuthProvider';
-import { makeStyles, spacing } from '../../theme';
+import { makeStyles, spacing, useTheme } from '../../theme';
 
 const HOURS = Array.from({ length: 24 }, (_, h) => ({ value: String(h), label: `${String(h).padStart(2, '0')}:00` }));
 const MINUTES = ['0', '15', '30', '45'].map((m) => ({ value: m, label: `:${m.padStart(2, '0')}` }));
 
 
 export default function PostScrimScreen() {
+  const t = useTheme();
   const s = useStyles();
   const myId = useUserId();
   const { byId } = useGames();
@@ -47,6 +48,7 @@ export default function PostScrimScreen() {
   const [rankMin, setRankMin] = useState<string | null>(null);
   const [rankMax, setRankMax] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
+  const [streamOk, setStreamOk] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const team = captained.find((x) => x.id === (teamId ?? captained[0]?.id)) ?? null;
@@ -68,6 +70,15 @@ export default function PostScrimScreen() {
     setBusy(true);
     try {
       const id = await postScrim({ teamId: team.id, scheduledAt, format, rankMin, rankMax, notes });
+      if (streamOk) {
+        // Set before anyone can request, so every requesting team sees it. If this fails the
+        // scrim still exists without streaming; the host can turn it on from the scrim page.
+        try {
+          await setScrimStreaming(id, true);
+        } catch (e) {
+          Alert.alert('Posted without streaming', (e as Error).message);
+        }
+      }
       router.replace({ pathname: '/scrims/[id]', params: { id } });
     } catch (e) {
       Alert.alert("Couldn't post the scrim", (e as Error).message);
@@ -155,6 +166,22 @@ export default function PostScrimScreen() {
         </View>
       ) : null}
 
+      <View style={s.streamRow}>
+        <View style={{ flex: 1 }}>
+          <Text variant="strong">OK to stream</Text>
+          <Text variant="caption">
+            Teams that request this scrim agree it may be streamed on YouTube or Twitch. Team voice stays off stream unless players agree.
+          </Text>
+        </View>
+        <Switch
+          value={streamOk}
+          onValueChange={setStreamOk}
+          accessibilityLabel="OK to stream this scrim"
+          trackColor={{ true: t.colors.primary, false: t.colors.surfaceRaised }}
+          thumbColor={t.colors.surface}
+        />
+      </View>
+
       <TextField
         label="Notes (optional)"
         value={notes}
@@ -180,5 +207,6 @@ const useStyles = makeStyles((t) =>
     label: { marginBottom: spacing.sm, fontFamily: t.fonts.heading, letterSpacing: 2, textTransform: 'uppercase' },
     when: { marginTop: spacing.md },
     problem: { color: t.colors.danger },
+    streamRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, marginBottom: spacing.xl },
   }),
 );

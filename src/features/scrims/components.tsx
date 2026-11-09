@@ -1,9 +1,10 @@
+import { Ionicons } from '@expo/vector-icons';
 import { memo } from 'react';
 import { StyleSheet, Text as RNText, View } from 'react-native';
 import { Card, Text } from '../../components/ui';
 import { regionLabel } from '../lfg/format';
 import { fontSize, makeStyles, spacing, useTheme } from '../../theme';
-import { displayStatus, FORMAT_LABELS, formatScrimTime, startsIn, STATUS_LABELS, type DisplayStatus } from './logic';
+import { displayStatus, FORMAT_LABELS, formatScrimTime, isStreamingNow, startsIn, STATUS_LABELS, streamPlatform, type DisplayStatus } from './logic';
 import type { Scrim, Team } from './types';
 
 /** Square team tag, e.g. [VNQ]. */
@@ -30,6 +31,17 @@ export function TeamTag({ team, size = 44, highlight }: { team: Pick<Team, 'tag'
       >
         {tag}
       </RNText>
+    </View>
+  );
+}
+
+/** "LIVE · YouTube" pill for scrims being streamed right now. */
+export function LivePill({ url }: { url: string }) {
+  const t = useTheme();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: t.colors.danger, borderRadius: t.radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 2 }}>
+      <Ionicons name="radio" size={12} color="#FFFFFF" />
+      <RNText style={{ fontFamily: t.fonts.bodyBold, fontSize: fontSize.xs, color: '#FFFFFF', letterSpacing: 0.5 }}>{`LIVE · ${streamPlatform(url)}`}</RNText>
     </View>
   );
 }
@@ -67,22 +79,27 @@ export const ScrimCard = memo(function ScrimCard({
   /** One of my teams is in it: highlight it. */
   mine?: boolean;
 }) {
+  const t = useTheme();
   const s = useStyles();
   const status = displayStatus(scrim, now);
   const ranks = scrim.rank_min || scrim.rank_max ? `${scrim.rank_min ?? 'Any'} – ${scrim.rank_max ?? 'Any'}` : 'Any rank';
   const when = formatScrimTime(scrim.scheduled_at, now);
+  const live = isStreamingNow(scrim, now);
   return (
     <Card
       onPress={onPress}
       style={s.card}
-      accessibilityLabel={`${teamLabel(scrim.host)} versus ${scrim.opponent ? teamLabel(scrim.opponent) : 'open slot'}, ${when}, ${FORMAT_LABELS[scrim.format]}, ${regionLabel(scrim.region)}, ${ranks}, ${STATUS_LABELS[status]}`}
+      accessibilityLabel={`${teamLabel(scrim.host)} versus ${scrim.opponent ? teamLabel(scrim.opponent) : 'open slot'}, ${when}, ${FORMAT_LABELS[scrim.format]}, ${regionLabel(scrim.region)}, ${ranks}, ${live ? 'live on stream' : STATUS_LABELS[status]}${scrim.stream_allowed && !live ? ', will be streamed' : ''}`}
     >
       <View style={s.top}>
         <Text variant="label" style={s.when}>
           {when}
           {status === 'open' || status === 'booked' ? ` · ${startsIn(scrim.scheduled_at, now)}` : ''}
         </Text>
-        <StatusPill status={status} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.xs }}>
+          {scrim.stream_allowed && !live ? <Ionicons name="videocam-outline" size={16} color={t.colors.textMuted} accessibilityElementsHidden /> : null}
+          {live && scrim.stream_url ? <LivePill url={scrim.stream_url} /> : <StatusPill status={status} />}
+        </View>
       </View>
       <View style={s.vsRow}>
         <View style={s.team}>

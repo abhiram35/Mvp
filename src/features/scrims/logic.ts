@@ -204,3 +204,27 @@ export function sideTeamLabel(
   const team = id === scrim.host_team_id ? scrim.host : scrim.opponent;
   return team ? `${team.name} [${team.tag}]` : 'A disbanded team';
 }
+
+// ── Streaming (0015) ────────────────────────────────────────────────────────
+const STREAM_URL = /^https:\/\/((www|m)\.)?(youtube\.com|youtu\.be|twitch\.tv)\/\S+$/i;
+
+/** Trims the link and checks it's a YouTube / Twitch https URL (same rule as the server). null = invalid. */
+export function cleanStreamUrl(raw: string): string | null {
+  const url = raw.trim();
+  return url.length <= 200 && STREAM_URL.test(url) ? url : null;
+}
+
+/** Hours after the start during which a scrim with a stream link counts as "live". */
+const LIVE_WINDOW_HOURS = 4;
+
+/** A booked scrim with a stream link that has started (and isn't hours old): show LIVE. */
+export function isStreamingNow(scrim: Pick<Scrim, 'status' | 'scheduled_at' | 'stream_url'>, now: number = Date.now()): boolean {
+  if (!scrim.stream_url || scrim.status !== 'booked') return false;
+  const t = new Date(scrim.scheduled_at).getTime();
+  return now >= t && now < t + LIVE_WINDOW_HOURS * HOUR;
+}
+
+/** "YouTube" / "Twitch" for button labels. */
+export function streamPlatform(url: string): 'YouTube' | 'Twitch' {
+  return /twitch\.tv/i.test(url) ? 'Twitch' : 'YouTube';
+}

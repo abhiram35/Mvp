@@ -2,6 +2,9 @@ import {
   buildScheduledAt,
   canClaimNoShow,
   canEscalate,
+  cleanStreamUrl,
+  isStreamingNow,
+  streamPlatform,
   defaultSlot,
   sideTeamLabel,
   checkInWindow,
@@ -165,5 +168,32 @@ describe('review fixes', () => {
     expect(sideTeamLabel(null, sc)).toBe('A disbanded team');
     expect(sideTeamLabel('A', sc)).toBe('Night Owls [NOWL]');
     expect(sideTeamLabel('B', sc)).toBe('A disbanded team');
+  });
+});
+
+describe('streaming', () => {
+  it('accepts only https YouTube / Twitch links', () => {
+    expect(cleanStreamUrl('  https://www.youtube.com/live/abc123 ')).toBe('https://www.youtube.com/live/abc123');
+    expect(cleanStreamUrl('https://youtu.be/abc')).toBe('https://youtu.be/abc');
+    expect(cleanStreamUrl('https://m.youtube.com/watch?v=x')).toBe('https://m.youtube.com/watch?v=x');
+    expect(cleanStreamUrl('https://twitch.tv/vinq')).toBe('https://twitch.tv/vinq');
+    expect(cleanStreamUrl('http://youtube.com/live/x')).toBeNull();
+    expect(cleanStreamUrl('https://youtube.com.evil.com/x')).toBeNull();
+    expect(cleanStreamUrl('https://evil.com/youtube.com/x')).toBeNull();
+    expect(cleanStreamUrl('https://youtube.com/')).toBeNull();
+    expect(cleanStreamUrl(`https://youtube.com/${'a'.repeat(200)}`)).toBeNull();
+  });
+  it('names the platform', () => {
+    expect(streamPlatform('https://twitch.tv/x')).toBe('Twitch');
+    expect(streamPlatform('https://youtu.be/x')).toBe('YouTube');
+  });
+  it('is live only for booked scrims with a link, from the start for 4 hours', () => {
+    const url = 'https://youtube.com/live/x';
+    expect(isStreamingNow(scrim({ stream_url: url }), T0 - 1)).toBe(false);
+    expect(isStreamingNow(scrim({ stream_url: url }), T0)).toBe(true);
+    expect(isStreamingNow(scrim({ stream_url: url }), T0 + 4 * 60 * MIN - 1)).toBe(true);
+    expect(isStreamingNow(scrim({ stream_url: url }), T0 + 4 * 60 * MIN)).toBe(false);
+    expect(isStreamingNow(scrim({ stream_url: null }), T0 + MIN)).toBe(false);
+    expect(isStreamingNow(scrim({ stream_url: url, status: 'completed' }), T0 + MIN)).toBe(false);
   });
 });

@@ -18,6 +18,7 @@ Everything the app needs lives in `migrations/`. Run the files **in order**:
 | `0012_rename_vinq.sql` | The app is now called Vinq: updates the default squad-chat notification title and two moderation messages |
 | `0013_feedback.sql` | In-app **Send feedback** (ideas, bugs, other). Players can only send; you read it in Table Editor → `feedback`. 10 per player per day |
 | `0014_scrims.sql` | **Scrims** (VALORANT and CS2): teams, invites, scrim board, requests, group chat for both rosters, check-in, results, disputes, no-shows, team stats. See `docs/SCRIMS.md` |
+| `0015_scrim_streams.sql` | **Streaming scrims**: opt-in "OK to stream", YouTube/Twitch link per scrim, moderator-featured scrims |
 
 All files are safe to run again. Re-running them will not create duplicates, and it will not undo your own edits
 to the game list.
@@ -36,8 +37,8 @@ to the game list.
 **Option A: SQL Editor (easiest)**
 1. In the dashboard open **SQL Editor → New query**.
 2. Open `migrations/0001_schema.sql`, copy the whole file, paste it, and click **Run**.
-3. Do the same for `0002`, `0003`, `0004`, `0005`, `0006`, `0007`, `0008`, `0009`, `0010`, `0011`, `0012`, `0013` and `0014`, in that order
-   (so the full run order is **0001 → 0014**). Already ran some of them earlier? Just run the newer ones, in order.
+3. Do the same for `0002`, `0003`, `0004`, `0005`, `0006`, `0007`, `0008`, `0009`, `0010`, `0011`, `0012`, `0013`, `0014` and `0015`, in that order
+   (so the full run order is **0001 → 0015**). Already ran some of them earlier? Just run the newer ones, in order.
 
 **Option B: Supabase CLI**
 ```bash
@@ -320,8 +321,8 @@ Notes:
   To change it, set `EXPO_PUBLIC_DISCORD_INVITE` (in `.env` locally and as an Expo environment variable for builds),
   then ship an update. Make the invite **never expire** in Discord (Server → Invite People → Edit invite link).
 
-## Scrims (`0014`)
-- Run `migrations/0014_scrims.sql` before shipping the app build with Scrims. Contract: `docs/SCRIMS.md`.
+## Scrims (`0014`, `0015`)
+- Run `migrations/0014_scrims.sql` and then `0015_scrim_streams.sql` before shipping the app build with Scrims. Contract: `docs/SCRIMS.md`.
 - **Which games:** `games.scrims_enabled` (on for `valorant` and `cs2`). Turn another game on with
   `update games set scrims_enabled = true where id = 'game_id';`. Re-running `0014` never changes it back.
 - All writes go through RPCs (`create_team`, `post_scrim`, `respond_scrim_request`, …). Players cannot insert or edit

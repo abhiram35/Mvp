@@ -70,6 +70,21 @@ Notification times use the region's main time zone (IST, GST, SGT) or UTC for re
 many zones; the app always shows the player's local time. Notifications use the new types `team_invite`, `scrim_request`, `scrim_update`, routed to
 `/teams/[id]` or `/scrims/[id]`.
 
+## Streaming (migration 0015_scrim_streams.sql)
+
+Opt-in per scrim. New columns on `scrims`: `stream_allowed`, `stream_url` (https YouTube / Twitch
+only), `featured_at`.
+
+| function | who | notes |
+|---|---|---|
+| `set_scrim_streaming(p_scrim_id, p_allowed) → void` | host captain | ON only while open and before any team has requested (so requesting teams agree knowingly); OFF any time before the start (also clears the link) |
+| `set_scrim_stream_url(p_scrim_id, p_url) → void` | either captain | booked / completed / disputed, `stream_allowed` required; null or '' clears; notifies the other team |
+| `set_scrim_featured(p_scrim_id, p_featured) → void` | moderator | featured scrims show at the top of the board |
+
+The app shows **LIVE · YouTube** from the start time for 4 hours while a booked scrim has a link.
+Streaming guidance shown to captains: stream from an observer slot with a 2–5 minute delay, team
+voice off stream unless players agree, no copyrighted music, no Riot/Valve logos.
+
 ## Not in Phase 1
 
 Brackets/tournaments (Phase 2), paid entry (Phase 3: needs registration with India's Online

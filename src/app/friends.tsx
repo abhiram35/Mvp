@@ -1,11 +1,12 @@
 import { router } from 'expo-router';
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
-import { Avatar, Button, EmptyState, ErrorState, LoadingState, Screen, Text } from '../components/ui';
+import { Avatar, Button, EmptyState, ErrorState, LiveDot, LoadingState, Screen, Text } from '../components/ui';
 import { openDm } from '../lib/actions';
 import { errorMessage } from '../lib/supabase';
 import { acceptFriendRequest, deleteFriendship } from '../features/friends/api';
 import { useFriendships, type FriendshipWithProfile } from '../features/friends/hooks';
+import { useNowPlaying } from '../features/profile/nowPlaying';
 import { fontSize, makeStyles, spacing, useTheme } from '../theme';
 
 type Segment = 'friends' | 'requests' | 'sent';
@@ -24,6 +25,8 @@ export default function FriendsScreen() {
     .sort((a, b) => a.profile.display_name.localeCompare(b.profile.display_name));
   const incoming = items.filter((i) => i.friendship.status === 'pending' && i.friendship.addressee_id === myId);
   const outgoing = items.filter((i) => i.friendship.status === 'pending' && i.friendship.requester_id === myId);
+  const friendIds = useMemo(() => friends.map((i) => i.profile.id), [friends]);
+  const nowPlaying = useNowPlaying(friendIds);
 
   const act = async (id: string, action: () => Promise<void>, failTitle: string) => {
     setBusyId(id);
@@ -93,7 +96,11 @@ export default function FriendsScreen() {
           <Avatar uri={profile.avatar_url} name={profile.display_name} size={44} />
           <View style={styles.names}>
             <Text style={styles.name} numberOfLines={1}>{profile.display_name}</Text>
-            {profile.username ? <Text variant="caption" numberOfLines={1}>@{profile.username}</Text> : null}
+            {nowPlaying[profile.id] ? (
+              <LiveDot label={`Playing ${nowPlaying[profile.id].name}`} numberOfLines={1} />
+            ) : profile.username ? (
+              <Text variant="caption" numberOfLines={1}>@{profile.username}</Text>
+            ) : null}
           </View>
         </Pressable>
         {actions}

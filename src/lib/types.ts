@@ -47,6 +47,7 @@ export interface Game {
   steam_appid: number | null; // Steam store app id: artwork + library matching
   logo_url: string | null; // optional self-hosted artwork (game-art bucket)
   squadable: boolean; // generated: category <> 'story' or is_coop. Only these get LFG / Squad Finder
+  scrims_enabled?: boolean; // 0014: team scrims are available (VALORANT, CS2). Missing on older databases.
 }
 
 /** table: profiles — one row per auth user, id = auth.users.id */
@@ -375,11 +376,14 @@ export type NotificationType =
   | 'community_reply' // reply on your post
   | 'community_solution' // your reply was marked as the solution
   | 'rating_received' // a teammate rated you (positive tags only)
-  | 'moderation'; // a moderator acted on your content or account
+  | 'moderation' // a moderator acted on your content or account
+  | 'team_invite' // invited to a scrim team
+  | 'scrim_request' // a team asked to play your scrim
+  | 'scrim_update'; // scrim accepted / declined / cancelled / result / no-show
 
 /** Where tapping a notification goes. `params` are Expo Router params. */
 export interface NotificationRoute {
-  pathname: '/lfg/[id]' | '/chat/[id]' | '/friends' | '/community/[id]' | '/user/[id]' | '/notifications';
+  pathname: '/lfg/[id]' | '/chat/[id]' | '/friends' | '/community/[id]' | '/user/[id]' | '/notifications' | '/scrims/[id]' | '/teams/[id]';
   params?: Record<string, string>;
 }
 

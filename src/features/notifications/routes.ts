@@ -11,6 +11,8 @@ const ROUTES: Record<Pathname, { needsId: boolean }> = {
   '/community/[id]': { needsId: true },
   '/user/[id]': { needsId: true },
   '/notifications': { needsId: false },
+  '/scrims/[id]': { needsId: true },
+  '/teams/[id]': { needsId: true },
 };
 
 function isPathname(v: unknown): v is Pathname {

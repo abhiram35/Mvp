@@ -21,6 +21,9 @@ const TYPE_ICONS: Record<NotificationType, IconName> = {
   community_solution: 'ribbon-outline',
   rating_received: 'star-outline',
   moderation: 'shield-outline',
+  team_invite: 'people-circle-outline',
+  scrim_request: 'flag-outline',
+  scrim_update: 'trophy-outline',
 };
 
 const MINUTE = 60_000;

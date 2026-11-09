@@ -142,6 +142,7 @@ export default function MyProfileScreen() {
         <ActionRow icon="notifications-outline" label="Notifications" onPress={() => router.push('/notifications')} />
         <ActionRow icon="color-palette-outline" label="Theme" value={t.name} onPress={() => router.push('/settings/theme')} />
         <ActionRow icon="people-outline" label="Friends" onPress={() => router.push('/friends')} />
+        <ActionRow icon="shield-half-outline" label="My teams" value="Scrims" onPress={() => router.push('/teams')} />
         <ActionRow icon="ban-outline" label="Blocked players" onPress={() => router.push('/settings/blocked')} />
         <ActionRow icon="shield-checkmark-outline" label="Community guidelines" onPress={showCommunityGuidelines} last={!isModerator} />
         {isModerator ? <ActionRow icon="hammer-outline" label="Moderation" onPress={() => router.push('/moderation')} last /> : null}

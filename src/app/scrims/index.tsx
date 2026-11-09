@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { router, Stack } from 'expo-router';
+import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text as RNText, View } from 'react-native';
 import { Button, Card, EmptyState, ErrorState, LoadingState, Screen, Text } from '../../components/ui';
 import { useGames } from '../../features/games/useGames';
 import { REGIONS, regionLabel } from '../../features/lfg/format';
@@ -10,6 +10,7 @@ import { fetchFeaturedScrims, fetchMyInvites, fetchMyScrims, fetchMyTeams, fetch
 import { ScrimCard } from '../../features/scrims/components';
 import { isScrimGame } from '../../features/scrims/logic';
 import type { Scrim } from '../../features/scrims/types';
+import { TournamentsTab } from '../../features/tournaments/TournamentsTab';
 import { useNow } from '../../lib/hooks';
 import type { Region } from '../../lib/types';
 import { useUserId } from '../../providers/AuthProvider';
@@ -18,6 +19,34 @@ import { makeStyles, spacing, useTheme } from '../../theme';
 const REGION_OPTIONS = REGIONS.map((r) => ({ value: r, label: regionLabel(r) }));
 
 type Row = { kind: 'header'; title: string; key: string } | { kind: 'scrim'; scrim: Scrim; mine: boolean; key: string };
+type Section = 'practice' | 'tournaments';
+
+/** Practice | Tournaments switch at the top of the Scrims section. */
+function SectionSwitch({ value, onChange }: { value: Section; onChange: (v: Section) => void }) {
+  const t = useTheme();
+  const options: { value: Section; label: string }[] = [
+    { value: 'practice', label: 'Practice' },
+    { value: 'tournaments', label: 'Tournaments' },
+  ];
+  return (
+    <View accessibilityRole="tablist" style={{ flexDirection: 'row', backgroundColor: t.colors.surfaceRaised, borderRadius: t.radius.md, padding: 4, marginBottom: spacing.lg }}>
+      {options.map((o) => {
+        const on = o.value === value;
+        return (
+          <Pressable
+            key={o.value}
+            onPress={() => onChange(o.value)}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: on }}
+            style={{ flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: t.radius.md - 2, backgroundColor: on ? t.colors.primary : 'transparent' }}
+          >
+            <RNText style={{ fontFamily: t.fonts.heading, fontSize: 16, letterSpacing: 1.5, textTransform: 'uppercase', color: on ? t.colors.onPrimary : t.colors.textMuted }}>{o.label}</RNText>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
 
 export default function ScrimBoardScreen() {
   const t = useTheme();
@@ -28,6 +57,8 @@ export default function ScrimBoardScreen() {
   const scrimGames = useMemo(() => games.filter(isScrimGame), [games]);
   const [gameId, setGameId] = useState<string | null>(null);
   const [region, setRegion] = useState<Region | null>(null);
+  const params = useLocalSearchParams<{ tab?: string }>();
+  const [section, setSection] = useState<Section>(params.tab === 'tournaments' ? 'tournaments' : 'practice');
 
   const mine = useLoader(
     useCallback(async () => {
@@ -76,6 +107,7 @@ export default function ScrimBoardScreen() {
 
   const header = (
     <View style={s.headerBlock}>
+      <SectionSwitch value={section} onChange={setSection} />
       <Text muted style={{ marginBottom: spacing.md }}>
         Book practice matches against other teams. Free to play.
       </Text>
@@ -113,6 +145,26 @@ export default function ScrimBoardScreen() {
       ) : null}
     </View>
   );
+
+  if (section === 'tournaments') {
+    return (
+      <Screen padded={false} edges={[]}>
+        <Stack.Screen options={{ title: 'Scrims' }} />
+        <TournamentsTab
+          gameId={gameId}
+          header={
+            <View>
+              <SectionSwitch value={section} onChange={setSection} />
+              <Text muted style={{ marginBottom: spacing.md }}>
+                Free, streamed tournaments hosted by verified organisers.
+              </Text>
+              <HorizontalChips options={scrimGames.map((g) => ({ value: g.id, label: g.name }))} value={gameId} onChange={setGameId} allLabel="All games" />
+            </View>
+          }
+        />
+      </Screen>
+    );
+  }
 
   if (board.loading && mine.loading) {
     return (

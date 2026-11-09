@@ -93,6 +93,13 @@ function RootNavigator() {
         {/* Community agent */}
         <Stack.Screen name="community/new" options={{ title: 'New post', presentation: 'modal' }} />
         <Stack.Screen name="community/[id]" options={{ title: 'Post' }} />
+        {/* Scrims (Phase 1) */}
+        <Stack.Screen name="scrims/index" options={{ title: 'Scrims' }} />
+        <Stack.Screen name="scrims/new" options={{ title: 'Post a scrim', presentation: 'modal' }} />
+        <Stack.Screen name="scrims/[id]" options={{ title: 'Scrim' }} />
+        <Stack.Screen name="teams/index" options={{ title: 'My teams' }} />
+        <Stack.Screen name="teams/new" options={{ title: 'Create a team', presentation: 'modal' }} />
+        <Stack.Screen name="teams/[id]" options={{ title: 'Team' }} />
       </Stack.Protected>
     </Stack>
   );

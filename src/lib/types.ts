@@ -47,6 +47,7 @@ export interface Game {
   steam_appid: number | null; // Steam store app id: artwork + library matching
   logo_url: string | null; // optional self-hosted artwork (game-art bucket)
   squadable: boolean; // generated: category <> 'story' or is_coop. Only these get LFG / Squad Finder
+  scrims_enabled?: boolean; // 0015: team scrims are available (VALORANT, CS2). Missing on older databases.
 }
 
 /** table: profiles — one row per auth user, id = auth.users.id */
@@ -332,7 +333,12 @@ export const PLAY_STYLE_LABELS: Record<PlayStyle, string> = {
   both: 'Both',
 };
 
-export const LANGUAGES = ['English', 'Hindi', 'Tamil', 'Telugu', 'Kannada', 'Malayalam', 'Bengali', 'Marathi', 'Gujarati', 'Punjabi', 'Urdu'] as const;
+// Global languages first, then the Indian languages our early players asked for.
+export const LANGUAGES = [
+  'English', 'Spanish', 'Portuguese', 'French', 'German', 'Arabic', 'Russian', 'Turkish', 'Indonesian', 'Filipino',
+  'Vietnamese', 'Thai', 'Japanese', 'Korean', 'Chinese',
+  'Hindi', 'Tamil', 'Telugu', 'Kannada', 'Malayalam', 'Bengali', 'Marathi', 'Gujarati', 'Punjabi', 'Urdu',
+] as const;
 
 export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
   harassment: 'Harassment or bullying',
@@ -375,11 +381,14 @@ export type NotificationType =
   | 'community_reply' // reply on your post
   | 'community_solution' // your reply was marked as the solution
   | 'rating_received' // a teammate rated you (positive tags only)
-  | 'moderation'; // a moderator acted on your content or account
+  | 'moderation' // a moderator acted on your content or account
+  | 'team_invite' // invited to a scrim team
+  | 'scrim_request' // a team asked to play your scrim
+  | 'scrim_update'; // scrim accepted / declined / cancelled / result / no-show
 
 /** Where tapping a notification goes. `params` are Expo Router params. */
 export interface NotificationRoute {
-  pathname: '/lfg/[id]' | '/chat/[id]' | '/friends' | '/community/[id]' | '/user/[id]' | '/notifications';
+  pathname: '/lfg/[id]' | '/chat/[id]' | '/friends' | '/community/[id]' | '/user/[id]' | '/notifications' | '/scrims/[id]' | '/teams/[id]';
   params?: Record<string, string>;
 }
 

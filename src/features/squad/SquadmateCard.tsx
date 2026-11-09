@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import { Avatar, Button, Card, Chip, ChipRow, Text } from '../../components/ui';
+import { Avatar, Button, Card, Chip, ChipRow, LiveDot, Text } from '../../components/ui';
 import { PLAY_STYLE_LABELS, REGION_LABELS, type SquadmateMatch } from '../../lib/types';
 import { fontSize, makeStyles, spacing, useTheme } from '../../theme';
 import { ReputationBadges } from '../reputation/PlayerCard';
@@ -23,13 +23,14 @@ export const SquadmateCard = memo(function SquadmateCard({
   const shared = new Set(shared_languages);
   const rankRole = [game.rank, game.role].filter(Boolean).join(' · ');
   const otherLanguages = profile.languages.filter((l) => !shared.has(l));
+  const isPlaying = game.play_status === 'playing';
 
   return (
     <Card style={s.card}>
       <Pressable
         onPress={onPress}
         accessibilityRole="button"
-        accessibilityLabel={`${name}, ${match_score}% match${rankRole ? `, ${rankRole}` : ''}${match.reputation ? `, level ${match.reputation.level}` : ''}. View profile.`}
+        accessibilityLabel={`${name}, ${match_score}% match${rankRole ? `, ${rankRole}` : ''}${isPlaying ? ', playing now' : ''}${match.reputation ? `, level ${match.reputation.level}` : ''}. View profile.`}
         style={({ pressed }) => [pressed && { opacity: 0.8 }]}
       >
         <View style={s.topRow}>
@@ -41,7 +42,11 @@ export const SquadmateCard = memo(function SquadmateCard({
             <Text variant="caption" numberOfLines={1}>
               @{profile.username}
             </Text>
-            {rankRole ? (
+            {isPlaying ? (
+              <View style={{ marginTop: 2 }}>
+                <LiveDot label="Playing now" numberOfLines={1} />
+              </View>
+            ) : rankRole ? (
               <Text variant="label" numberOfLines={1} style={{ marginTop: 2 }}>
                 {rankRole}
               </Text>

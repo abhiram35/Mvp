@@ -5,6 +5,7 @@ import { Alert, Pressable, StyleSheet, View } from 'react-native';
 import { Button, EmptyState, ErrorState, LoadingState, Screen, Text } from '../../components/ui';
 import { ActionRow } from '../../features/profile/ActionRow';
 import { FriendButton } from '../../features/friends/FriendButton';
+import { useGames } from '../../features/games/useGames';
 import { ProfileGamesList } from '../../features/profile/ProfileGamesList';
 import { SteamCard } from '../../features/steam/SteamCard';
 import { ProfileHeader } from '../../features/profile/ProfileHeader';
@@ -22,6 +23,8 @@ export default function UserProfileScreen() {
   const t = useTheme();
   const styles = useStyles();
   const { profile, games, gameIds, steam, loading, error, reload } = useProfile(id);
+  const { byId } = useGames();
+  const nowPlaying = byId(games.find((g) => g.play_status === 'playing')?.game_id) ?? null;
   const { blockedIds } = useBlockedIds();
   const [busy, setBusy] = useState(false);
   const [messaging, setMessaging] = useState(false);
@@ -143,7 +146,7 @@ export default function UserProfileScreen() {
   return (
     <Screen scroll edges={['bottom']}>
       {header}
-      <ProfileHeader profile={profile} gamesCount={games.length}>
+      <ProfileHeader profile={profile} gamesCount={games.length} nowPlaying={nowPlaying}>
         <View style={styles.actions}>
           <View style={{ flex: 1 }}>
             <FriendButton profileId={id} />

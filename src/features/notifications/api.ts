@@ -16,6 +16,9 @@ const TYPES: NotificationType[] = [
   'community_solution',
   'rating_received',
   'moderation',
+  'team_invite',
+  'scrim_request',
+  'scrim_update',
 ];
 
 function channelName(base: string): string {

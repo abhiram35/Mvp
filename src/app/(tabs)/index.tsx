@@ -104,6 +104,22 @@ export default function LfgBoardScreen() {
             </View>
           }
         />
+        {/* Scrims entry: team practice matches (VALORANT / CS2) */}
+        <Pressable
+          onPress={() => router.push('/scrims')}
+          accessibilityRole="button"
+          accessibilityLabel="Scrims. Book team practice matches for VALORANT and CS2"
+          style={({ pressed }) => [styles.scrimBanner, { backgroundColor: t.colors.panel, borderRadius: t.radius.md }, pressed && { opacity: 0.85 }]}
+        >
+          <Ionicons name="flag" size={18} color={t.colors.primary} />
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: t.colors.onPanel, fontFamily: t.fonts.heading, letterSpacing: 1.5 }}>SCRIMS</Text>
+            <Text variant="caption" style={{ color: t.colors.onPanel, opacity: 0.8 }}>
+              Team vs team practice · VALORANT and CS2 · free
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={t.colors.onPanel} />
+        </Pressable>
       </View>
 
       <View style={styles.filters}>
@@ -157,6 +173,7 @@ export default function LfgBoardScreen() {
 
 const useStyles = makeStyles((t) =>
   StyleSheet.create({
+    scrimBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, marginBottom: spacing.sm, minHeight: 48 },
     header: { paddingHorizontal: spacing.lg },
     hostButton: { minHeight: 44 },
     headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },

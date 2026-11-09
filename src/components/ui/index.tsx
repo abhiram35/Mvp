@@ -593,13 +593,17 @@ export function SegmentBar({ filled, total, height = 8 }: { filled: number; tota
   );
 }
 
-/** Online / live indicator. */
-export function LiveDot({ label }: { label?: string }) {
+/** Online / live indicator, e.g. "Playing Valorant". */
+export function LiveDot({ label, numberOfLines }: { label?: string; numberOfLines?: number }) {
   const t = useTheme();
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 }}>
       <View style={{ width: 8, height: 8, borderRadius: t.shape.round ? 4 : 0, backgroundColor: t.colors.accent }} />
-      {label ? <Text variant="label">{label}</Text> : null}
+      {label ? (
+        <Text variant="label" numberOfLines={numberOfLines} style={{ color: t.colors.accent, flexShrink: 1 }}>
+          {label}
+        </Text>
+      ) : null}
     </View>
   );
 }

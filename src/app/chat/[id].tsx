@@ -13,7 +13,7 @@ import {
   View,
   type AlertButton,
 } from 'react-native';
-import { Avatar, EmptyState, ErrorState, LoadingState, Screen, Text, textStyle } from '../../components/ui';
+import { Avatar, EmptyState, ErrorState, LiveDot, LoadingState, Screen, Text, textStyle } from '../../components/ui';
 import { openReport } from '../../lib/actions';
 import { errorMessage } from '../../lib/supabase';
 import { useUserId } from '../../providers/AuthProvider';
@@ -23,6 +23,7 @@ import { bubbleLayout } from '../../features/chat/layout';
 import { MessageBubble } from '../../features/chat/MessageBubble';
 import { useConversation, type MemberProfile } from '../../features/chat/useConversation';
 import { useMessages, type ChatMessage } from '../../features/chat/useMessages';
+import { useNowPlaying } from '../../features/profile/nowPlaying';
 import { useBlockedIds } from '../../features/safety/blocks';
 import { ActionMenu } from '../../features/community/ActionMenu';
 import { BannedBanner } from '../../features/moderation/BannedBanner';
@@ -222,6 +223,7 @@ export default function ChatScreen() {
 
 function DmHeader({ partner }: { partner: MemberProfile }) {
   const styles = useStyles();
+  const nowPlaying = useNowPlaying([partner.id])[partner.id];
   return (
     <Pressable
       accessibilityRole="button"
@@ -233,7 +235,9 @@ function DmHeader({ partner }: { partner: MemberProfile }) {
       <Avatar uri={partner.avatar_url} name={partner.display_name} size={32} />
       <View style={{ marginLeft: spacing.sm, flexShrink: 1 }}>
         <Text style={styles.headerName} numberOfLines={1}>{partner.display_name}</Text>
-        {partner.username ? (
+        {nowPlaying ? (
+          <LiveDot label={`Playing ${nowPlaying.name}`} numberOfLines={1} />
+        ) : partner.username ? (
           <Text variant="caption" numberOfLines={1}>@{partner.username}</Text>
         ) : null}
       </View>

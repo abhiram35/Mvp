@@ -1,4 +1,4 @@
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { EmptyState, ErrorState, LoadingState, Screen } from '../components/ui';
@@ -7,15 +7,19 @@ import { BetaStats } from '../features/moderation/BetaStats';
 import { ReportCard, type ReportCardAction } from '../features/moderation/ReportCard';
 import { REPORTS_PAGE_SIZE, getBetaMetrics, listReports, resolveReport, unbanUser } from '../features/moderation/api';
 import { useMyStatus } from '../features/moderation/useMyStatus';
+import { fetchDisputedScrims, useLoader } from '../features/scrims/api';
+import { ScrimCard } from '../features/scrims/components';
+import { useNow } from '../lib/hooks';
 import type { BetaMetrics, Report, ReportQueueItem } from '../lib/types';
 import { makeStyles, spacing, useTheme } from '../theme';
 
-type Tab = Report['status'] | 'stats';
+type Tab = Report['status'] | 'scrims' | 'stats';
 
 const TABS: readonly { value: Tab; label: string }[] = [
   { value: 'open', label: 'Open' },
   { value: 'reviewed', label: 'Reviewed' },
   { value: 'actioned', label: 'Actioned' },
+  { value: 'scrims', label: 'Scrims' },
   { value: 'stats', label: 'Beta stats' },
 ];
 
@@ -211,6 +215,27 @@ function StatsTab() {
   );
 }
 
+/** Scrims where the two captains reported different scores. Open one to set the result. */
+function DisputesTab() {
+  const t = useTheme();
+  const s = useStyles();
+  const now = useNow();
+  const q = useLoader(fetchDisputedScrims, 'disputes');
+  if (q.loading) return <LoadingState />;
+  if (q.error && !q.data) return <ErrorState message={q.error} onRetry={() => void q.reload()} />;
+  const items = q.data ?? [];
+  return (
+    <FlatList
+      data={items}
+      keyExtractor={(x) => x.id}
+      contentContainerStyle={[s.list, !items.length && { flexGrow: 1 }]}
+      renderItem={({ item }) => <ScrimCard scrim={item} now={now} onPress={() => router.push({ pathname: '/scrims/[id]', params: { id: item.id } })} />}
+      ListEmptyComponent={<EmptyState icon="trophy-outline" title="No disputes" message="Scrims where captains report different scores show up here." />}
+      refreshControl={<RefreshControl refreshing={q.refreshing} tintColor={t.colors.primary} colors={[t.colors.primary]} onRefresh={() => void q.refresh()} />}
+    />
+  );
+}
+
 export default function ModerationScreen() {
   const s = useStyles();
   const { isModerator, loaded } = useMyStatus();
@@ -237,7 +262,7 @@ export default function ModerationScreen() {
       <View style={s.tabs}>
         <UnderlineTabs options={TABS} value={tab} onChange={setTab} />
       </View>
-      {tab === 'stats' ? <StatsTab /> : <ReportList key={tab} status={tab} />}
+      {tab === 'stats' ? <StatsTab /> : tab === 'scrims' ? <DisputesTab /> : <ReportList key={tab} status={tab} />}
     </Screen>
   );
 }

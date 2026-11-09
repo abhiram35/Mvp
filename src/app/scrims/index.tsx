@@ -54,7 +54,7 @@ export default function ScrimBoardScreen() {
       out.push({ kind: 'header', title: 'Your scrims', key: 'h-mine' });
       myScrims.forEach((x) => out.push({ kind: 'scrim', scrim: x, mine: true, key: `m-${x.id}` }));
     }
-    const open = (board.data ?? []).filter((x) => !myTeamIds.has(x.host_team_id));
+    const open = (board.data ?? []).filter((x) => !x.host_team_id || !myTeamIds.has(x.host_team_id));
     out.push({ kind: 'header', title: 'Open scrims', key: 'h-open' });
     open.forEach((x) => out.push({ kind: 'scrim', scrim: x, mine: false, key: `o-${x.id}` }));
     return out;

@@ -17,6 +17,7 @@ Everything the app needs lives in `migrations/`. Run the files **in order**:
 | `0011_review_fixes.sql` | Privacy and safety fixes for 0010: in-game IDs and Steam accounts only visible to friends / squad chats / DMs where the player wrote to you, safer Steam linking (2 steps), one-call profile game saving, Steam name filter, Genshin Impact moved to Co-op & Casual |
 | `0012_rename_vinq.sql` | The app is now called Vinq: updates the default squad-chat notification title and two moderation messages |
 | `0013_feedback.sql` | In-app **Send feedback** (ideas, bugs, other). Players can only send; you read it in Table Editor → `feedback`. 10 per player per day |
+| `0014_scrims.sql` | **Scrims** (VALORANT and CS2): teams, invites, scrim board, requests, group chat for both rosters, check-in, results, disputes, no-shows, team stats. See `docs/SCRIMS.md` |
 
 All files are safe to run again. Re-running them will not create duplicates, and it will not undo your own edits
 to the game list.
@@ -35,8 +36,8 @@ to the game list.
 **Option A: SQL Editor (easiest)**
 1. In the dashboard open **SQL Editor → New query**.
 2. Open `migrations/0001_schema.sql`, copy the whole file, paste it, and click **Run**.
-3. Do the same for `0002`, `0003`, `0004`, `0005`, `0006`, `0007`, `0008`, `0009`, `0010`, `0011`, `0012` and `0013`, in that order
-   (so the full run order is **0001 → 0013**). Already ran some of them earlier? Just run the newer ones, in order.
+3. Do the same for `0002`, `0003`, `0004`, `0005`, `0006`, `0007`, `0008`, `0009`, `0010`, `0011`, `0012`, `0013` and `0014`, in that order
+   (so the full run order is **0001 → 0014**). Already ran some of them earlier? Just run the newer ones, in order.
 
 **Option B: Supabase CLI**
 ```bash
@@ -318,3 +319,17 @@ Notes:
 - **Discord invite:** the app opens `https://discord.gg/sQa6fnPhw` from Me → Feedback & community and the Community tab.
   To change it, set `EXPO_PUBLIC_DISCORD_INVITE` (in `.env` locally and as an Expo environment variable for builds),
   then ship an update. Make the invite **never expire** in Discord (Server → Invite People → Edit invite link).
+
+## Scrims (`0014`)
+- Run `migrations/0014_scrims.sql` before shipping the app build with Scrims. Contract: `docs/SCRIMS.md`.
+- **Which games:** `games.scrims_enabled` (on for `valorant` and `cs2`). Turn another game on with
+  `update games set scrims_enabled = true where id = 'game_id';`. Re-running `0014` never changes it back.
+- All writes go through RPCs (`create_team`, `post_scrim`, `respond_scrim_request`, …). Players cannot insert or edit
+  `teams`, `team_members`, `team_invites`, `scrims`, `scrim_requests`, `scrim_lobby` or `scrim_reports` directly.
+- **Disputes:** when the two captains report different scores the scrim becomes `disputed`. Find them with
+  `select * from scrims where status = 'disputed';`, look at both rows in `scrim_reports` (screenshots), then as a
+  moderator in the app, or in SQL Editor: `select resolve_scrim_dispute('<scrim id>', 2, 1);` (host score, opponent score).
+- A captain who leaves hands the team to the longest-serving member. When the last member leaves, the team is
+  deleted and its upcoming open/booked scrims are cancelled (old scrims stay, with the team shown as removed).
+- The scrim chat is a normal group chat, so both rosters can see each other's in-game IDs (same rule as squad chats).
+

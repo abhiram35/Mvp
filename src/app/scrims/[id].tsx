@@ -105,7 +105,7 @@ export default function ScrimRoomScreen() {
         fetchScrimRequests(scrim.id).catch(() => []),
         fetchScrimLobby(scrim.id).catch(() => null),
         fetchScrimReports(scrim.id).catch(() => []),
-        fetchTeamStats(scrim.host_team_id).catch(() => null),
+        scrim.host_team_id ? fetchTeamStats(scrim.host_team_id).catch(() => null) : Promise.resolve(null),
         scrim.opponent_team_id ? fetchTeamStats(scrim.opponent_team_id).catch(() => null) : Promise.resolve(null),
       ]);
       return { scrim, myTeams, requests, lobby, reports, hostStats, oppStats };
@@ -205,7 +205,7 @@ export default function ScrimRoomScreen() {
             <StatusPill status={status} />
           </View>
           <View style={s.vsRow}>
-            <TeamColumn team={scrim.host} stats={reliabilityLabel(d.hostStats?.reliability)} onPress={scrim.host ? () => router.push({ pathname: '/teams/[id]', params: { id: scrim.host_team_id } }) : undefined} />
+            <TeamColumn team={scrim.host} stats={reliabilityLabel(d.hostStats?.reliability)} onPress={scrim.host ? () => router.push({ pathname: '/teams/[id]', params: { id: String(scrim.host_team_id) } }) : undefined} />
             <Text style={[s.vs, { color: t.colors.onPanel }]}>
               {scrim.host_score !== null && scrim.opp_score !== null ? `${scrim.host_score}–${scrim.opp_score}` : 'VS'}
             </Text>
@@ -393,6 +393,15 @@ export default function ScrimRoomScreen() {
                 {r.team_id === scrim.host_team_id ? scrim.host?.tag : scrim.opponent?.tag} reported {r.host_score} – {r.opp_score}
               </Text>
             ))}
+            {isCaptain && inScrim && !isModerator ? (
+              <View style={{ marginTop: spacing.md }}>
+                <Text muted style={{ marginBottom: spacing.sm }}>
+                  Made a mistake? Correct your report. If it now matches the other captain, the scrim is completed.
+                </Text>
+                <ScoreChips format={scrim.format} value={score} onChange={setScore} host={scrim.host} opp={scrim.opponent} />
+                <Button title="Correct my report" variant="secondary" style={{ marginTop: spacing.md }} disabled={!score} loading={busy === 'report'} onPress={() => submitScore((h, o) => reportScrimResult(scrim.id, h, o), 'report')} />
+              </View>
+            ) : null}
             {isModerator ? (
               <View style={{ marginTop: spacing.md }}>
                 <ScoreChips format={scrim.format} value={score} onChange={setScore} host={scrim.host} opp={scrim.opponent} />
@@ -416,7 +425,8 @@ export default function ScrimRoomScreen() {
         ) : null}
 
         {/* Cancel: host captain while open/booked, opponent captain while booked */}
-        {isCaptain && (scrim.status === 'open' || scrim.status === 'booked') && status !== 'expired' ? (
+        {/* The server refuses cancels after the start (report the result or a no-show instead). */}
+        {isCaptain && (scrim.status === 'open' || scrim.status === 'booked') && !hasStarted(scrim, now) && (scrim.status === 'booked' || isHostCaptain) ? (
           <Button title="Cancel scrim" variant="ghost" icon="close-circle-outline" style={{ marginTop: spacing.lg }} loading={busy === 'cancel'} onPress={confirmCancel} />
         ) : null}
       </ScrollView>

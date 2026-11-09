@@ -34,7 +34,7 @@ export interface TeamInvite {
   id: string;
   team_id: string;
   profile_id: string;
-  invited_by: string;
+  invited_by: string | null;
   status: InviteStatus;
   created_at: string;
   team: Team | null;
@@ -44,7 +44,8 @@ export interface TeamInvite {
 export interface Scrim {
   id: string;
   game_id: string;
-  host_team_id: string;
+  /** null once the host team was disbanded (old scrims keep their row). */
+  host_team_id: string | null;
   opponent_team_id: string | null;
   region: Region;
   scheduled_at: string;
@@ -61,7 +62,7 @@ export interface Scrim {
   cancelled_by_team_id: string | null;
   late_cancel: boolean;
   conversation_id: string | null;
-  created_by: string;
+  created_by: string | null;
   created_at: string;
   updated_at: string;
   host: Team | null;
@@ -87,7 +88,7 @@ export interface ScrimReport {
   host_score: number;
   opp_score: number;
   screenshot_url: string | null;
-  reported_by: string;
+  reported_by: string | null;
   created_at: string;
 }
 

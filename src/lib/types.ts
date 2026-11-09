@@ -333,7 +333,12 @@ export const PLAY_STYLE_LABELS: Record<PlayStyle, string> = {
   both: 'Both',
 };
 
-export const LANGUAGES = ['English', 'Hindi', 'Tamil', 'Telugu', 'Kannada', 'Malayalam', 'Bengali', 'Marathi', 'Gujarati', 'Punjabi', 'Urdu'] as const;
+// Global languages first, then the Indian languages our early players asked for.
+export const LANGUAGES = [
+  'English', 'Spanish', 'Portuguese', 'French', 'German', 'Arabic', 'Russian', 'Turkish', 'Indonesian', 'Filipino',
+  'Vietnamese', 'Thai', 'Japanese', 'Korean', 'Chinese',
+  'Hindi', 'Tamil', 'Telugu', 'Kannada', 'Malayalam', 'Bengali', 'Marathi', 'Gujarati', 'Punjabi', 'Urdu',
+] as const;
 
 export const REPORT_REASON_LABELS: Record<ReportReason, string> = {
   harassment: 'Harassment or bullying',

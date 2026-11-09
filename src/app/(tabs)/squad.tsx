@@ -1,41 +1,63 @@
-import { router } from 'expo-router';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { FlatList, StyleSheet, View } from 'react-native';
-import { Button, EmptyState, ErrorState, LoadingState, Screen, ScreenHeader, Text } from '../../components/ui';
-import { isSquadable } from '../../features/games/art';
+import { Image } from 'expo-image';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { BackHandler, FlatList, ScrollView, StyleSheet, View } from 'react-native';
+import { Button, EmptyState, ErrorState, LiveDot, Screen, ScreenHeader, Text } from '../../components/ui';
+import { DuoReveal } from '../../features/duo/DuoReveal';
+import { GameCarousel } from '../../features/duo/GameCarousel';
+import { LoadoutLine, type LoadoutOption } from '../../features/duo/LoadoutLine';
+import { useReducedMotion } from '../../features/duo/motion';
+import { initialQueue, queueReducer, STYLE_STOPS, styleStopIndex } from '../../features/duo/queue';
+import { QueueButton } from '../../features/duo/QueueButton';
+import { RadarSearch } from '../../features/duo/RadarSearch';
+import { StyleSlider } from '../../features/duo/StyleSlider';
+import { playersLabel, usePlayerCount } from '../../features/duo/api';
+import { gameArtUrl, isSquadable } from '../../features/games/art';
 import { fetchGames, useGames } from '../../features/games/useGames';
 import { hostCta, REGIONS, regionLabel } from '../../features/lfg/format';
-import { GameChipScroller, HorizontalChips } from '../../features/lfg/HorizontalChips';
 import { useBlockedIds } from '../../features/safety/blocks';
-import { fetchMyGameIds, useSquadSearch } from '../../features/squad/api';
+import { fetchMyGameIds, findSquadmates } from '../../features/squad/api';
 import { SquadmateCard } from '../../features/squad/SquadmateCard';
 import { openDm } from '../../lib/actions';
-import { LANGUAGES, PLAY_STYLE_LABELS, type Game, type PlayStyle, type Region, type SquadmateMatch } from '../../lib/types';
+import { LANGUAGES, type Game, type PlayStyle, type Region, type SquadmateMatch } from '../../lib/types';
 import { useAuth, useUserId } from '../../providers/AuthProvider';
 import { makeStyles, spacing, useTheme } from '../../theme';
 
-const REGION_OPTIONS = REGIONS.map((r) => ({ value: r, label: regionLabel(r) }));
-const STYLE_OPTIONS = (Object.keys(PLAY_STYLE_LABELS) as PlayStyle[])
-  .filter((s) => s !== 'both')
-  .map((s) => ({ value: s, label: PLAY_STYLE_LABELS[s] }));
+/** Searches shorter than this still show the radar briefly, so the result doesn't flash in. */
+const MIN_SEARCH_MS = 1600;
 
-export default function SquadFinderScreen() {
+const REGION_OPTIONS: LoadoutOption<Region>[] = [
+  { value: null, label: 'any region' },
+  ...REGIONS.map((r) => ({ value: r, label: regionLabel(r) })),
+];
+
+const openProfile = (id: string) => router.push({ pathname: '/user/[id]', params: { id } });
+
+export default function DuoFinderScreen() {
   const t = useTheme();
-  const styles = useStyles();
+  const s = useStyles();
+  const reduced = useReducedMotion();
   const myId = useUserId();
   const { profile } = useAuth();
-  const { games, byId } = useGames();
+  const { games, loading: gamesLoading, byId } = useGames();
   const { blockedIds } = useBlockedIds();
-  const { results, loading, error, search, retry } = useSquadSearch();
 
-  const [gameId, setGameId] = useState<string | null>(null);
+  const [pickedGameId, setGameId] = useState<string | null>(null);
   const [region, setRegion] = useState<Region | null>(null);
   const [language, setLanguage] = useState<string | null>(null);
   const [playStyle, setPlayStyle] = useState<PlayStyle | null>(null);
-  const [searchedGameId, setSearchedGameId] = useState<string | null>(null);
+  const [results, setResults] = useState<SquadmateMatch[]>([]);
+  const [showAll, setShowAll] = useState(false);
+  const [queue, dispatch] = useReducer(queueReducer, initialQueue);
+  const reqId = useRef(0);
 
-  // Default the game to the first one on my profile. A failed games-catalog fetch must not
-  // drop the preselect (it only filters out story games), so the two are not coupled.
+  const squadGames = useMemo(() => games.filter(isSquadable), [games]);
+  // Until the player (or their profile) picks one, use the first game so Queue up works straight away.
+  const gameId = pickedGameId ?? squadGames[0]?.id ?? null;
+  const game = byId(gameId);
+  const playerCount = usePlayerCount(gameId);
+
+  // Default the game to the first squadable one on my profile.
   useEffect(() => {
     if (!myId) return;
     let active = true;
@@ -44,7 +66,7 @@ export default function SquadFinderScreen() {
       try {
         ids = await fetchMyGameIds(myId);
       } catch {
-        return; // non-critical: user just picks a game
+        return; // non-critical: the player just picks a game
       }
       let all: Game[] | null = null;
       try {
@@ -52,9 +74,8 @@ export default function SquadFinderScreen() {
       } catch {
         all = null;
       }
-      // Skip single-player story games: there is nobody to squad up with.
+      if (!all) return; // can't tell which games are squadable; let the player pick
       const first = ids.find((id) => {
-        if (!all) return true;
         const g = all.find((x) => x.id === id);
         return !!g && isSquadable(g);
       });
@@ -65,115 +86,189 @@ export default function SquadFinderScreen() {
     };
   }, [myId]);
 
-  const languageOptions = useMemo(
-    () => Array.from(new Set([...(profile?.languages ?? []), ...LANGUAGES])).map((l) => ({ value: l, label: l })),
+  const languageOptions = useMemo<LoadoutOption<string>[]>(
+    () => [{ value: null, label: 'any language' }, ...Array.from(new Set([...(profile?.languages ?? []), ...LANGUAGES])).map((l) => ({ value: l, label: l }))],
     [profile?.languages],
   );
 
-  const visible = useMemo(() => (results ?? []).filter((m) => !blockedIds.has(m.profile.id) && m.profile.id !== myId), [results, blockedIds, myId]);
+  const visible = useMemo(() => results.filter((m) => !blockedIds.has(m.profile.id) && m.profile.id !== myId), [results, blockedIds, myId]);
+  const current = queue.phase === 'found' ? visible[queue.index % Math.max(1, visible.length)] : undefined;
 
-  const runSearch = () => {
+  const runSearch = async () => {
     if (!gameId) return;
-    setSearchedGameId(gameId);
-    void search({ gameId, region, language, playStyle });
+    const id = ++reqId.current;
+    setShowAll(false);
+    dispatch({ type: 'queue' });
+    const started = Date.now();
+    const wait = async () => {
+      const left = (reduced ? 0 : MIN_SEARCH_MS) - (Date.now() - started);
+      if (left > 0) await new Promise((r) => setTimeout(r, left));
+    };
+    try {
+      const rows = await findSquadmates({ gameId, region, language, playStyle });
+      await wait();
+      if (id !== reqId.current) return;
+      setResults(rows);
+      const count = rows.filter((m) => !blockedIds.has(m.profile.id) && m.profile.id !== myId).length;
+      dispatch({ type: 'results', count });
+    } catch (e) {
+      await wait();
+      if (id !== reqId.current) return;
+      dispatch({ type: 'error', message: (e as { message?: string })?.message ?? 'Something went wrong.' });
+    }
   };
 
-  const filterSummary = [
-    byId(gameId)?.name ?? 'Pick a game',
-    region ? regionLabel(region) : 'any region',
-    language ?? 'any language',
-    playStyle ? PLAY_STYLE_LABELS[playStyle].toLowerCase() : 'any style',
-  ].join(' · ');
+  const leave = useCallback((type: 'cancel' | 'back') => {
+    reqId.current++; // drop any search still in flight
+    setShowAll(false);
+    dispatch({ type });
+  }, []);
 
-  const header = (
-    <View style={styles.headerBlock}>
-      <ScreenHeader title="Find a duo" subtitle={filterSummary} />
-
-      <GameChipScroller label="Game" value={gameId} onChange={setGameId} squadOnly />
-      <View style={styles.filters}>
-        <HorizontalChips label="Region" options={REGION_OPTIONS} value={region} onChange={setRegion} allLabel="Any" />
-        <HorizontalChips label="Language" options={languageOptions} value={language} onChange={setLanguage} allLabel="Any" />
-        <HorizontalChips label="Play style" options={STYLE_OPTIONS} value={playStyle} onChange={setPlayStyle} allLabel="Any" />
-      </View>
-
-      <Button
-        title="Find players"
-        icon="search"
-        onPress={runSearch}
-        disabled={!gameId}
-        loading={loading}
-        style={{ marginTop: spacing.lg }}
-      />
-      {!gameId && games.length > 0 ? (
-        <Text variant="caption" style={{ marginTop: spacing.xs, textAlign: 'center' }}>
-          Pick a game to start
-        </Text>
-      ) : null}
-
-      {results && !loading && !error && visible.length > 0 ? (
-        <Text variant="label" style={styles.resultsLabel}>
-          {visible.length} {visible.length === 1 ? 'player' : 'players'} for {byId(searchedGameId)?.name ?? 'this game'}
-        </Text>
-      ) : null}
-    </View>
+  const overlayOpen = queue.phase !== 'idle';
+  // Android back closes the overlay (list → reveal → lobby) instead of leaving the tab.
+  useFocusEffect(
+    useCallback(() => {
+      if (!overlayOpen) return;
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        if (showAll) setShowAll(false);
+        else leave(queue.phase === 'searching' ? 'cancel' : 'back');
+        return true;
+      });
+      return () => sub.remove();
+    }, [overlayOpen, showAll, leave, queue.phase]),
   );
 
-  let empty: ReactNode = null;
-  if (loading) empty = <View style={styles.stateBox}><LoadingState label="Scouting players…" /></View>;
-  else if (error) empty = <View style={styles.stateBox}><ErrorState message={error} onRetry={retry} /></View>;
-  else if (results === null)
-    empty = (
-      <View style={styles.stateBox}>
-        <EmptyState icon="people" title="Ready when you are" message="Set your filters and tap Find players." />
-      </View>
-    );
-  else
-    empty = (
-      <View style={styles.stateBox}>
-        <EmptyState
-          icon="search"
-          title="No matches yet"
-          message={`Try removing a filter, or open a post in ${t.words.lobbies} so players can find you.`}
-          action={<Button title={hostCta(t.words)} variant="secondary" icon="add" onPress={() => router.push('/lfg/new')} />}
-        />
-      </View>
-    );
-
-  const renderItem = ({ item }: { item: SquadmateMatch }) => (
-    <SquadmateCard
-      match={item}
-      onPress={() => router.push({ pathname: '/user/[id]', params: { id: item.profile.id } })}
-      onMessage={() => void openDm(item.profile.id)}
-    />
-  );
+  const gameName = game?.name ?? 'this game';
+  const summary = [gameName, region ? regionLabel(region) : 'any region', language ?? 'any language', STYLE_STOPS[styleStopIndex(playStyle)].a11y.toLowerCase()].join(' · ');
+  const art = gameArtUrl(game);
 
   return (
     <Screen padded={false}>
-      <FlatList
-        data={loading || error ? [] : visible}
-        keyExtractor={(m) => m.profile.id}
-        renderItem={renderItem}
-        ListHeaderComponent={header}
-        ListEmptyComponent={empty}
-        contentContainerStyle={styles.list}
-        keyboardShouldPersistTaps="handled"
-      />
+      <View style={{ flex: 1 }}>
+        {art ? (
+          <Image
+            source={{ uri: art }}
+            blurRadius={40}
+            contentFit="cover"
+            transition={300}
+            style={[s.backdrop, { opacity: t.dark ? 0.3 : 0.16 }]}
+            accessibilityIgnoresInvertColors
+          />
+        ) : null}
+        <ScrollView
+          contentContainerStyle={s.content}
+          keyboardShouldPersistTaps="handled"
+          // Hide the lobby from screen readers while an overlay covers it (Android has no accessibilityViewIsModal).
+          importantForAccessibility={overlayOpen ? 'no-hide-descendants' : 'auto'}
+          accessibilityElementsHidden={overlayOpen}
+        >
+          <ScreenHeader title="Find a duo" />
+          <View style={s.countRow}>
+            {playerCount !== null && game ? <LiveDot label={`${playersLabel(playerCount)} play ${game.name} on Vinq`} /> : <Text variant="label">Pick a game, set your loadout, queue up.</Text>}
+          </View>
+
+          <Text variant="label" style={s.kicker}>
+            Pick your game
+          </Text>
+          {gamesLoading && squadGames.length === 0 ? (
+            <Text muted style={{ marginVertical: spacing.lg }}>
+              Loading games…
+            </Text>
+          ) : (
+            <GameCarousel games={squadGames} value={gameId} onChange={setGameId} reduced={reduced} />
+          )}
+
+          <LoadoutLine
+            region={region}
+            regionOptions={REGION_OPTIONS}
+            onRegion={setRegion}
+            language={language}
+            languageOptions={languageOptions}
+            onLanguage={setLanguage}
+            reduced={reduced}
+          />
+
+          <View style={{ marginTop: spacing.lg }}>
+            <StyleSlider value={playStyle} onChange={setPlayStyle} reduced={reduced} />
+          </View>
+
+          <View style={{ marginTop: spacing.xl }}>
+            <QueueButton title="Queue up" onPress={() => void runSearch()} disabled={!gameId} reduced={reduced} />
+          </View>
+        </ScrollView>
+
+        {queue.phase === 'searching' ? <RadarSearch summary={summary} onCancel={() => leave('cancel')} reduced={reduced} /> : null}
+
+        {/* The reveal stays mounted under "All results", so its intro doesn't replay on the way back. */}
+        {queue.phase === 'found' && current ? (
+          <DuoReveal
+            me={profile ?? null}
+            match={current}
+            index={queue.index % visible.length}
+            total={visible.length}
+            revealKey={queue.revealKey}
+            gameName={gameName}
+            onMessage={() => void openDm(current.profile.id)}
+            onProfile={() => openProfile(current.profile.id)}
+            onNext={() => dispatch({ type: 'next', count: visible.length })}
+            onBack={() => leave('back')}
+            onSeeAll={() => setShowAll(true)}
+            hidden={showAll}
+            reduced={reduced}
+          />
+        ) : null}
+
+        {queue.phase === 'found' && showAll ? (
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: t.colors.bg }]} accessibilityViewIsModal>
+            <FlatList
+              data={visible}
+              keyExtractor={(m) => m.profile.id}
+              contentContainerStyle={s.list}
+              ListHeaderComponent={
+                <View style={{ marginBottom: spacing.md }}>
+                  <ScreenHeader title={`${visible.length} duos found`} subtitle={summary} />
+                  <Button title="Back to reveal" variant="secondary" icon="arrow-back" size="sm" onPress={() => setShowAll(false)} />
+                </View>
+              }
+              renderItem={({ item }) => <SquadmateCard match={item} onPress={() => openProfile(item.profile.id)} onMessage={() => void openDm(item.profile.id)} />}
+            />
+          </View>
+        ) : null}
+
+        {queue.phase === 'empty' || (queue.phase === 'found' && !current) ? (
+          <View style={[StyleSheet.absoluteFill, s.overlay, { backgroundColor: t.colors.bg }]} accessibilityViewIsModal>
+            <EmptyState
+              icon="radio-outline"
+              title="No duos right now"
+              message={`Nobody matches that loadout yet. Loosen a filter, or host a lobby in ${t.words.lobbies} so players can find you.`}
+              action={
+                <View style={{ gap: spacing.sm, alignSelf: 'stretch' }}>
+                  <Button title={hostCta(t.words)} icon="add" onPress={() => router.push('/lfg/new')} />
+                  <Button title="Change loadout" variant="secondary" onPress={() => leave('back')} />
+                </View>
+              }
+            />
+          </View>
+        ) : null}
+
+        {queue.phase === 'error' ? (
+          <View style={[StyleSheet.absoluteFill, s.overlay, { backgroundColor: t.colors.bg }]} accessibilityViewIsModal>
+            <ErrorState message={queue.error ?? 'Something went wrong.'} onRetry={() => void runSearch()} />
+            <Button title="Back" variant="ghost" onPress={() => leave('back')} />
+          </View>
+        ) : null}
+      </View>
     </Screen>
   );
 }
 
 const useStyles = makeStyles((t) =>
   StyleSheet.create({
+    backdrop: { position: 'absolute', left: -40, right: -40, top: -60, height: 320 },
+    content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
+    countRow: { marginTop: -spacing.xs, marginBottom: spacing.lg },
+    kicker: { fontFamily: t.fonts.heading, letterSpacing: 2, textTransform: 'uppercase' },
     list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
-    headerBlock: { marginBottom: spacing.md },
-    filters: { gap: spacing.sm, marginTop: spacing.md },
-    resultsLabel: {
-      marginTop: spacing.xl,
-      paddingTop: spacing.md,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: t.colors.border,
-      color: t.colors.textMuted,
-    },
-    stateBox: { minHeight: 240 },
+    overlay: { justifyContent: 'center', padding: spacing.lg },
   }),
 );

@@ -24,6 +24,8 @@ const TYPE_ICONS: Record<NotificationType, IconName> = {
   team_invite: 'people-circle-outline',
   scrim_request: 'flag-outline',
   scrim_update: 'trophy-outline',
+  tournament_update: 'podium-outline',
+  organiser_application: 'ribbon-outline',
 };
 
 const MINUTE = 60_000;

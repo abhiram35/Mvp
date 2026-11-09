@@ -75,10 +75,13 @@ export default function TournamentScreen() {
     const myTeamIds = new Set(myTeams.map((m) => m.team.id));
     const myEntry = entries.find((e) => myTeamIds.has(e.team_id) && e.status !== 'withdrawn') ?? null;
     const myMembership = myEntry ? (myTeams.find((m) => m.team.id === myEntry.team_id) ?? null) : null;
-    const eligible = myTeams.filter((m) => m.role === 'captain' && m.team.game_id === tour.game_id).map((m) => m.team);
+    const captained = myTeams.filter((m) => m.role === 'captain' && m.team.game_id === tour.game_id).map((m) => m.team);
+    // Region-locked tournaments only take teams from that region (the server checks this too).
+    const eligible = captained.filter((x) => !tour.region || x.region === tour.region);
+    const wrongRegion = captained.length > 0 && eligible.length === 0;
     const active = activeEntries(entries);
     const checkedIn = entries.filter((e) => e.status === 'registered' && e.checked_in_at).length;
-    return { myEntry, myMembership, eligible, active, checkedIn };
+    return { myEntry, myMembership, eligible, wrongRegion, active, checkedIn };
   }, [d]);
 
   const act = async (key: string, fn: () => Promise<unknown>, failTitle: string) => {
@@ -119,7 +122,7 @@ export default function TournamentScreen() {
   }
 
   const { tour, entries, matches } = d;
-  const { myEntry, myMembership, eligible, active, checkedIn } = derived;
+  const { myEntry, myMembership, eligible, wrongRegion, active, checkedIn } = derived;
   const phase = tournamentPhase(tour, now);
   const isOrganiser = !!myId && tour.organiser_id === myId;
   const game = byId(tour.game_id);
@@ -232,7 +235,11 @@ export default function TournamentScreen() {
             eligible.length === 0 ? (
               <Card style={{ gap: spacing.sm }}>
                 <Text variant="strong">Want to play?</Text>
-                <Text muted>{`Team captains register here. Make a ${game?.name ?? ''} team with ${TOURNAMENT_RULES.minRoster}+ players first.`}</Text>
+                <Text muted>
+                  {wrongRegion
+                    ? `This tournament is only for teams in ${tour.region ? regionLabel(tour.region) : 'its region'}.`
+                    : `Team captains register here. Make a ${game?.name ?? ''} team with ${TOURNAMENT_RULES.minRoster}+ players first.`}
+                </Text>
                 <Button title="My teams" variant="secondary" size="sm" onPress={() => router.push('/teams')} />
               </Card>
             ) : (

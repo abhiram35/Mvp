@@ -19,6 +19,8 @@ const TYPES: NotificationType[] = [
   'team_invite',
   'scrim_request',
   'scrim_update',
+  'tournament_update',
+  'organiser_application',
 ];
 
 function channelName(base: string): string {

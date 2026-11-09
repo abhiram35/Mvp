@@ -19,6 +19,7 @@ Everything the app needs lives in `migrations/`. Run the files **in order**:
 | `0013_feedback.sql` | In-app **Send feedback** (ideas, bugs, other). Players can only send; you read it in Table Editor → `feedback`. 10 per player per day |
 | `0014_scrims.sql` | **Scrims** (VALORANT and CS2): teams, invites, scrim board, requests, group chat for both rosters, check-in, results, disputes, no-shows, team stats. See `docs/SCRIMS.md` |
 | `0015_scrim_streams.sql` | **Streaming scrims**: opt-in "OK to stream", YouTube/Twitch link per scrim, moderator-featured scrims |
+| `0016_tournaments.sql` | **Tournaments**: verified organisers (apply → moderator review), free single-elimination cups with registration, check-in, auto bracket with byes, match chats, results/disputes, streamed on YouTube/Twitch. See `docs/TOURNAMENTS.md` |
 
 All files are safe to run again. Re-running them will not create duplicates, and it will not undo your own edits
 to the game list.
@@ -37,8 +38,8 @@ to the game list.
 **Option A: SQL Editor (easiest)**
 1. In the dashboard open **SQL Editor → New query**.
 2. Open `migrations/0001_schema.sql`, copy the whole file, paste it, and click **Run**.
-3. Do the same for `0002`, `0003`, `0004`, `0005`, `0006`, `0007`, `0008`, `0009`, `0010`, `0011`, `0012`, `0013`, `0014` and `0015`, in that order
-   (so the full run order is **0001 → 0015**). Already ran some of them earlier? Just run the newer ones, in order.
+3. Do the same for `0002`, `0003`, `0004`, `0005`, `0006`, `0007`, `0008`, `0009`, `0010`, `0011`, `0012`, `0013`, `0014`, `0015` and `0016`, in that order
+   (so the full run order is **0001 → 0016**). Already ran some of them earlier? Just run the newer ones, in order.
 
 **Option B: Supabase CLI**
 ```bash
@@ -334,3 +335,21 @@ Notes:
   deleted and its upcoming open/booked scrims are cancelled (old scrims stay, with the team shown as removed).
 - The scrim chat is a normal group chat, so both rosters can see each other's in-game IDs (same rule as squad chats).
 
+## Tournaments (`0016`)
+- Run `migrations/0016_tournaments.sql` (after `0014` and `0015`) before shipping the app build with Tournaments.
+  Contract: `docs/TOURNAMENTS.md`.
+- **Organisers:** players apply in the app (account 30+ days old). Moderators see `organiser_application`
+  notifications and approve/reject in the app, or in SQL Editor:
+  `select review_organiser_application('<application id>', true, 'Welcome');`. Remove a badge with
+  `select revoke_organiser('<profile id>');` (their tournaments stay; a moderator can cancel them with
+  `select cancel_tournament('<tournament id>');`).
+- All writes go through RPCs. Players cannot insert or edit `organiser_applications`, `organisers`, `tournaments`,
+  `tournament_teams`, `tournament_rosters`, `tournament_matches` or `tournament_match_reports` directly.
+- **Lobby details are private:** `tournament_matches.lobby_info` has no SELECT grant for players, so the app must
+  list the other columns by name (`select *` on `tournament_matches` fails) and read the lobby with
+  `get_match_lobby`. If you add a column to `tournament_matches`, add it to the `grant select (…)` list too.
+- **Disputes:** `select * from tournament_matches where status = 'disputed';`, check both rows in
+  `tournament_match_reports`, then the organiser sets the result in the app, or a moderator / SQL Editor runs
+  `select resolve_match('<match id>', 2, 1);` (team A score, team B score). Nobody on either team can resolve.
+- Starting builds the whole bracket at once: teams that didn't check in become `no_show`, seeds follow scrim
+  reliability, top seeds get byes, and every match with two known teams gets a group chat (both rosters + organiser).

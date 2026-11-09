@@ -384,11 +384,14 @@ export type NotificationType =
   | 'moderation' // a moderator acted on your content or account
   | 'team_invite' // invited to a scrim team
   | 'scrim_request' // a team asked to play your scrim
-  | 'scrim_update'; // scrim accepted / declined / cancelled / result / no-show
+  | 'scrim_update' // scrim accepted / declined / cancelled / result / no-show
+  | 'tournament_update' // registration, start, your match is ready, results, cancelled
+  | 'organiser_application'; // organiser application submitted (mods) / reviewed (applicant)
 
 /** Where tapping a notification goes. `params` are Expo Router params. */
 export interface NotificationRoute {
-  pathname: '/lfg/[id]' | '/chat/[id]' | '/friends' | '/community/[id]' | '/user/[id]' | '/notifications' | '/scrims/[id]' | '/teams/[id]';
+  pathname: '/lfg/[id]' | '/chat/[id]' | '/friends' | '/community/[id]' | '/user/[id]' | '/notifications' | '/scrims/[id]' | '/teams/[id]'
+    | '/scrims' | '/moderation' | '/tournaments/[id]' | '/tournaments/match/[id]';
   params?: Record<string, string>;
 }
 

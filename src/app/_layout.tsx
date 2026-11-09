@@ -100,6 +100,11 @@ function RootNavigator() {
         <Stack.Screen name="teams/index" options={{ title: 'My teams' }} />
         <Stack.Screen name="teams/new" options={{ title: 'Create a team', presentation: 'modal' }} />
         <Stack.Screen name="teams/[id]" options={{ title: 'Team' }} />
+        {/* Tournaments (Phase 2) */}
+        <Stack.Screen name="tournaments/new" options={{ title: 'Host a tournament', presentation: 'modal' }} />
+        <Stack.Screen name="tournaments/[id]" options={{ title: 'Tournament' }} />
+        <Stack.Screen name="tournaments/match/[id]" options={{ title: 'Match' }} />
+        <Stack.Screen name="organisers/apply" options={{ title: 'Apply to host', presentation: 'modal' }} />
       </Stack.Protected>
     </Stack>
   );

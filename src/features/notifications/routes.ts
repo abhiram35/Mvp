@@ -13,6 +13,10 @@ const ROUTES: Record<Pathname, { needsId: boolean }> = {
   '/notifications': { needsId: false },
   '/scrims/[id]': { needsId: true },
   '/teams/[id]': { needsId: true },
+  '/scrims': { needsId: false },
+  '/moderation': { needsId: false },
+  '/tournaments/[id]': { needsId: true },
+  '/tournaments/match/[id]': { needsId: true },
 };
 
 function isPathname(v: unknown): v is Pathname {

@@ -17,6 +17,7 @@ Everything the app needs lives in `migrations/`. Run the files **in order**:
 | `0011_review_fixes.sql` | Privacy and safety fixes for 0010: in-game IDs and Steam accounts only visible to friends / squad chats / DMs where the player wrote to you, safer Steam linking (2 steps), one-call profile game saving, Steam name filter, Genshin Impact moved to Co-op & Casual |
 | `0012_rename_vinq.sql` | The app is now called Vinq: updates the default squad-chat notification title and two moderation messages |
 | `0013_feedback.sql` | In-app **Send feedback** (ideas, bugs, other). Players can only send; you read it in Table Editor → `feedback`. 10 per player per day |
+| `0014_now_playing.sql` | **Currently playing** becomes one game at a time, so it can show as a live status on profile, friends, squad finder and chat |
 | `0015_scrims.sql` | **Scrims** (VALORANT and CS2): teams, invites, scrim board, requests, group chat for both rosters, check-in, results, disputes, no-shows, team stats. See `docs/SCRIMS.md` |
 | `0016_scrim_streams.sql` | **Streaming scrims**: opt-in "OK to stream", YouTube/Twitch link per scrim, moderator-featured scrims |
 
@@ -37,7 +38,7 @@ to the game list.
 **Option A: SQL Editor (easiest)**
 1. In the dashboard open **SQL Editor → New query**.
 2. Open `migrations/0001_schema.sql`, copy the whole file, paste it, and click **Run**.
-3. Do the same for `0002`, `0003`, `0004`, `0005`, `0006`, `0007`, `0008`, `0009`, `0010`, `0011`, `0012`, `0013`, `0015` and `0016`, in that order
+3. Do the same for `0002`, `0003`, `0004`, `0005`, `0006`, `0007`, `0008`, `0009`, `0010`, `0011`, `0012`, `0013`, `0014`, `0015` and `0016`, in that order
    (so the full run order is **0001 → 0016**). Already ran some of them earlier? Just run the newer ones, in order.
 
 **Option B: Supabase CLI**

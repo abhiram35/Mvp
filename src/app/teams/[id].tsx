@@ -6,9 +6,22 @@ import { Avatar, Button, Card, EmptyState, ErrorState, LoadingState, Screen, Sta
 import { useFriends } from '../../features/friends/hooks';
 import { useGames } from '../../features/games/useGames';
 import { regionLabel } from '../../features/lfg/format';
-import { fetchTeam, fetchTeamInvites, fetchTeamMembers, fetchTeamScrims, fetchTeamStats, inviteToTeam, leaveTeam, removeTeamMember, useLoader } from '../../features/scrims/api';
+import {
+  fetchMyInviteForTeam,
+  fetchTeam,
+  fetchTeamInvites,
+  fetchTeamMembers,
+  fetchTeamScrims,
+  fetchTeamStats,
+  inviteToTeam,
+  leaveTeam,
+  removeTeamMember,
+  respondTeamInvite,
+  useLoader,
+} from '../../features/scrims/api';
 import { ScrimCard, TeamTag } from '../../features/scrims/components';
 import { reliabilityLabel, ROLE_LABELS, SCRIM_RULES } from '../../features/scrims/logic';
+import { useMyStatus } from '../../features/moderation/useMyStatus';
 import { useNow } from '../../lib/hooks';
 import { useUserId } from '../../providers/AuthProvider';
 import { makeStyles, spacing, useTheme } from '../../theme';
@@ -21,6 +34,7 @@ export default function TeamScreen() {
   const now = useNow(60_000);
   const { byId } = useGames();
   const { friends } = useFriends();
+  const { banned } = useMyStatus();
   const [busy, setBusy] = useState<string | null>(null);
   const [showInvite, setShowInvite] = useState(false);
 
@@ -28,15 +42,16 @@ export default function TeamScreen() {
     useCallback(async () => {
       const team = await fetchTeam(String(id));
       if (!team) return null;
-      const [members, stats, scrims, invites] = await Promise.all([
+      const [members, stats, scrims, invites, myInvite] = await Promise.all([
         fetchTeamMembers(team.id),
         fetchTeamStats(team.id).catch(() => null),
         fetchTeamScrims(team.id).catch(() => []),
         fetchTeamInvites(team.id).catch(() => []),
+        myId ? fetchMyInviteForTeam(myId, team.id).catch(() => null) : Promise.resolve(null),
       ]);
-      return { team, members, stats, scrims, invites };
-    }, [id]),
-    `team-${id}`,
+      return { team, members, stats, scrims, invites, myInvite };
+    }, [id, myId]),
+    `team-${id}-${myId}`,
   );
 
   const d = data.data;
@@ -112,6 +127,31 @@ export default function TeamScreen() {
           </View>
         </View>
 
+        {!me && d.myInvite ? (
+          <Card style={{ marginBottom: spacing.lg }}>
+            <Text variant="strong">{`You're invited to join ${team.name}`}</Text>
+            <View style={{ flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md }}>
+              <Button
+                title="Join team"
+                size="sm"
+                style={{ flex: 1 }}
+                disabled={banned}
+                loading={busy === 'join'}
+                onPress={() => void act('join', () => respondTeamInvite(String(d.myInvite?.id), true), "Couldn't join")}
+              />
+              <Button
+                title="Decline"
+                size="sm"
+                variant="secondary"
+                style={{ flex: 1 }}
+                loading={busy === 'decline'}
+                onPress={() => void act('decline', () => respondTeamInvite(String(d.myInvite?.id), false), "Couldn't decline")}
+              />
+            </View>
+            {banned ? <Text variant="caption" style={{ marginTop: spacing.sm }}>{"Your account is paused, so you can't join right now."}</Text> : null}
+          </Card>
+        ) : null}
+
         <Card style={s.stats}>
           <Stat value={stats ? String(stats.played) : '–'} label="Played" />
           <Stat value={stats ? `${stats.wins}–${stats.losses}` : '–'} label="W–L" />
@@ -175,7 +215,7 @@ export default function TeamScreen() {
               title={showInvite ? 'Hide friends' : 'Invite friends'}
               icon="person-add"
               variant={showInvite ? 'secondary' : 'primary'}
-              disabled={rosterFull}
+              disabled={rosterFull || banned}
               onPress={() => setShowInvite((v) => !v)}
             />
             {rosterFull ? <Text variant="caption" style={{ marginTop: spacing.xs }}>Roster is full.</Text> : null}

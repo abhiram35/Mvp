@@ -93,8 +93,14 @@ export async function fetchMyScrims(teamIds: string[]): Promise<Scrim[]> {
     .order('scheduled_at', { ascending: false })
     .limit(60);
   if (error) throw error;
+  const now = Date.now();
   return ((data ?? []) as Scrim[])
-    .filter((s) => ACTIVE.includes(s.status) || new Date(s.scheduled_at).getTime() >= since)
+    .filter((s) => {
+      const at = new Date(s.scheduled_at).getTime();
+      // Open scrims whose time passed are dead: show them only briefly so the host can tidy up.
+      if (s.status === 'open') return at >= since;
+      return ACTIVE.includes(s.status) || at >= since || at > now;
+    })
     .reverse();
 }
 
@@ -175,6 +181,7 @@ export const setScrimLobby = (scrimId: string, info: string) => rpc<void>('set_s
 export const reportScrimResult = (scrimId: string, hostScore: number, oppScore: number, screenshotUrl: string | null = null) =>
   rpc<ScrimStatus>('report_scrim_result', { p_scrim_id: scrimId, p_host_score: hostScore, p_opp_score: oppScore, p_screenshot_url: screenshotUrl });
 export const claimScrimNoShow = (scrimId: string) => rpc<void>('claim_scrim_no_show', { p_scrim_id: scrimId });
+export const escalateScrim = (scrimId: string) => rpc<void>('escalate_scrim', { p_scrim_id: scrimId });
 export const resolveScrimDispute = (scrimId: string, hostScore: number, oppScore: number) =>
   rpc<void>('resolve_scrim_dispute', { p_scrim_id: scrimId, p_host_score: hostScore, p_opp_score: oppScore });
 
@@ -257,4 +264,34 @@ export async function fetchDisputedScrims(): Promise<Scrim[]> {
   const { data, error } = await supabase.from('scrims').select(SCRIM_SELECT).eq('status', 'disputed').order('scheduled_at', { ascending: true }).limit(50);
   if (error) throw error;
   return (data ?? []) as Scrim[];
+}
+
+/** My pending invite to one team, if any (shown on the team page when I'm not a member yet). */
+export async function fetchMyInviteForTeam(myId: string, teamId: string): Promise<{ id: string } | null> {
+  const { data, error } = await supabase
+    .from('team_invites')
+    .select('id')
+    .eq('team_id', teamId)
+    .eq('profile_id', myId)
+    .eq('status', 'pending')
+    .maybeSingle();
+  if (error) throw error;
+  return (data as { id: string } | null) ?? null;
+}
+
+/**
+ * Calls `onChange` when this scrim or its requests change (realtime), and every `pollMs` as a
+ * fallback (realtime can drop on mobile networks). Returns an unsubscribe function.
+ */
+export function watchScrim(scrimId: string, onChange: () => void, pollMs = 30_000): () => void {
+  const channel = supabase
+    .channel(`scrim-${scrimId}-${Math.random().toString(36).slice(2, 8)}`)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'scrims', filter: `id=eq.${scrimId}` }, onChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'scrim_requests', filter: `scrim_id=eq.${scrimId}` }, onChange)
+    .subscribe();
+  const timer = setInterval(onChange, pollMs);
+  return () => {
+    clearInterval(timer);
+    void supabase.removeChannel(channel);
+  };
 }

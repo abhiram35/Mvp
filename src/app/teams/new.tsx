@@ -8,6 +8,7 @@ import { HorizontalChips } from '../../features/lfg/HorizontalChips';
 import { createTeam } from '../../features/scrims/api';
 import { cleanTag, isScrimGame, SCRIM_RULES, teamFormProblem } from '../../features/scrims/logic';
 import type { Region } from '../../lib/types';
+import { useMyStatus } from '../../features/moderation/useMyStatus';
 import { useAuth } from '../../providers/AuthProvider';
 import { makeStyles, spacing } from '../../theme';
 
@@ -17,6 +18,7 @@ export default function CreateTeamScreen() {
   const s = useStyles();
   const { profile } = useAuth();
   const { games } = useGames();
+  const { banned } = useMyStatus();
   const scrimGames = useMemo(() => games.filter(isScrimGame), [games]);
   const [gameId, setGameId] = useState<string | null>(null);
   const [name, setName] = useState('');
@@ -70,7 +72,8 @@ export default function CreateTeamScreen() {
       <View style={s.section}>
         <HorizontalChips label="Region" options={REGION_OPTIONS} value={region} onChange={setRegion} />
       </View>
-      <Button title="Create team" icon="shield-half" onPress={() => void submit()} loading={busy} disabled={!!problem || !game} />
+      <Button title="Create team" icon="shield-half" onPress={() => void submit()} loading={busy} disabled={!!problem || !game || banned} />
+      {banned ? <Text muted style={{ marginTop: spacing.sm, textAlign: 'center' }}>{"Your account is paused, so you can't create a team right now."}</Text> : null}
       <Text variant="caption" style={{ marginTop: spacing.sm, textAlign: 'center' }}>
         {`You'll be the captain. Invite friends from the team page. Scrims need ${SCRIM_RULES.minRoster} players; up to ${SCRIM_RULES.maxRoster} with subs.`}
       </Text>

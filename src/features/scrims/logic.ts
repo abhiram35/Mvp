@@ -19,6 +19,7 @@ export const SCRIM_RULES = {
   notesMax: 200,
   messageMax: 140,
   lobbyMax: 300,
+  escalateAfterHours: 2,
 } as const;
 
 export const FORMAT_LABELS: Record<ScrimFormat, string> = { bo1: 'Best of 1', bo3: 'Best of 3', bo5: 'Best of 5' };
@@ -142,6 +143,16 @@ export function dayOptions(now: number = Date.now()): DayOption[] {
   });
 }
 
+
+/** The next full hour at least an hour away, as a day offset from `now` plus an hour. */
+export function defaultSlot(now: number): { offset: number; hour: number } {
+  const d = new Date(now + 60 * 60_000);
+  if (d.getMinutes() > 0 || d.getSeconds() > 0 || d.getMilliseconds() > 0) d.setHours(d.getHours() + 1, 0, 0, 0);
+  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const offset = Math.round((startOfDay(d) - startOfDay(new Date(now))) / (24 * 3600_000));
+  return { offset, hour: d.getHours() };
+}
+
 /** Local date `offset` days from now at hh:mm, as an ISO string. */
 export function buildScheduledAt(offset: number, hour: number, minute: number, now: number = Date.now()): string {
   const b = new Date(now);
@@ -177,4 +188,19 @@ export function reliabilityLabel(reliability: number | null | undefined): string
 /** Games with scrims. Falls back to VALORANT + CS2 on databases without the 0014 column. */
 export function isScrimGame(game: { id: string; scrims_enabled?: boolean | null }): boolean {
   return typeof game.scrims_enabled === 'boolean' ? game.scrims_enabled : game.id === 'valorant' || game.id === 'cs2';
+}
+
+/** A booked scrim nobody finished: 2 h after the start a captain can hand it to a moderator. */
+export function canEscalate(scrim: Pick<Scrim, 'status' | 'scheduled_at'>, now: number = Date.now()): boolean {
+  return scrim.status === 'booked' && now >= new Date(scrim.scheduled_at).getTime() + SCRIM_RULES.escalateAfterHours * HOUR;
+}
+
+/** Label for the team behind an id on a finished scrim (null id = the team was disbanded). */
+export function sideTeamLabel(
+  id: string | null,
+  scrim: Pick<Scrim, 'host_team_id' | 'host' | 'opponent'>,
+): string {
+  if (!id) return 'A disbanded team';
+  const team = id === scrim.host_team_id ? scrim.host : scrim.opponent;
+  return team ? `${team.name} [${team.tag}]` : 'A disbanded team';
 }

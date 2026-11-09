@@ -20,6 +20,7 @@ post_scrim ──► open ──request_scrim──► (requests) ──respond_
                                                                                    ▼
                        report_scrim_result by both captains: same score → completed
                                                              different     → disputed
+                       booked ≥ 2 h after start ──escalate_scrim (captain)──► disputed
                        disputed ──resolve_scrim_dispute (moderator)──► completed
 ```
 
@@ -61,10 +62,12 @@ members of the host or requesting team. `team_invites` by the invitee and team m
 | `set_scrim_lobby(p_scrim_id, p_info) → void` | either captain | booked |
 | `report_scrim_result(p_scrim_id, p_host_score, p_opp_score, p_screenshot_url) → text` | either captain | booked and started; scores valid for the format (bo1 1–0, bo3 2–0/2–1, bo5 3–0/3–1/3–2); returns new status |
 | `claim_scrim_no_show(p_scrim_id) → void` | captain of the team that checked in | ≥ 15 min after start, other team not checked in |
-| `resolve_scrim_dispute(p_scrim_id, p_host_score, p_opp_score) → void` | moderator | disputed → completed |
+| `escalate_scrim(p_scrim_id) → void` | either captain | booked and ≥ 2 h after the start (nobody finished it): → disputed, for a moderator |
+| `resolve_scrim_dispute(p_scrim_id, p_host_score, p_opp_score) → void` | moderator | disputed → completed; not for a scrim the moderator's own team played |
 | `get_team_stats(p_team_id) → jsonb` | anyone | `{ played, wins, losses, no_shows, late_cancels, reliability }` (reliability 0–100 or null) |
 
-Notifications use the new types `team_invite`, `scrim_request`, `scrim_update`, routed to
+Notification times use the region's main time zone (IST, GST, SGT) or UTC for regions that span
+many zones; the app always shows the player's local time. Notifications use the new types `team_invite`, `scrim_request`, `scrim_update`, routed to
 `/teams/[id]` or `/scrims/[id]`.
 
 ## Not in Phase 1

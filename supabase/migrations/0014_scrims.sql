@@ -260,14 +260,26 @@ as $$
            else 'That score isn''t possible in a BO5 (use 3–0, 3–1 or 3–2)' end;
 $$;
 
--- "Sat 14 Nov, 21:30 IST"
-create or replace function public.gg_scrim_when(p_at timestamptz)
+-- "Sat 14 Nov, 21:30 IST" in the scrim region's main time zone; UTC where a region spans
+-- many zones (Europe, North America, other). The app always shows the player's local time.
+drop function if exists public.gg_scrim_when(timestamptz);
+create or replace function public.gg_scrim_when(p_at timestamptz, p_region text)
 returns text
 language sql
 stable
 set search_path = public
 as $$
-  select to_char(p_at at time zone 'Asia/Kolkata', 'Dy DD Mon, HH24:MI') || ' IST';
+  select to_char(p_at at time zone z.tz, 'Dy DD Mon, HH24:MI') || ' ' || z.label
+  from (select case
+                 when p_region in ('india_north','india_south','india_east','india_west','south_asia') then 'Asia/Kolkata'
+                 when p_region = 'middle_east'    then 'Asia/Dubai'
+                 when p_region = 'southeast_asia' then 'Asia/Singapore'
+                 else 'UTC' end as tz,
+               case
+                 when p_region in ('india_north','india_south','india_east','india_west','south_asia') then 'IST'
+                 when p_region = 'middle_east'    then 'GST'
+                 when p_region = 'southeast_asia' then 'SGT'
+                 else 'UTC' end as label) z;
 $$;
 
 create or replace function public.gg_team_label(p_team_id uuid)
@@ -316,7 +328,7 @@ $$;
 revoke all on function public.gg_scrim_actor(boolean)                   from public, anon, authenticated;
 revoke all on function public.gg_scrim_score_ok(text, integer, integer) from public, anon, authenticated;
 revoke all on function public.gg_scrim_score_hint(text)                 from public, anon, authenticated;
-revoke all on function public.gg_scrim_when(timestamptz)                from public, anon, authenticated;
+revoke all on function public.gg_scrim_when(timestamptz, text)          from public, anon, authenticated;
 revoke all on function public.gg_team_label(uuid)                       from public, anon, authenticated;
 revoke all on function public.gg_notify_team(uuid, text, text, text, jsonb, uuid, jsonb, boolean)
   from public, anon, authenticated;
@@ -423,7 +435,7 @@ begin
     if s.status = 'booked' and v_other is not null then
       perform public.gg_notify_team(
         v_other, 'scrim_update', 'Scrim cancelled: ' || old.tag || ' disbanded',
-        public.gg_scrim_when(s.scheduled_at),
+        public.gg_scrim_when(s.scheduled_at, s.region),
         public.gg_route('/scrims/[id]', s.id), null,
         jsonb_build_object('scrim_id', s.id), true);
     end if;
@@ -938,7 +950,7 @@ begin
   perform public.gg_notify(
     v_host.captain_id, 'scrim_request',
     v_team.name || ' [' || v_team.tag || '] wants your scrim',
-    coalesce(public.gg_preview(v_msg, 158), public.gg_scrim_when(v_scrim.scheduled_at)),
+    coalesce(public.gg_preview(v_msg, 158), public.gg_scrim_when(v_scrim.scheduled_at, v_scrim.region)),
     public.gg_route('/scrims/[id]', p_scrim_id), me,
     jsonb_build_object('scrim_id', p_scrim_id, 'request_id', v_id, 'team_id', p_team_id));
   return v_id;
@@ -1015,7 +1027,7 @@ begin
   end if;
 
   select * into v_opp from public.teams where id = v_req.team_id;
-  v_when := public.gg_scrim_when(v_scrim.scheduled_at);
+  v_when := public.gg_scrim_when(v_scrim.scheduled_at, v_scrim.region);
 
   if not coalesce(p_accept, false) then
     update public.scrim_requests set status = 'declined' where id = v_req.id;
@@ -1140,7 +1152,7 @@ begin
     update public.scrim_requests set status = 'declined' where id = r.id;
     perform public.gg_notify_team(
       r.team_id, 'scrim_update', public.gg_team_label(v_mine) || ' cancelled their scrim',
-      public.gg_scrim_when(v_scrim.scheduled_at),
+      public.gg_scrim_when(v_scrim.scheduled_at, v_scrim.region),
       public.gg_route('/scrims/[id]', p_scrim_id), me,
       jsonb_build_object('scrim_id', p_scrim_id), true);
   end loop;
@@ -1149,7 +1161,7 @@ begin
     perform public.gg_notify_team(
       v_other, 'scrim_update',
       public.gg_team_label(v_mine) || ' cancelled the scrim' || case when v_late then ' (late)' else '' end,
-      public.gg_scrim_when(v_scrim.scheduled_at),
+      public.gg_scrim_when(v_scrim.scheduled_at, v_scrim.region),
       public.gg_route('/scrims/[id]', p_scrim_id), me,
       jsonb_build_object('scrim_id', p_scrim_id), true);
   end if;
@@ -1249,13 +1261,13 @@ begin
     perform public.gg_notify_team(
       v_other, 'scrim_update', 'Lobby details posted: ' || public.gg_team_label(v_scrim.host_team_id)
         || ' vs ' || public.gg_team_label(v_scrim.opponent_team_id),
-      public.gg_scrim_when(v_scrim.scheduled_at),
+      public.gg_scrim_when(v_scrim.scheduled_at, v_scrim.region),
       public.gg_route('/scrims/[id]', p_scrim_id), me,
       jsonb_build_object('scrim_id', p_scrim_id));
     perform public.gg_notify_team(
       v_mine, 'scrim_update', 'Lobby details posted: ' || public.gg_team_label(v_scrim.host_team_id)
         || ' vs ' || public.gg_team_label(v_scrim.opponent_team_id),
-      public.gg_scrim_when(v_scrim.scheduled_at),
+      public.gg_scrim_when(v_scrim.scheduled_at, v_scrim.region),
       public.gg_route('/scrims/[id]', p_scrim_id), me,
       jsonb_build_object('scrim_id', p_scrim_id));
   end if;
@@ -1415,6 +1427,50 @@ begin
 end;
 $$;
 
+-- ── escalate_scrim(p_scrim_id) → void ───────────────────────────────────────────
+-- Escape hatch for a booked scrim nobody can finish (e.g. a captain never reports):
+-- 2 hours after the start either captain can send it to the moderators as disputed.
+create or replace function public.escalate_scrim(p_scrim_id uuid)
+returns void
+language plpgsql
+volatile
+security definer
+set search_path = public
+as $$
+declare
+  me       uuid := public.gg_scrim_actor(true);
+  v_scrim  public.scrims%rowtype;
+  v_other  uuid;
+begin
+  select * into v_scrim from public.scrims where id = p_scrim_id for update;
+  if not found then
+    raise exception 'Scrim not found' using errcode = 'P0002';
+  end if;
+  if exists (select 1 from public.teams where id = v_scrim.host_team_id and captain_id = me) then
+    v_other := v_scrim.opponent_team_id;
+  elsif v_scrim.opponent_team_id is not null
+        and exists (select 1 from public.teams where id = v_scrim.opponent_team_id and captain_id = me) then
+    v_other := v_scrim.host_team_id;
+  else
+    raise exception 'Only a team captain can ask a moderator' using errcode = '42501';
+  end if;
+  if v_scrim.status <> 'booked' then
+    raise exception 'Only a booked scrim can be sent to a moderator' using errcode = '22023';
+  end if;
+  if now() < v_scrim.scheduled_at + interval '2 hours' then
+    raise exception 'You can ask a moderator 2 hours after the start' using errcode = '22023';
+  end if;
+
+  update public.scrims set status = 'disputed' where id = p_scrim_id;
+  perform public.gg_notify_team(
+    v_other, 'scrim_update', 'Sent to a moderator: ' || public.gg_team_label(v_scrim.host_team_id)
+      || ' vs ' || public.gg_team_label(v_scrim.opponent_team_id),
+    'The result wasn''t confirmed, so a moderator will set it.',
+    public.gg_route('/scrims/[id]', p_scrim_id), me,
+    jsonb_build_object('scrim_id', p_scrim_id), true);
+end;
+$$;
+
 -- ── resolve_scrim_dispute(p_scrim_id, p_host_score, p_opp_score) → void (moderators) ─
 create or replace function public.resolve_scrim_dispute(p_scrim_id uuid, p_host_score integer, p_opp_score integer)
 returns void
@@ -1434,6 +1490,10 @@ begin
   end if;
   if v_scrim.status <> 'disputed' then
     raise exception 'This scrim isn''t disputed' using errcode = '22023';
+  end if;
+  if exists (select 1 from public.team_members m
+             where m.profile_id = me and m.team_id in (v_scrim.host_team_id, v_scrim.opponent_team_id)) then
+    raise exception 'Another moderator must resolve a scrim your own team played' using errcode = '42501';
   end if;
   if not public.gg_scrim_score_ok(v_scrim.format, p_host_score, p_opp_score) then
     raise exception '%', public.gg_scrim_score_hint(v_scrim.format) using errcode = '22023';
@@ -1523,6 +1583,7 @@ begin
     'public.set_scrim_lobby(uuid, text)',
     'public.report_scrim_result(uuid, integer, integer, text)',
     'public.claim_scrim_no_show(uuid)',
+    'public.escalate_scrim(uuid)',
     'public.resolve_scrim_dispute(uuid, integer, integer)',
     'public.get_team_stats(uuid)'
   ] loop

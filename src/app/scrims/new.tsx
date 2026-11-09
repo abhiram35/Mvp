@@ -7,6 +7,7 @@ import { HorizontalChips } from '../../features/lfg/HorizontalChips';
 import { fetchMyTeams, postScrim, useLoader } from '../../features/scrims/api';
 import {
   buildScheduledAt,
+  defaultSlot,
   dayOptions,
   FORMAT_LABELS,
   FORMATS,
@@ -15,22 +16,19 @@ import {
   SCRIM_RULES,
 } from '../../features/scrims/logic';
 import type { ScrimFormat } from '../../features/scrims/types';
+import { useMyStatus } from '../../features/moderation/useMyStatus';
 import { useUserId } from '../../providers/AuthProvider';
 import { makeStyles, spacing } from '../../theme';
 
 const HOURS = Array.from({ length: 24 }, (_, h) => ({ value: String(h), label: `${String(h).padStart(2, '0')}:00` }));
 const MINUTES = ['0', '15', '30', '45'].map((m) => ({ value: m, label: `:${m.padStart(2, '0')}` }));
 
-/** Next full hour (at least an hour away) as the default start. */
-function defaultSlot(now: number) {
-  const d = new Date(now + 60 * 60_000);
-  return { offset: d.getDate() === new Date(now).getDate() ? 0 : 1, hour: d.getHours() + (d.getMinutes() > 0 ? 1 : 0) };
-}
 
 export default function PostScrimScreen() {
   const s = useStyles();
   const myId = useUserId();
   const { byId } = useGames();
+  const { banned } = useMyStatus();
   const teams = useLoader(useCallback(() => (myId ? fetchMyTeams(myId) : Promise.resolve([])), [myId]), `teams-${myId}`);
   const captained = useMemo(() => (teams.data ?? []).filter((m) => m.role === 'captain').map((m) => m.team), [teams.data]);
 
@@ -38,7 +36,7 @@ export default function PostScrimScreen() {
   const days = useMemo(() => dayOptions(now), [now]);
   const initial = useMemo(() => {
     const d = defaultSlot(now);
-    return { offset: Math.min(d.offset, days.length - 1), hour: d.hour % 24 };
+    return { offset: Math.min(d.offset, days.length - 1), hour: d.hour };
   }, [now, days.length]);
 
   const [teamId, setTeamId] = useState<string | null>(null);
@@ -54,7 +52,8 @@ export default function PostScrimScreen() {
   const team = captained.find((x) => x.id === (teamId ?? captained[0]?.id)) ?? null;
   const game = byId(team?.game_id ?? null);
   const ranks = (game?.ranks ?? []).map((r) => ({ value: r, label: r }));
-  const scheduledAt = buildScheduledAt(offset, hour, minute);
+  // Day offsets are relative to the date the screen opened (so "Today" keeps meaning that day).
+  const scheduledAt = buildScheduledAt(offset, hour, minute, now);
   const timeProblem = scheduleProblem(scheduledAt);
   const rankProblem =
     rankMin && rankMax && game && game.ranks.indexOf(rankMin) > game.ranks.indexOf(rankMax) ? 'The lowest rank must be below the highest rank.' : null;
@@ -166,7 +165,8 @@ export default function PostScrimScreen() {
         hint={`${notes.length}/${SCRIM_RULES.notesMax} · Region: your team's region`}
       />
 
-      <Button title="Post scrim" icon="flag" onPress={() => void submit()} loading={busy} disabled={!!timeProblem || !!rankProblem} />
+      <Button title="Post scrim" icon="flag" onPress={() => void submit()} loading={busy} disabled={!!timeProblem || !!rankProblem || banned} />
+      {banned ? <Text muted style={{ marginTop: spacing.sm, textAlign: 'center' }}>{"Your account is paused, so you can't post scrims right now."}</Text> : null}
       <Text variant="caption" style={{ marginTop: spacing.sm, textAlign: 'center' }}>
         Your team needs at least {SCRIM_RULES.minRoster} players. Free to play.
       </Text>

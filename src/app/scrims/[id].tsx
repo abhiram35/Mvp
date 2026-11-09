@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Card, Chip, ChipRow, EmptyState, ErrorState, LoadingState, Screen, Text, TextField } from '../../components/ui';
 import { useGames } from '../../features/games/useGames';
@@ -10,6 +10,7 @@ import {
   cancelScrim,
   checkInScrim,
   claimScrimNoShow,
+  escalateScrim,
   fetchMyTeams,
   fetchScrim,
   fetchScrimLobby,
@@ -22,11 +23,13 @@ import {
   respondScrimRequest,
   setScrimLobby,
   useLoader,
+  watchScrim,
   withdrawScrimRequest,
 } from '../../features/scrims/api';
 import { StatusPill, TeamTag, teamLabel } from '../../features/scrims/components';
 import {
   canClaimNoShow,
+  canEscalate,
   checkInWindow,
   displayStatus,
   FORMAT_LABELS,
@@ -35,6 +38,7 @@ import {
   isLateCancel,
   reliabilityLabel,
   scoreOptions,
+  sideTeamLabel,
   SCRIM_RULES,
   sides,
   startsIn,
@@ -94,7 +98,7 @@ export default function ScrimRoomScreen() {
   const myId = useUserId();
   const now = useNow(15_000);
   const { byId } = useGames();
-  const { isModerator } = useMyStatus();
+  const { isModerator, banned } = useMyStatus();
 
   const room = useLoader(
     useCallback(async () => {
@@ -113,6 +117,10 @@ export default function ScrimRoomScreen() {
     `scrim-${id}-${myId}`,
   );
   const { busy, run } = useAction(useCallback(() => void room.reload(), [room]));
+  const reloadRoom = room.reload;
+  // Live updates: requests arriving, the other team checking in, results, cancels.
+  useEffect(() => (id ? watchScrim(String(id), () => void reloadRoom()) : undefined), [id, reloadRoom]);
+  const [editingReport, setEditingReport] = useState(false);
 
   const [requestTeamId, setRequestTeamId] = useState<string | null>(null);
   const [message, setMessage] = useState('');
@@ -171,6 +179,8 @@ export default function ScrimRoomScreen() {
   const pendingRequests = d.requests.filter((r) => r.status === 'pending');
   const pickedRequestTeam = eligible.find((e) => e.id === (requestTeamId ?? eligible[0]?.id)) ?? null;
   const myPending = myRequests.find((r) => r.status === 'pending');
+  const myDeclined = !myPending ? myRequests.find((r) => r.status === 'declined') : undefined;
+  const pausedNote = banned ? <Text muted style={{ marginTop: spacing.sm }}>{"Your account is paused, so you can't do this right now."}</Text> : null;
 
   const confirmCancel = () => {
     const late = isLateCancel(scrim, now);
@@ -244,7 +254,7 @@ export default function ScrimRoomScreen() {
                     size="sm"
                     style={{ flex: 1 }}
                     loading={busy === `acc-${r.id}`}
-                    disabled={status === 'expired'}
+                    disabled={status === 'expired' || banned}
                     onPress={() => void run(`acc-${r.id}`, () => respondScrimRequest(r.id, true))}
                   />
                   <Button title="Decline" size="sm" variant="secondary" style={{ flex: 1 }} loading={busy === `dec-${r.id}`} onPress={() => void run(`dec-${r.id}`, () => respondScrimRequest(r.id, false))} />
@@ -257,7 +267,11 @@ export default function ScrimRoomScreen() {
         {/* ── Open: other captains can request ───────────────────────── */}
         {scrim.status === 'open' && status !== 'expired' && !inScrim ? (
           <Section title="Play this scrim">
-            {myPending ? (
+            {myDeclined ? (
+              <Text muted>
+                {`The host declined ${teamLabel(eligible.find((e) => e.id === myDeclined.team_id) ?? null)} for this scrim. Find another one on the board.`}
+              </Text>
+            ) : myPending ? (
               <>
                 <Text>
                   Request sent for <Text variant="strong">{teamLabel(eligible.find((e) => e.id === myPending.team_id) ?? null)}</Text>. The host captain will accept or decline.
@@ -279,9 +293,11 @@ export default function ScrimRoomScreen() {
                   </ChipRow>
                 ) : null}
                 <TextField label="Message (optional)" value={message} onChangeText={setMessage} maxLength={SCRIM_RULES.messageMax} placeholder="GLHF, we can host the lobby" />
+                {pausedNote}
                 <Button
                   title={`Request as ${pickedRequestTeam?.tag ?? 'team'}`}
                   icon="flag"
+                  disabled={banned}
                   loading={busy === 'request'}
                   onPress={() => pickedRequestTeam && void run('request', () => requestScrim(scrim.id, pickedRequestTeam.id, message), "Couldn't send the request")}
                 />
@@ -347,7 +363,7 @@ export default function ScrimRoomScreen() {
                   <Text selectable muted={!d.lobby?.info}>
                     {d.lobby?.info || 'No lobby details yet. A captain can add the party code or server here.'}
                   </Text>
-                  {isCaptain ? <Button title={d.lobby?.info ? 'Edit lobby details' : 'Add lobby details'} size="sm" variant="secondary" style={{ marginTop: spacing.md }} onPress={() => setLobbyDraft(d.lobby?.info ?? '')} /> : null}
+                  {isCaptain && !banned ? <Button title={d.lobby?.info ? 'Edit lobby details' : 'Add lobby details'} size="sm" variant="secondary" style={{ marginTop: spacing.md }} onPress={() => setLobbyDraft(d.lobby?.info ?? '')} /> : null}
                 </>
               )}
               {scrim.conversation_id ? (
@@ -363,22 +379,50 @@ export default function ScrimRoomScreen() {
 
             {hasStarted(scrim, now) ? (
               <Section title="Result">
-                {myReport ? (
-                  <Text>
-                    You reported <Text variant="strong">{`${scrim.host?.tag ?? 'Host'} ${myReport.host_score} – ${myReport.opp_score} ${scrim.opponent?.tag ?? 'Opp'}`}</Text>.
-                    {theirReport ? '' : ' Waiting for the other captain.'}
-                  </Text>
+                {myReport && !editingReport ? (
+                  <>
+                    <Text>
+                      You reported <Text variant="strong">{`${scrim.host?.tag ?? 'Host'} ${myReport.host_score} – ${myReport.opp_score} ${scrim.opponent?.tag ?? 'Opp'}`}</Text>.
+                      {theirReport ? '' : ' Waiting for the other captain.'}
+                    </Text>
+                    {isCaptain ? <Button title="Change my report" size="sm" variant="ghost" style={{ marginTop: spacing.sm }} onPress={() => setEditingReport(true)} /> : null}
+                  </>
                 ) : isCaptain ? (
                   <>
                     <Text muted style={{ marginBottom: spacing.sm }}>
                       Both captains report the final series score. If they match, the scrim is completed.
                     </Text>
                     <ScoreChips format={scrim.format} value={score} onChange={setScore} host={scrim.host} opp={scrim.opponent} />
-                    <Button title="Submit result" icon="trophy" style={{ marginTop: spacing.md }} disabled={!score} loading={busy === 'report'} onPress={() => submitScore((h, o) => reportScrimResult(scrim.id, h, o), 'report')} />
+                    <Button
+                      title={myReport ? 'Save new report' : 'Submit result'}
+                      icon="trophy"
+                      style={{ marginTop: spacing.md }}
+                      disabled={!score}
+                      loading={busy === 'report'}
+                      onPress={() => {
+                        submitScore((h, o) => reportScrimResult(scrim.id, h, o), 'report');
+                        setEditingReport(false);
+                      }}
+                    />
                   </>
                 ) : (
                   <Text muted>Your captain reports the result.</Text>
                 )}
+                {isCaptain && canEscalate(scrim, now) ? (
+                  <Button
+                    title="Ask a moderator"
+                    icon="help-buoy-outline"
+                    variant="secondary"
+                    style={{ marginTop: spacing.md }}
+                    loading={busy === 'escalate'}
+                    onPress={() =>
+                      Alert.alert('Ask a moderator?', "The result still isn't confirmed. A moderator will look at it and set the score.", [
+                        { text: 'Not yet', style: 'cancel' },
+                        { text: 'Ask', onPress: () => void run('escalate', () => escalateScrim(scrim.id)) },
+                      ])
+                    }
+                  />
+                ) : null}
               </Section>
             ) : null}
           </>
@@ -387,7 +431,7 @@ export default function ScrimRoomScreen() {
         {/* ── Finished states ────────────────────────────────────────── */}
         {scrim.status === 'disputed' ? (
           <Section title="Disputed">
-            <Text>The captains reported different scores. A moderator will check and set the result.</Text>
+            <Text>{"The result isn't confirmed (different scores, or a captain didn't report). A moderator will set it."}</Text>
             {d.reports.map((r) => (
               <Text key={r.team_id} variant="caption" style={{ marginTop: spacing.xs }}>
                 {r.team_id === scrim.host_team_id ? scrim.host?.tag : scrim.opponent?.tag} reported {r.host_score} – {r.opp_score}
@@ -402,7 +446,7 @@ export default function ScrimRoomScreen() {
                 <Button title="Correct my report" variant="secondary" style={{ marginTop: spacing.md }} disabled={!score} loading={busy === 'report'} onPress={() => submitScore((h, o) => reportScrimResult(scrim.id, h, o), 'report')} />
               </View>
             ) : null}
-            {isModerator ? (
+            {isModerator && !inScrim ? (
               <View style={{ marginTop: spacing.md }}>
                 <ScoreChips format={scrim.format} value={score} onChange={setScore} host={scrim.host} opp={scrim.opponent} />
                 <Button title="Set final result" variant="secondary" style={{ marginTop: spacing.md }} disabled={!score} loading={busy === 'resolve'} onPress={() => submitScore((h, o) => resolveScrimDispute(scrim.id, h, o), 'resolve')} />
@@ -412,13 +456,13 @@ export default function ScrimRoomScreen() {
         ) : null}
         {scrim.status === 'no_show' ? (
           <Section title="No-show">
-            <Text>{`${scrim.no_show_team_id === scrim.host_team_id ? teamLabel(scrim.host) : teamLabel(scrim.opponent)} didn't check in.`}</Text>
+            <Text>{`${sideTeamLabel(scrim.no_show_team_id, scrim)} didn't check in.`}</Text>
           </Section>
         ) : null}
         {scrim.status === 'cancelled' ? (
           <Section title="Cancelled">
             <Text>
-              {scrim.cancelled_by_team_id === scrim.host_team_id ? teamLabel(scrim.host) : teamLabel(scrim.opponent)} cancelled this scrim
+              {sideTeamLabel(scrim.cancelled_by_team_id, scrim)} cancelled this scrim
               {scrim.late_cancel ? ' late.' : '.'}
             </Text>
           </Section>
@@ -426,7 +470,8 @@ export default function ScrimRoomScreen() {
 
         {/* Cancel: host captain while open/booked, opponent captain while booked */}
         {/* The server refuses cancels after the start (report the result or a no-show instead). */}
-        {isCaptain && (scrim.status === 'open' || scrim.status === 'booked') && !hasStarted(scrim, now) && (scrim.status === 'booked' || isHostCaptain) ? (
+        {/* Open scrims (even expired ones) can still be cancelled by the host to tidy up the list. */}
+        {isCaptain && ((scrim.status === 'open' && isHostCaptain) || (scrim.status === 'booked' && !hasStarted(scrim, now))) ? (
           <Button title="Cancel scrim" variant="ghost" icon="close-circle-outline" style={{ marginTop: spacing.lg }} loading={busy === 'cancel'} onPress={confirmCancel} />
         ) : null}
       </ScrollView>

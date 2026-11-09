@@ -1,6 +1,9 @@
 import {
   buildScheduledAt,
   canClaimNoShow,
+  canEscalate,
+  defaultSlot,
+  sideTeamLabel,
   checkInWindow,
   cleanTag,
   dayOptions,
@@ -140,5 +143,27 @@ describe('teams', () => {
     expect(isScrimGame({ id: 'bgmi' })).toBe(false);
     expect(isScrimGame({ id: 'bgmi', scrims_enabled: true })).toBe(true);
     expect(isScrimGame({ id: 'cs2', scrims_enabled: false })).toBe(false);
+  });
+});
+
+describe('review fixes', () => {
+  it('default slot is never in the past, even late at night', () => {
+    const late = new Date(2026, 10, 9, 22, 30).getTime();
+    expect(defaultSlot(late)).toEqual({ offset: 1, hour: 0 }); // tomorrow 00:00
+    const iso = buildScheduledAt(1, 0, 0, late);
+    expect(scheduleProblem(iso, late)).toBeNull();
+    expect(defaultSlot(new Date(2026, 10, 9, 18, 0).getTime())).toEqual({ offset: 0, hour: 19 });
+    expect(defaultSlot(new Date(2026, 10, 9, 18, 10).getTime())).toEqual({ offset: 0, hour: 20 });
+  });
+  it('escalation opens 2 hours after the start of a booked scrim', () => {
+    expect(canEscalate(scrim(), T0 + 119 * MIN)).toBe(false);
+    expect(canEscalate(scrim(), T0 + 120 * MIN)).toBe(true);
+    expect(canEscalate(scrim({ status: 'disputed' }), T0 + 300 * MIN)).toBe(false);
+  });
+  it('labels disbanded teams instead of "Open slot"', () => {
+    const sc = scrim({ host: { id: 'A', game_id: 'valorant', name: 'Night Owls', tag: 'NOWL', region: 'europe', captain_id: 'u', created_at: '' } });
+    expect(sideTeamLabel(null, sc)).toBe('A disbanded team');
+    expect(sideTeamLabel('A', sc)).toBe('Night Owls [NOWL]');
+    expect(sideTeamLabel('B', sc)).toBe('A disbanded team');
   });
 });

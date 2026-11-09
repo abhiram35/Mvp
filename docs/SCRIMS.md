@@ -89,3 +89,18 @@ voice off stream unless players agree, no copyrighted music, no Riot/Valve logos
 
 Brackets/tournaments (Phase 2), paid entry (Phase 3: needs registration with India's Online
 Gaming Authority and a lawyer/CA review), automatic result verification (needs Riot API approval).
+
+## Follow-ups from the pre-merge review (planned as migration 0017)
+
+Database, security and mobile reviews all passed with no blockers. Open items:
+
+- **Fix before launch:** `leave_team` / `remove_team_member` don't remove the player from the scrim
+  group chats of their team's booked scrims, so a kicked player can still read lobby codes there.
+- Scrim group chats only check blocks between the two captains; skip blocked pairs when adding rosters.
+- `request_scrim` locks the team before the scrim, while `respond_scrim_request` locks the scrim and
+  then (implicitly) the team, so they can deadlock. Lock the scrim first, or don't lock the team.
+- `get_team_stats` needs partial indexes on `no_show_team_id` and `cancelled_by_team_id`.
+- Add `notifications_type_check` as `NOT VALID` and then `VALIDATE` it, so a big table isn't locked.
+- On accept, re-check that the host roster has at least 5 players. Add cooldowns on re-invites,
+  re-requests and stream-link notifications.
+- `remove_team_member` lets a paused captain act. `screenshot_url` accepts any https host.

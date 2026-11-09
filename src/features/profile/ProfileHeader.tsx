@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Avatar, Card, Chip, ChipRow, PanelFrame, Stat, Text } from '../../components/ui';
-import { PLAY_STYLE_LABELS, PLAY_TIME_LABELS, REGION_LABELS, type Profile } from '../../lib/types';
+import { Avatar, Card, Chip, ChipRow, LiveDot, PanelFrame, Stat, Text } from '../../components/ui';
+import { PLAY_STYLE_LABELS, PLAY_TIME_LABELS, REGION_LABELS, type Game, type Profile } from '../../lib/types';
 import { usePlayerStats } from '../reputation/api';
 import { formatCount, PanelLevel, ReputationDetails } from '../reputation/PlayerCard';
 import { makeStyles, spacing, useTheme } from '../../theme';
@@ -24,12 +24,15 @@ export function ProfileHeader({
   profile,
   gamesCount,
   own,
+  nowPlaying,
   children,
 }: {
   profile: Profile;
   gamesCount: number;
   /** Own profile: the avatar gets the highlight treatment. */
   own?: boolean;
+  /** The game profile_games.play_status marks 'playing' for this player, if any. */
+  nowPlaying?: Game | null;
   /** Optional actions rendered under the stats (e.g. Friend / Message buttons). */
   children?: ReactNode;
 }) {
@@ -49,6 +52,11 @@ export function ProfileHeader({
             <Text variant="label" style={s.meta} numberOfLines={1}>
               @{profile.username} · {REGION_LABELS[profile.region]}
             </Text>
+            {nowPlaying ? (
+              <View style={s.playing}>
+                <LiveDot label={`Playing ${nowPlaying.name}`} numberOfLines={1} />
+              </View>
+            ) : null}
           </View>
         </View>
         <PanelLevel stats={stats} />
@@ -91,6 +99,7 @@ const useStyles = makeStyles((t) =>
     names: { marginLeft: spacing.lg, flex: 1 },
     name: { fontSize: 40, lineHeight: 44, color: t.colors.onPanel },
     meta: { color: t.colors.onPanel, opacity: 0.8, marginTop: spacing.xs },
+    playing: { marginTop: spacing.xs },
     stats: {
       flexDirection: 'row',
       flexWrap: 'wrap',

@@ -7,6 +7,7 @@ import { BannedBanner } from '../../features/moderation/BannedBanner';
 import { useMyStatus } from '../../features/moderation/useMyStatus';
 import { ActionRow } from '../../features/profile/ActionRow';
 import { openDiscord } from '../../lib/links';
+import { useGames } from '../../features/games/useGames';
 import { ProfileGamesList } from '../../features/profile/ProfileGamesList';
 import { SteamCard } from '../../features/steam/SteamCard';
 import { ProfileHeader } from '../../features/profile/ProfileHeader';
@@ -22,6 +23,8 @@ export default function MyProfileScreen() {
   const userId = useUserId();
   const { signOut } = useAuth();
   const { profile, games, gameIds, steam, steamError, loading, error, reload } = useProfile(userId);
+  const { byId } = useGames();
+  const nowPlaying = byId(games.find((g) => g.play_status === 'playing')?.game_id) ?? null;
   const { isModerator } = useMyStatus();
   const [deleting, setDeleting] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -118,12 +121,12 @@ export default function MyProfileScreen() {
       <ScreenHeader title="Profile" />
       {/* Hidden when the tabs layout already shows it above every tab. */}
       <BannedBanner />
-      <ProfileHeader profile={profile} gamesCount={games.length} own>
+      <ProfileHeader profile={profile} gamesCount={games.length} own nowPlaying={nowPlaying}>
         <Button title="Edit profile" icon="create-outline" variant="secondary" onPress={() => router.push('/settings/edit-profile')} />
       </ProfileHeader>
 
       <View style={styles.section}>
-        <ProfileGamesList games={games} gameIds={gameIds} />
+        <ProfileGamesList games={games} gameIds={gameIds} own profileId={userId ?? undefined} onChanged={() => void reload()} />
         {userId ? (
           <SteamCard
             account={steam}

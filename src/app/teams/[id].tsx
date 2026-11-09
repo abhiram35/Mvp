@@ -62,6 +62,7 @@ export default function TeamScreen() {
   const invitable = friends.filter((f) => !memberIds.has(f.profile.id));
 
   const act = async (key: string, fn: () => Promise<unknown>, failTitle: string, after?: () => void) => {
+    if (busy) return; // one action at a time
     setBusy(key);
     try {
       await fn();

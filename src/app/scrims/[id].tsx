@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Alert, Linking, RefreshControl, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { Button, Card, Chip, ChipRow, EmptyState, ErrorState, LoadingState, Screen, Text, TextField } from '../../components/ui';
 import { useGames } from '../../features/games/useGames';
@@ -69,8 +69,11 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
 /** Runs an action with a busy flag and a friendly alert on failure. */
 function useAction(after: () => void) {
   const [busy, setBusy] = useState<string | null>(null);
+  const inFlight = useRef(false);
   const run = useCallback(
     async (key: string, fn: () => Promise<unknown>, failTitle = "Couldn't do that") => {
+      if (inFlight.current) return; // one action at a time (e.g. Accept + Decline)
+      inFlight.current = true;
       setBusy(key);
       try {
         await fn();
@@ -78,6 +81,7 @@ function useAction(after: () => void) {
       } catch (e) {
         Alert.alert(failTitle, (e as Error).message);
       } finally {
+        inFlight.current = false;
         setBusy(null);
       }
     },
@@ -245,7 +249,11 @@ export default function ScrimRoomScreen() {
                 icon="play-circle"
                 size="sm"
                 backdrop={t.colors.panel}
-                onPress={() => void Linking.openURL(String(scrim.stream_url)).catch(() => Alert.alert("Couldn't open the stream", String(scrim.stream_url)))}
+                onPress={() => {
+                  const url = cleanStreamUrl(String(scrim.stream_url));
+                  if (!url) return Alert.alert("Couldn't open the stream", 'This link is not a YouTube or Twitch link.');
+                  void Linking.openURL(url).catch(() => Alert.alert("Couldn't open the stream", url));
+                }}
               />
             </View>
           ) : scrim.stream_allowed ? (

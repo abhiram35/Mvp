@@ -226,5 +226,5 @@ export function isStreamingNow(scrim: Pick<Scrim, 'status' | 'scheduled_at' | 's
 
 /** "YouTube" / "Twitch" for button labels. */
 export function streamPlatform(url: string): 'YouTube' | 'Twitch' {
-  return /twitch\.tv/i.test(url) ? 'Twitch' : 'YouTube';
+  return /^https:\/\/((www|m)\.)?twitch\.tv\//i.test(url.trim()) ? 'Twitch' : 'YouTube';
 }

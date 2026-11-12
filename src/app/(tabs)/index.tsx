@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
-import { Button, EmptyState, ErrorState, LoadingState, Screen, ScreenHeader, Text } from '../../components/ui';
+import { AngledEdge, Button, Card, displayLineHeight, EmptyState, ErrorState, Kicker, LoadingState, PanelFrame, Screen, ScreenHeader, Text } from '../../components/ui';
 import { useGames } from '../../features/games/useGames';
 import { useLfgPosts, useNewLfgPostsCount } from '../../features/lfg/api';
 import { hostCta, REGIONS, regionLabel } from '../../features/lfg/format';
@@ -13,13 +13,17 @@ import { useLatestRef, useNow } from '../../lib/hooks';
 import { useBlockedIds } from '../../features/safety/blocks';
 import { LANGUAGES, type LfgPostWithAuthor, type Region } from '../../lib/types';
 import { useUserId } from '../../providers/AuthProvider';
-import { fontSize, makeStyles, spacing, useTheme } from '../../theme';
+import { designTokens, fontSize, makeStyles, spacing, useDesign, useTheme, type AppTheme } from '../../theme';
+
+/** Extra bottom padding on the hero so the angled edge never clips the text. */
+const designPad = (t: AppTheme) => designTokens(t).lang.heroAngle;
 
 const REGION_OPTIONS = REGIONS.map((r) => ({ value: r, label: regionLabel(r) }));
 const LANGUAGE_OPTIONS = LANGUAGES.map((l) => ({ value: l as string, label: l as string }));
 
 export default function LfgBoardScreen() {
   const t = useTheme();
+  const d = useDesign();
   const styles = useStyles();
   const myId = useUserId();
   const { byId } = useGames();
@@ -96,6 +100,8 @@ export default function LfgBoardScreen() {
       <View style={styles.header}>
         <ScreenHeader
           title={t.words.lobbies}
+          kicker={loading && posts.length === 0 ? 'Live board' : `Live now · ${visible.length} open`}
+          index={1}
           subtitle="Open lobbies you can join now"
           right={
             <View style={styles.headerActions}>
@@ -104,22 +110,28 @@ export default function LfgBoardScreen() {
             </View>
           }
         />
-        {/* Scrims entry: team practice matches (VALORANT / CS2) */}
-        <Pressable
+        {/* Scrims entry: team practice matches (VALORANT / CS2), as a hero band. */}
+        <Card
+          variant="hero"
           onPress={() => router.push('/scrims')}
-          accessibilityRole="button"
           accessibilityLabel="Scrims. Book team practice matches for VALORANT and CS2"
-          style={({ pressed }) => [styles.scrimBanner, { backgroundColor: t.colors.panel, borderRadius: t.radius.md }, pressed && { opacity: 0.85 }]}
+          style={styles.scrimHero}
         >
-          <Ionicons name="flag" size={18} color={t.colors.primary} />
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: t.colors.onPanel, fontFamily: t.fonts.heading, letterSpacing: 1.5 }}>SCRIMS</Text>
-            <Text variant="caption" style={{ color: t.colors.onPanel, opacity: 0.8 }}>
-              Team vs team practice · VALORANT and CS2 · free
-            </Text>
+          <View style={styles.scrimRow}>
+            <View style={{ flex: 1 }}>
+              <Kicker tone="onPanel">Team vs team · free</Kicker>
+              <Text style={styles.scrimTitle}>Scrims</Text>
+              <Text variant="caption" style={{ color: t.colors.onPanel, opacity: 0.85 }}>
+                Practice matches for VALORANT and CS2
+              </Text>
+            </View>
+            <View style={[styles.scrimGo, { backgroundColor: t.colors.primary, borderRadius: d.lang.corner === 'soft' ? 20 : t.radius.sm }]}>
+              <Ionicons name="arrow-forward" size={20} color={t.colors.onPrimary} />
+            </View>
           </View>
-          <Ionicons name="chevron-forward" size={18} color={t.colors.onPanel} />
-        </Pressable>
+          {/* Angled themes get the diagonal edge; the others keep their bracket / frame decoration. */}
+          {d.lang.heroAngle ? <AngledEdge color={t.colors.bg} /> : <PanelFrame />}
+        </Card>
       </View>
 
       <View style={styles.filters}>
@@ -141,7 +153,7 @@ export default function LfgBoardScreen() {
             ]}
             hitSlop={6}
           >
-            <Ionicons name="options-outline" size={18} color={activeExtraFilters ? t.colors.primary : t.colors.textMuted} />
+            <Ionicons name="options-outline" size={18} color={activeExtraFilters ? d.primaryText : t.colors.textMuted} />
             {activeExtraFilters ? <Text style={styles.filterCount}>{activeExtraFilters}</Text> : null}
           </Pressable>
         </View>
@@ -173,7 +185,18 @@ export default function LfgBoardScreen() {
 
 const useStyles = makeStyles((t) =>
   StyleSheet.create({
-    scrimBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, marginBottom: spacing.sm, minHeight: 48 },
+    scrimHero: { marginBottom: spacing.md, paddingVertical: spacing.lg, paddingBottom: spacing.lg + designPad(t) },
+    scrimRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+    scrimTitle: {
+      fontFamily: t.fonts.display,
+      fontSize: 36,
+      lineHeight: displayLineHeight(t, 36),
+      color: t.colors.onPanel,
+      letterSpacing: t.shape.headingLetterSpacing,
+      textTransform: t.shape.headingUppercase ? 'uppercase' : 'none',
+      marginTop: 2,
+    },
+    scrimGo: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
     header: { paddingHorizontal: spacing.lg },
     hostButton: { minHeight: 44 },
     headerActions: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
@@ -181,23 +204,21 @@ const useStyles = makeStyles((t) =>
       paddingLeft: spacing.lg,
       paddingBottom: spacing.sm,
       borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: t.colors.border,
+      borderBottomColor: designTokens(t).hairline,
     },
     filterLine: { flexDirection: 'row', alignItems: 'center' },
     filterToggle: {
       width: 44,
       height: 44,
       marginHorizontal: spacing.sm,
-      borderRadius: t.radius.md,
-      borderWidth: 1,
-      borderColor: t.colors.border,
-      backgroundColor: t.colors.surface,
+      borderRadius: designTokens(t).lang.corner === 'soft' ? 22 : t.radius.md,
+      backgroundColor: designTokens(t).chip.bg,
       alignItems: 'center',
       justifyContent: 'center',
       flexDirection: 'row',
     },
-    filterToggleActive: { borderColor: t.colors.primary },
-    filterCount: { color: t.colors.primary, fontSize: fontSize.xs, fontFamily: t.fonts.bodyBold, marginLeft: 2 },
+    filterToggleActive: { backgroundColor: designTokens(t).primaryTint },
+    filterCount: { color: designTokens(t).primaryText, fontSize: fontSize.xs, fontFamily: t.fonts.bodyBold, marginLeft: 2 },
     extraFilters: { gap: spacing.sm, marginTop: spacing.sm },
     list: { paddingBottom: spacing.xxl },
     newPill: {

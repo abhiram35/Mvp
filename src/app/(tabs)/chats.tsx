@@ -1,12 +1,12 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
-import { Avatar, Button, EmptyState, ErrorState, LoadingState, Screen, ScreenHeader, Text } from '../../components/ui';
+import { Avatar, Badge, Button, EmptyState, ErrorState, ListRow, LoadingState, Screen, ScreenHeader, Text } from '../../components/ui';
 import type { ConversationSummary } from '../../lib/types';
 import { formatRelativeTime } from '../../features/chat/format';
 import { useConversationList } from '../../features/chat/useConversationList';
 import { useIncomingRequestCount } from '../../features/friends/hooks';
-import { fontSize, makeStyles, spacing, useTheme } from '../../theme';
+import { designTokens, fontSize, makeStyles, spacing, useTheme } from '../../theme';
 
 const AVATAR = 48;
 
@@ -17,6 +17,7 @@ export default function ChatsScreen() {
   const s = useStyles();
   const { conversations, loading, refreshing, error, load } = useConversationList();
   const { count: requestCount, reload: reloadRequests } = useIncomingRequestCount();
+  const unreadChats = conversations.filter((c) => c.unread_count > 0).length;
 
   // Runs on first focus too; 'initial' only shows the spinner until the first successful load.
   useFocusEffect(
@@ -29,8 +30,24 @@ export default function ChatsScreen() {
   return (
     <Screen padded={false}>
       <View style={s.header}>
-        <ScreenHeader title="Chats" right={<FriendsButton count={requestCount} />} />
+        <ScreenHeader
+          title="Chats"
+          index={4}
+          kicker={unreadChats > 0 ? `${unreadChats} unread` : `${t.words.squad}s & DMs`}
+          right={<FriendsButton count={requestCount} />}
+        />
       </View>
+      {requestCount > 0 ? (
+        <ListRow
+          icon="person-add-outline"
+          highlight
+          title={requestCount === 1 ? '1 friend request' : `${requestCount} friend requests`}
+          subtitle="Accept to message and squad up faster"
+          trailing={<Badge count={requestCount} />}
+          onPress={() => router.push('/friends')}
+          divider="full"
+        />
+      ) : null}
 
       {loading && conversations.length === 0 ? (
         <LoadingState />
@@ -84,8 +101,8 @@ function FriendsButton({ count }: { count: number }) {
         onPress={() => router.push('/friends')}
       />
       {count > 0 ? (
-        <View style={[s.badge, s.headerBadge]} pointerEvents="none" importantForAccessibility="no-hide-descendants">
-          <Text style={s.badgeText}>{count > 99 ? '99+' : count}</Text>
+        <View style={s.headerBadge} pointerEvents="none" importantForAccessibility="no-hide-descendants">
+          <Badge count={count} />
         </View>
       ) : null}
     </View>
@@ -103,8 +120,9 @@ function ConversationRow({ item }: { item: ConversationSummary }) {
       accessibilityRole="button"
       accessibilityLabel={`${title}${unread ? `, ${item.unread_count} unread` : ''}`}
       onPress={() => router.push({ pathname: '/chat/[id]', params: { id: item.conversation_id } })}
-      style={({ pressed }) => [s.row, pressed && { backgroundColor: t.colors.surfaceRaised }]}
+      style={({ pressed }) => [s.row, pressed && { backgroundColor: designTokens(t).surface.high }]}
     >
+      {unread ? <View style={s.edge} /> : null}
       <Avatar uri={item.avatar_url} name={item.title} size={AVATAR} highlight={item.is_group} icon={item.is_group && !item.avatar_url ? 'people' : undefined} />
       <View style={s.rowBody}>
         <View style={s.rowTop}>
@@ -117,11 +135,7 @@ function ConversationRow({ item }: { item: ConversationSummary }) {
           <Text numberOfLines={1} style={[s.preview, unread && s.previewUnread]}>
             {item.last_message ?? 'No messages yet — say hi!'}
           </Text>
-          {unread ? (
-            <View style={s.badge}>
-              <Text style={s.badgeText}>{item.unread_count > 99 ? '99+' : item.unread_count}</Text>
-            </View>
-          ) : null}
+          {unread ? <Badge count={item.unread_count} /> : null}
         </View>
       </View>
     </Pressable>
@@ -141,24 +155,22 @@ const useStyles = makeStyles((t) =>
     rowBody: { flex: 1, marginLeft: spacing.md },
     rowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
     rowBottom: { flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: spacing.sm },
-    title: { flex: 1, fontFamily: t.fonts.bodyBold, fontSize: fontSize.md, color: t.colors.text },
+    title: {
+      flex: 1,
+      fontFamily: t.fonts.heading,
+      fontSize: fontSize.lg,
+      color: t.colors.text,
+      letterSpacing: t.shape.headingLetterSpacing * 0.6,
+      textTransform: t.shape.headingUppercase ? 'uppercase' : 'none',
+    },
     timeUnread: { color: t.colors.text, fontFamily: t.fonts.bodyMedium },
     preview: { flex: 1, fontFamily: t.fonts.body, fontSize: fontSize.sm, color: t.colors.textMuted },
     previewUnread: { color: t.colors.text, fontFamily: t.fonts.bodyMedium },
-    badge: {
-      minWidth: 22,
-      height: 22,
-      paddingHorizontal: 6,
-      borderRadius: t.radius.sm,
-      backgroundColor: t.colors.primary,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    headerBadge: { position: 'absolute', top: -8, right: -8, minWidth: 20, height: 20 },
-    badgeText: { color: t.colors.onPrimary, fontFamily: t.fonts.bodyBold, fontSize: fontSize.xs, lineHeight: 16 },
+    headerBadge: { position: 'absolute', top: -8, right: -8 },
+    edge: { position: 'absolute', left: 0, top: spacing.md, bottom: spacing.md, width: 3, backgroundColor: t.colors.primary },
     separator: {
       height: StyleSheet.hairlineWidth,
-      backgroundColor: t.colors.border,
+      backgroundColor: designTokens(t).hairline,
       marginLeft: spacing.lg + AVATAR + spacing.md,
       marginRight: spacing.lg,
     },

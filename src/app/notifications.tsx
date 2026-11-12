@@ -2,14 +2,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack } from 'expo-router';
 import { memo, useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
-import { EmptyState, ErrorState, LoadingState, Screen, Text, type IconName } from '../components/ui';
+import { EmptyState, ErrorState, ListRow, LoadingState, Screen, Text, type IconName } from '../components/ui';
 import { useNotifications } from '../features/notifications/api';
 import { openNotificationRoute, routeFromData } from '../features/notifications/routes';
 import { useUnreadNotifications } from '../features/notifications/unread';
 import type { AppNotification, NotificationType } from '../lib/types';
 import { useNow } from '../lib/hooks';
 import { useUserId } from '../providers/AuthProvider';
-import { fontSize, makeStyles, spacing, useTheme } from '../theme';
+import { designTokens, fontSize, makeStyles, spacing, useTheme } from '../theme';
 
 const TYPE_ICONS: Record<NotificationType, IconName> = {
   lfg_request: 'person-add-outline',
@@ -55,35 +55,22 @@ const NotificationRow = memo(function NotificationRow({
   now: number;
   onPress: (n: AppNotification) => void;
 }) {
-  const t = useTheme();
   const s = useStyles();
   const unread = !item.read_at;
   const time = relativeTime(item.created_at, now);
   return (
-    <Pressable
+    <ListRow
+      icon={TYPE_ICONS[item.type]}
+      highlight={unread}
+      title={item.title}
+      titleLines={2}
+      subtitle={item.body || undefined}
+      meta={time}
+      chevron={false}
+      trailing={unread ? <View style={s.dot} /> : undefined}
       onPress={() => onPress(item)}
-      accessibilityRole="button"
       accessibilityLabel={`${unread ? 'Unread. ' : ''}${item.title}${item.body ? `. ${item.body}` : ''}. ${time}`}
-      style={({ pressed }) => [s.row, unread && s.rowUnread, pressed && { backgroundColor: t.colors.surfaceRaised }]}
-    >
-      <View style={[s.iconBox, unread && s.iconBoxUnread]}>
-        <Ionicons name={TYPE_ICONS[item.type]} size={20} color={unread ? t.colors.primary : t.colors.textMuted} />
-      </View>
-      <View style={s.textCol}>
-        <Text style={[s.title, unread && s.titleUnread]} numberOfLines={2}>
-          {item.title}
-        </Text>
-        {item.body ? (
-          <Text variant="label" numberOfLines={2} style={s.body}>
-            {item.body}
-          </Text>
-        ) : null}
-        <Text variant="caption" style={s.time}>
-          {time}
-        </Text>
-      </View>
-      {unread ? <View style={s.dot} /> : null}
-    </Pressable>
+    />
   );
 });
 
@@ -173,7 +160,6 @@ export default function NotificationsScreen() {
         data={items}
         keyExtractor={(n) => n.id}
         renderItem={({ item }) => <NotificationRow item={item} now={now} onPress={onPressRow} />}
-        ItemSeparatorComponent={() => <View style={s.separator} />}
         contentContainerStyle={[s.list, items.length === 0 && { flexGrow: 1 }]}
         onEndReached={() => {
           if (hasMore) void loadMore();
@@ -190,7 +176,7 @@ export default function NotificationsScreen() {
         }
         ListFooterComponent={loadingMore ? <ActivityIndicator color={t.colors.primary} style={s.footer} /> : undefined}
         ListEmptyComponent={
-          <EmptyState icon="notifications-off-outline" title="You're all caught up." message="Join requests, messages and replies will show up here." />
+          <EmptyState icon="notifications-off-outline" kicker="Inbox zero" title="You're all caught up." message="Join requests, messages and replies will show up here." />
         }
       />
     </Screen>
@@ -201,40 +187,14 @@ const useStyles = makeStyles((t) =>
   StyleSheet.create({
     list: { paddingBottom: spacing.xxl },
     footer: { paddingVertical: spacing.lg },
-    row: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      gap: spacing.md,
-      paddingVertical: spacing.md,
-      paddingHorizontal: spacing.lg,
-      minHeight: 64,
-    },
-    rowUnread: { backgroundColor: t.colors.surface },
-    iconBox: {
-      width: 40,
-      height: 40,
-      borderRadius: t.shape.round ? 20 : t.radius.sm,
-      borderWidth: 1,
-      borderColor: t.colors.border,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    iconBoxUnread: { borderColor: t.colors.primary },
-    textCol: { flex: 1, gap: 2 },
-    title: { fontFamily: t.fonts.body, fontSize: fontSize.md, color: t.colors.text, lineHeight: 21 },
-    titleUnread: { fontFamily: t.fonts.bodyBold },
-    body: { lineHeight: 19 },
-    time: { marginTop: 2 },
     dot: {
       width: 10,
       height: 10,
-      marginTop: 6,
       borderRadius: t.shape.round ? 5 : 0,
       backgroundColor: t.colors.primary,
     },
-    separator: { height: StyleSheet.hairlineWidth, backgroundColor: t.colors.border },
     markAll: { paddingHorizontal: spacing.sm, minHeight: 44, justifyContent: 'center', borderRadius: t.radius.sm },
-    markAllText: { fontFamily: t.fonts.bodyBold, fontSize: fontSize.sm, color: t.colors.primary },
+    markAllText: { fontFamily: t.fonts.bodyBold, fontSize: fontSize.sm, color: designTokens(t).primaryText },
     errorBanner: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -242,8 +202,8 @@ const useStyles = makeStyles((t) =>
       margin: spacing.md,
       padding: spacing.md,
       borderRadius: t.radius.md,
-      borderWidth: 1,
-      borderColor: t.colors.danger,
+      borderLeftWidth: 3,
+      borderLeftColor: t.colors.danger,
       backgroundColor: t.colors.surface,
     },
     errorText: { flex: 1, color: t.colors.danger },

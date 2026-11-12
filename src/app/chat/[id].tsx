@@ -266,8 +266,6 @@ const useStyles = makeStyles((t) =>
       padding: spacing.md,
       borderRadius: t.radius.md,
       backgroundColor: t.colors.surface,
-      borderWidth: 1,
-      borderColor: t.colors.border,
       borderLeftWidth: 3,
       borderLeftColor: t.colors.danger,
     },

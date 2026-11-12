@@ -17,6 +17,22 @@ export {
   type TextureId,
   type ThemeId,
 } from './themes';
+export {
+  alpha,
+  contrast,
+  designLanguage,
+  designTokens,
+  ensureContrast,
+  formatIndex,
+  mixHex,
+  type CornerStyle,
+  type DesignLanguage,
+  type DesignTokens,
+  type HeaderStyle,
+  type IndexStyle,
+  type RuleStyle,
+} from './design';
+export { useDesign } from './ThemeProvider';
 export { customRowId, customThemeId, specToAppTheme, validateSpec, SPEC_LIMITS, type ThemeSpec } from './custom';
 
 export const spacing = {
@@ -26,6 +42,8 @@ export const spacing = {
   lg: 16,
   xl: 24,
   xxl: 32,
+  /** Gap between major page sections (editorial rhythm). */
+  section: 40,
 } as const;
 
 export const fontSize = {

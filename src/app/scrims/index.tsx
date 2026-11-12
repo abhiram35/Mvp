@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
-import { FlatList, Pressable, RefreshControl, StyleSheet, Text as RNText, View } from 'react-native';
-import { Button, Card, EmptyState, ErrorState, LoadingState, Screen, Text } from '../../components/ui';
+import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
+import { Button, Card, EmptyState, ErrorState, LoadingState, Screen, SectionHeader, SegmentedControl, Text } from '../../components/ui';
 import { useGames } from '../../features/games/useGames';
 import { REGIONS, regionLabel } from '../../features/lfg/format';
 import { HorizontalChips } from '../../features/lfg/HorizontalChips';
@@ -18,34 +18,17 @@ import { makeStyles, spacing, useTheme } from '../../theme';
 
 const REGION_OPTIONS = REGIONS.map((r) => ({ value: r, label: regionLabel(r) }));
 
-type Row = { kind: 'header'; title: string; key: string } | { kind: 'scrim'; scrim: Scrim; mine: boolean; key: string };
+type Row = { kind: 'header'; title: string; key: string; index?: number } | { kind: 'scrim'; scrim: Scrim; mine: boolean; key: string };
 type Section = 'practice' | 'tournaments';
+
+const SECTIONS = [
+  { value: 'practice' as const, label: 'Practice' },
+  { value: 'tournaments' as const, label: 'Tournaments' },
+];
 
 /** Practice | Tournaments switch at the top of the Scrims section. */
 function SectionSwitch({ value, onChange }: { value: Section; onChange: (v: Section) => void }) {
-  const t = useTheme();
-  const options: { value: Section; label: string }[] = [
-    { value: 'practice', label: 'Practice' },
-    { value: 'tournaments', label: 'Tournaments' },
-  ];
-  return (
-    <View accessibilityRole="tablist" style={{ flexDirection: 'row', backgroundColor: t.colors.surfaceRaised, borderRadius: t.radius.md, padding: 4, marginBottom: spacing.lg }}>
-      {options.map((o) => {
-        const on = o.value === value;
-        return (
-          <Pressable
-            key={o.value}
-            onPress={() => onChange(o.value)}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: on }}
-            style={{ flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: t.radius.md - 2, backgroundColor: on ? t.colors.primary : 'transparent' }}
-          >
-            <RNText style={{ fontFamily: t.fonts.heading, fontSize: 16, letterSpacing: 1.5, textTransform: 'uppercase', color: on ? t.colors.onPrimary : t.colors.textMuted }}>{o.label}</RNText>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
+  return <SegmentedControl value={value} options={SECTIONS} onChange={onChange} accessibilityLabel="Scrims view" style={{ marginBottom: spacing.lg }} />;
 }
 
 export default function ScrimBoardScreen() {
@@ -84,16 +67,16 @@ export default function ScrimBoardScreen() {
     const feat = (featured.data ?? []).filter((x) => !gameId || x.game_id === gameId);
     const featIds = new Set(feat.map((x) => x.id));
     if (feat.length > 0) {
-      out.push({ kind: 'header', title: 'Featured', key: 'h-feat' });
+      out.push({ kind: 'header', title: 'Featured', key: 'h-feat', index: out.filter((r) => r.kind === 'header').length + 1 });
       feat.forEach((x) => out.push({ kind: 'scrim', scrim: x, mine: !!(x.host_team_id && myTeamIds.has(x.host_team_id)), key: `f-${x.id}` }));
     }
     const myScrims = (mine.data?.scrims ?? []).filter((x) => !gameId || x.game_id === gameId);
     if (myScrims.length > 0) {
-      out.push({ kind: 'header', title: 'Your scrims', key: 'h-mine' });
+      out.push({ kind: 'header', title: 'Your scrims', key: 'h-mine', index: out.filter((r) => r.kind === 'header').length + 1 });
       myScrims.forEach((x) => out.push({ kind: 'scrim', scrim: x, mine: true, key: `m-${x.id}` }));
     }
     const open = (board.data ?? []).filter((x) => (!x.host_team_id || !myTeamIds.has(x.host_team_id)) && !featIds.has(x.id));
-    out.push({ kind: 'header', title: 'Open scrims', key: 'h-open' });
+    out.push({ kind: 'header', title: 'Open scrims', key: 'h-open', index: out.filter((r) => r.kind === 'header').length + 1 });
     open.forEach((x) => out.push({ kind: 'scrim', scrim: x, mine: false, key: `o-${x.id}` }));
     return out;
   }, [mine.data, board.data, featured.data, gameId, myTeamIds]);
@@ -186,9 +169,7 @@ export default function ScrimBoardScreen() {
         refreshControl={<RefreshControl refreshing={board.refreshing || mine.refreshing} onRefresh={refresh} tintColor={t.colors.primary} />}
         renderItem={({ item }) =>
           item.kind === 'header' ? (
-            <Text variant="label" accessibilityRole="header" style={s.section}>
-              {item.title}
-            </Text>
+            <SectionHeader title={item.title} index={item.index} style={{ marginBottom: spacing.sm }} />
           ) : (
             <ScrimCard
               scrim={item.scrim}

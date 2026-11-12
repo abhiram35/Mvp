@@ -12,7 +12,7 @@ import { UnderlineTabs } from '../../features/community/UnderlineTabs';
 import { useGames } from '../../features/games/useGames';
 import { GameChipScroller, HorizontalChips } from '../../features/lfg/HorizontalChips';
 import type { CommunityPostKind, CommunityPostSummary, CommunitySort } from '../../lib/types';
-import { fontSize, makeStyles, spacing, useTheme } from '../../theme';
+import { designTokens, fontSize, makeStyles, spacing, useTheme } from '../../theme';
 
 const SORT_OPTIONS: readonly { value: CommunitySort; label: string }[] = [
   { value: 'hot', label: 'Hot' },
@@ -59,9 +59,10 @@ export default function CommunityScreen() {
   );
 
   const renderItem = useCallback(
-    ({ item }: { item: CommunityPostSummary }) => (
+    ({ item, index }: { item: CommunityPostSummary; index: number }) => (
       <PostRow
         item={item}
+        featured={index === 0 && sort === 'hot' && !search}
         game={byId(item.post.game_id)}
         now={now}
         onPress={() => router.push({ pathname: '/community/[id]', params: { id: item.post.id } })}
@@ -69,7 +70,7 @@ export default function CommunityScreen() {
     ),
     // byId is recreated every render but only depends on `games`.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [now, games],
+    [now, games, sort, search],
   );
 
   const empty = (() => {
@@ -164,7 +165,9 @@ export default function CommunityScreen() {
       <View style={s.header}>
         <ScreenHeader
           title={t.words.community}
-          subtitle="Takes, questions and fixes from players"
+          kicker="Takes · questions · fixes"
+          index={3}
+          rule={false}
           right={<Button title="Post" icon="add" size="sm" onPress={() => openNew()} style={s.postButton} accessibilityLabel="New post" />}
         />
         <Pressable
@@ -184,12 +187,12 @@ export default function CommunityScreen() {
 
       <View style={s.controls}>
         <View style={s.searchWrap}>
-          <Ionicons name="search" size={18} color={t.colors.textFaint} />
+          <Ionicons name="search" size={18} color={t.colors.textMuted} />
           <TextInput
             value={searchText}
             onChangeText={setSearchText}
             placeholder={`Search ${t.words.community.toLowerCase()}`}
-            placeholderTextColor={t.colors.textFaint}
+            placeholderTextColor={t.colors.textMuted}
             selectionColor={t.colors.primary}
             cursorColor={t.colors.primary}
             style={s.searchInput}
@@ -217,14 +220,14 @@ const useStyles = makeStyles((t) =>
     header: { paddingHorizontal: spacing.lg },
     postButton: { minHeight: 44 },
     discordHint: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, minHeight: 44, marginBottom: spacing.xs },
-    discordLink: { color: t.colors.primary, textDecorationLine: 'underline' },
+    discordLink: { color: designTokens(t).primaryText, textDecorationLine: 'underline' },
     controls: {
       paddingLeft: spacing.lg,
       paddingTop: spacing.md,
       paddingBottom: spacing.sm,
       gap: spacing.xs,
       borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: t.colors.border,
+      borderBottomColor: designTokens(t).hairline,
     },
     searchWrap: {
       flexDirection: 'row',
@@ -234,10 +237,8 @@ const useStyles = makeStyles((t) =>
       minHeight: 44,
       paddingHorizontal: spacing.md,
       gap: spacing.sm,
-      backgroundColor: t.colors.surface,
-      borderWidth: 1,
-      borderColor: t.colors.border,
-      borderRadius: t.radius.md,
+      backgroundColor: designTokens(t).chip.bg,
+      borderRadius: designTokens(t).lang.corner === 'soft' ? 22 : t.radius.md,
     },
     searchInput: {
       flex: 1,

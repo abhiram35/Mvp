@@ -1,9 +1,10 @@
-// GG UI kit. Every component reads the active theme (Protocol / Defuse / Ronin),
+// Vinq UI kit. Every component reads the active theme (Protocol / Defuse / Ronin / custom),
 // so screens built from these switch look instantly when the player changes theme.
 // Feature code should compose these instead of styling raw React Native views.
+// Design rules (tonal layers, no boxed borders, editorial headers): docs/DESIGN_SYSTEM.md.
 import { Ionicons } from '@expo/vector-icons';
 import { HeaderHeightContext } from 'expo-router/react-navigation';
-import { useContext, type ComponentProps, type ReactNode } from 'react';
+import { useContext, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -17,63 +18,18 @@ import {
   type PressableProps,
   type StyleProp,
   type TextInputProps,
-  type TextProps,
-  type TextStyle,
   type ViewStyle,
 } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 import Svg, { Circle, Defs, Ellipse, G, Path, Pattern, Polygon, Rect } from 'react-native-svg';
-import { fontSize, spacing, useTheme, type AppTheme, type TextureId } from '../../theme';
+import { contrast, fontSize, mixHex, spacing, useDesign, useTheme, type AppTheme, type TextureId } from '../../theme';
+import { displayLineHeight, Notch, Text, type IconName } from './base';
+import { AccentRule, GlyphTile, GradientFill, Kicker } from './decor';
 
-export type IconName = ComponentProps<typeof Ionicons>['name'];
-
-// ── Text ────────────────────────────────────────────────────────────────────
-/**
- * display  – huge moment titles (ACE, 1v3 RETAKE, One Blade)
- * title    – screen titles
- * heading  – section titles, card titles
- * body     – normal text
- * strong   – emphasised body text
- * label    – form labels, secondary info
- * caption  – timestamps, hints
- */
-export type TextVariant = 'display' | 'title' | 'heading' | 'body' | 'strong' | 'label' | 'caption';
-
-export function textStyle(t: AppTheme, variant: TextVariant): TextStyle {
-  const heading = (size: number, family: string): TextStyle => ({
-    fontFamily: family,
-    fontSize: size,
-    color: t.colors.text,
-    letterSpacing: t.shape.headingLetterSpacing,
-    textTransform: t.shape.headingUppercase ? 'uppercase' : 'none',
-  });
-  switch (variant) {
-    case 'display':
-      return { ...heading(fontSize.moment, t.fonts.display), lineHeight: fontSize.moment * 0.95 };
-    case 'title':
-      return heading(fontSize.xxl + 4, t.fonts.heading);
-    case 'heading':
-      return heading(fontSize.lg + 2, t.fonts.heading);
-    case 'body':
-      return { fontFamily: t.fonts.body, fontSize: fontSize.md, color: t.colors.text, lineHeight: 22 };
-    case 'strong':
-      return { fontFamily: t.fonts.bodyBold, fontSize: fontSize.md, color: t.colors.text, lineHeight: 22 };
-    case 'label':
-      return { fontFamily: t.fonts.bodyMedium, fontSize: fontSize.sm, color: t.colors.textMuted };
-    case 'caption':
-      return { fontFamily: t.fonts.body, fontSize: fontSize.xs, color: t.colors.textFaint };
-  }
-}
-
-export function Text({
-  variant = 'body',
-  muted,
-  style,
-  ...rest
-}: TextProps & { variant?: TextVariant; muted?: boolean }) {
-  const t = useTheme();
-  return <RNText style={[textStyle(t, variant), muted && { color: t.colors.textMuted }, style]} {...rest} />;
-}
+export { CornerMark, displayLineHeight, Notch, Text, textStyle, type IconName, type TextVariant } from './base';
+export { AccentRule, AngledEdge, Badge, GlyphTile, GradientFill, Kicker } from './decor';
+export { ListRow, SectionHeader, type ListRowProps } from './rows';
+export { SegmentedControl, type SegmentOption } from './SegmentedControl';
 
 // ── Screen ──────────────────────────────────────────────────────────────────
 export function Screen({
@@ -111,49 +67,75 @@ export function Screen({
   );
 }
 
-/** Screen header used at the top of tab screens: big themed title, optional right-side action. */
-export function ScreenHeader({ title, right, subtitle }: { title: string; right?: ReactNode; subtitle?: string }) {
+/**
+ * Editorial screen header: optional kicker (with index number), a big display-font title, an
+ * optional right-side action, subtitle, and the theme's accent rule.
+ *  - Protocol: red slash bar + "/01" kicker, tight condensed capitals.
+ *  - Defuse: "[01]" HUD index in gold, dashed rule with gold end blocks.
+ *  - Ronin: red seal + quiet kicker, airy Mincho title, brush-stroke rule.
+ */
+export function ScreenHeader({
+  title,
+  right,
+  subtitle,
+  kicker,
+  index,
+  rule,
+  size = 'lg',
+}: {
+  title: string;
+  right?: ReactNode;
+  subtitle?: string;
+  /** Small tracked label above the title ("Live now", "Your crew"). */
+  kicker?: string;
+  /** Section number shown with the kicker ("/01", "[01]", "No.01"). */
+  index?: number | string;
+  /** Show the accent rule under the header. Defaults on for HUD and ink themes. */
+  rule?: boolean;
+  /** 'md' for stacked / secondary screens. */
+  size?: 'md' | 'lg';
+}) {
+  const t = useTheme();
+  const d = useDesign();
+  const titleSize = size === 'md' ? 32 : d.lang.header === 'ink' ? 36 : 44;
+  const showRule = rule ?? d.lang.header !== 'tactical';
   return (
-    <View style={{ paddingTop: spacing.md, paddingBottom: spacing.md, gap: spacing.xs }}>
+    <View style={{ paddingTop: spacing.lg, paddingBottom: spacing.md, gap: spacing.xs }}>
+      {kicker || index != null ? <Kicker index={index}>{kicker}</Kicker> : null}
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md }}>
-        <Text variant="title" accessibilityRole="header" style={{ flexShrink: 1 }}>
+        <Text
+          accessibilityRole="header"
+          numberOfLines={2}
+          adjustsFontSizeToFit
+          minimumFontScale={0.7}
+          style={{
+            flexShrink: 1,
+            fontFamily: t.fonts.display,
+            fontSize: titleSize,
+            lineHeight: displayLineHeight(t, titleSize),
+            color: t.colors.text,
+            letterSpacing: t.shape.headingUppercase ? Math.min(t.shape.headingLetterSpacing, 1) : t.shape.headingLetterSpacing,
+            textTransform: t.shape.headingUppercase ? 'uppercase' : 'none',
+          }}
+        >
           {title}
         </Text>
         {right}
       </View>
       {subtitle ? <Text variant="label">{subtitle}</Text> : null}
-    </View>
-  );
-}
-
-// ── Notch: the diagonal cut used by the Protocol theme ──────────────────────
-/** Paints a triangle in `color` over a corner, making the element look cut. Renders nothing when the theme has no cut. */
-export function Notch({ corner, color, size }: { corner: 'topRight' | 'bottomLeft' | 'topLeft' | 'bottomRight'; color: string; size?: number }) {
-  const t = useTheme();
-  const s = size ?? t.shape.cut;
-  if (!s) return null;
-  const pos: ViewStyle = { position: 'absolute', width: s, height: s };
-  const points = {
-    topRight: `0,0 ${s},0 ${s},${s}`,
-    bottomLeft: `0,0 0,${s} ${s},${s}`,
-    topLeft: `0,0 ${s},0 0,${s}`,
-    bottomRight: `${s},0 ${s},${s} 0,${s}`,
-  }[corner];
-  if (corner === 'topRight') Object.assign(pos, { top: 0, right: 0 });
-  if (corner === 'bottomLeft') Object.assign(pos, { bottom: 0, left: 0 });
-  if (corner === 'topLeft') Object.assign(pos, { top: 0, left: 0 });
-  if (corner === 'bottomRight') Object.assign(pos, { bottom: 0, right: 0 });
-  return (
-    <View pointerEvents="none" style={pos}>
-      <Svg width={s} height={s}>
-        <Polygon points={points} fill={color} />
-      </Svg>
+      {showRule ? <AccentRule style={{ marginTop: spacing.sm }} /> : null}
     </View>
   );
 }
 
 // ── Button ──────────────────────────────────────────────────────────────────
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger';
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'outline';
+/**
+ * primary – filled primary (notched in Protocol, HUD highlight in Defuse)
+ * secondary – tonal fill, no border (the de-boxed default for second actions)
+ * outline – the old bordered secondary, for use on top of tonal cards that need separation
+ * ghost – text only; danger – filled danger
+ */
 export function Button({
   title,
   onPress,
@@ -179,10 +161,14 @@ export function Button({
   accessibilityLabel?: string;
 }) {
   const t = useTheme();
+  const d = useDesign();
   const c = t.colors;
   const isDisabled = disabled || loading;
-  const fg = variant === 'primary' ? c.onPrimary : variant === 'danger' ? '#FFFFFF' : variant === 'secondary' ? c.text : c.primary;
+  const dangerFg = contrast('#FFFFFF', c.danger) >= 4.5 ? '#FFFFFF' : '#111111';
+  const fg =
+    variant === 'primary' ? c.onPrimary : variant === 'danger' ? dangerFg : variant === 'secondary' || variant === 'outline' ? c.text : d.primaryText;
   const filled = variant === 'primary' || variant === 'danger';
+  const radius = d.lang.corner === 'soft' ? Math.max(t.radius.md, 6) : t.radius.md;
   return (
     <Pressable
       accessibilityRole="button"
@@ -190,23 +176,30 @@ export function Button({
       accessibilityState={{ disabled: !!isDisabled, busy: !!loading }}
       onPress={onPress}
       disabled={isDisabled}
+      // Small buttons are 40 tall; the slop brings the touch target to 44+.
+      hitSlop={size === 'sm' ? { top: 4, bottom: 4 } : undefined}
       style={({ pressed }) => [
         {
-          minHeight: size === 'sm' ? 38 : 50,
+          minHeight: size === 'sm' ? 40 : 52,
           paddingHorizontal: size === 'sm' ? spacing.lg : spacing.xl,
-          borderRadius: t.radius.md,
+          borderRadius: radius,
           alignItems: 'center',
           justifyContent: 'center',
           overflow: 'hidden',
         },
         variant === 'primary' && { backgroundColor: pressed ? c.primaryPressed : c.primary },
         variant === 'danger' && { backgroundColor: c.danger, opacity: pressed ? 0.8 : 1 },
-        variant === 'secondary' && { backgroundColor: pressed ? c.surfaceRaised : 'transparent', borderWidth: 1, borderColor: c.border },
+        variant === 'secondary' && { backgroundColor: pressed ? mixHex(d.chip.bg, c.text, 0.08) : d.chip.bg },
+        variant === 'outline' && { backgroundColor: pressed ? c.surfaceRaised : 'transparent', borderWidth: 1, borderColor: c.border },
         variant === 'ghost' && { backgroundColor: pressed ? c.surfaceRaised : 'transparent' },
         isDisabled && { opacity: 0.5 },
         style,
       ]}
     >
+      {/* Defuse-style HUD bevel: a lighter line along the top of filled square buttons. */}
+      {filled && d.lang.corner === 'square' ? (
+        <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2, backgroundColor: '#FFFFFF', opacity: 0.22 }} />
+      ) : null}
       {loading ? (
         <ActivityIndicator color={fg} />
       ) : (
@@ -231,25 +224,36 @@ export function Button({
 }
 
 // ── TextField ───────────────────────────────────────────────────────────────
+/** Tonal input with an underline that lights up in primary on focus (no boxed border). */
 export function TextField({
   label,
   error,
   hint,
   style,
+  onFocus,
+  onBlur,
   ...rest
 }: TextInputProps & { label?: string; error?: string | null; hint?: string }) {
   const t = useTheme();
+  const d = useDesign();
+  const [focused, setFocused] = useState(false);
+  const line = error ? t.colors.danger : focused ? t.colors.primary : t.colors.border;
   return (
     <View style={{ marginBottom: spacing.lg }}>
       {label ? <Text variant="label" style={{ marginBottom: spacing.xs }}>{label}</Text> : null}
       <TextInput
         placeholderTextColor={t.colors.textFaint}
+        selectionColor={t.colors.primary}
+        cursorColor={t.colors.primary}
         style={[
           {
             backgroundColor: t.colors.surface,
-            borderWidth: 1,
-            borderColor: error ? t.colors.danger : t.colors.border,
-            borderRadius: t.radius.md,
+            borderBottomWidth: 2,
+            borderBottomColor: line,
+            borderTopLeftRadius: t.radius.md,
+            borderTopRightRadius: t.radius.md,
+            borderBottomLeftRadius: d.lang.corner === 'soft' ? t.radius.md : 0,
+            borderBottomRightRadius: d.lang.corner === 'soft' ? t.radius.md : 0,
             paddingHorizontal: spacing.lg,
             paddingVertical: spacing.md,
             minHeight: 50,
@@ -261,6 +265,14 @@ export function TextField({
           style,
         ]}
         accessibilityLabel={label}
+        onFocus={(e) => {
+          setFocused(true);
+          onFocus?.(e);
+        }}
+        onBlur={(e) => {
+          setFocused(false);
+          onBlur?.(e);
+        }}
         {...rest}
       />
       {error ? (
@@ -273,44 +285,88 @@ export function TextField({
 }
 
 // ── Card ────────────────────────────────────────────────────────────────────
-/** A content block. `tone="panel"` gives the dark media panel used behind clips and hero areas. */
+/**
+ * A content block, separated from the page by TONE, not a border.
+ *  - variant 'tonal' (default): surface fill, no border; Protocol cuts the top-right corner.
+ *  - variant 'hero' (or tone="panel"): the dark media panel with the theme's hero gradient.
+ *  - variant 'outline': the old bordered look, for nested content that needs a frame.
+ *  - variant 'flat': no fill; just padding and press feedback.
+ * `media` renders full-bleed at the top (clip thumbnail, game art). `accent` adds a primary
+ * stripe along the top edge (featured / live items).
+ */
 export function Card({
   children,
   onPress,
   style,
   tone = 'surface',
+  variant,
+  accent,
+  media,
+  cut,
+  backdrop,
+  padded = true,
   accessibilityLabel,
+  accessibilityHint,
 }: {
   children: ReactNode;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
   tone?: 'surface' | 'panel';
+  variant?: 'tonal' | 'hero' | 'outline' | 'flat';
+  accent?: boolean;
+  media?: ReactNode;
+  /** Protocol corner cut. Defaults on for cut themes; turn off when the card sits on something other than the screen bg (or pass `backdrop`). */
+  cut?: boolean;
+  /** Colour behind the card, so the corner cut blends in. Defaults to the screen background. */
+  backdrop?: string;
+  padded?: boolean;
   accessibilityLabel?: string;
+  accessibilityHint?: string;
 }) {
   const t = useTheme();
+  const d = useDesign();
+  const kind = variant ?? (tone === 'panel' ? 'hero' : 'tonal');
+  const hero = kind === 'hero';
+  const pad = padded ? spacing.lg : 0;
   const base: ViewStyle = {
-    backgroundColor: tone === 'panel' ? t.colors.panel : t.colors.surface,
-    borderRadius: t.radius.lg,
-    borderWidth: tone === 'panel' ? 0 : 1,
+    backgroundColor: hero ? t.colors.panel : kind === 'flat' ? 'transparent' : t.colors.surface,
+    borderRadius: d.lang.corner === 'soft' ? Math.max(t.radius.lg, 8) : t.radius.lg,
+    borderWidth: kind === 'outline' ? 1 : 0,
     borderColor: t.colors.border,
-    padding: spacing.lg,
+    padding: pad,
     overflow: 'hidden',
   };
+  const showCut = (cut ?? d.lang.corner === 'cut') && kind !== 'flat';
+  const inner = (
+    <>
+      {hero ? <GradientFill from={d.hero.from} to={d.hero.to} /> : null}
+      {media ? <View style={{ marginHorizontal: -pad, marginTop: -pad, marginBottom: spacing.md }}>{media}</View> : null}
+      {children}
+      {accent ? <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, backgroundColor: t.colors.primary }} /> : null}
+      {showCut ? <Notch corner="topRight" color={backdrop ?? t.colors.bg} /> : null}
+    </>
+  );
   if (onPress) {
     return (
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
+        accessibilityHint={accessibilityHint}
         onPress={onPress}
-        style={({ pressed }) => [base, pressed && { backgroundColor: tone === 'panel' ? t.colors.panel : t.colors.surfaceRaised, opacity: tone === 'panel' ? 0.9 : 1 }, style]}
+        style={({ pressed }) => [
+          base,
+          pressed && (hero ? { opacity: 0.9 } : { backgroundColor: kind === 'flat' ? d.surface.high : t.colors.surfaceRaised }),
+          style,
+        ]}
       >
-        {children}
+        {inner}
       </Pressable>
     );
   }
-  return <View style={[base, style]}>{children}</View>;
+  return <View style={[base, style]}>{inner}</View>;
 }
 
+// ── Media panel decoration + screen texture ─────────────────────────────────
 /**
  * Media panel decoration, per the theme's `panelStyle`: corner brackets (Protocol / Defuse),
  * a thin accent frame (Ronin), or nothing. Put it last inside the panel. `theme` overrides the
@@ -495,6 +551,7 @@ export function Avatar({
   highlight,
   icon,
   backdrop,
+  online,
 }: {
   uri?: string | null;
   name?: string | null;
@@ -504,43 +561,71 @@ export function Avatar({
   icon?: IconName;
   /** Colour behind the avatar, so the Protocol notch blends in (pass t.colors.panel on dark panels). */
   backdrop?: string;
+  /** Small presence dot at the bottom-right. */
+  online?: boolean;
 }) {
   const t = useTheme();
+  const d = useDesign();
   const initials = (name ?? '?').trim().slice(0, 2).toUpperCase();
   const round = !!t.shape.round;
   const box: ViewStyle = {
     width: size,
     height: size,
     borderRadius: round ? size / 2 : t.radius.sm,
-    backgroundColor: highlight ? t.colors.primary : t.colors.surfaceRaised,
+    backgroundColor: highlight ? t.colors.primary : d.chip.bg,
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
     borderWidth: round ? 2 : 0,
     borderColor: t.colors.accent,
   };
+  const dot = Math.max(10, Math.round(size * 0.24));
   return (
-    <View style={box}>
-      {uri ? (
-        <Image source={{ uri }} style={{ width: size, height: size }} accessibilityIgnoresInvertColors />
-      ) : icon ? (
-        <Ionicons name={icon} size={size * 0.5} color={highlight ? t.colors.onPrimary : t.colors.text} />
-      ) : (
-        <RNText style={{ color: highlight ? t.colors.onPrimary : t.colors.text, fontFamily: t.fonts.heading, fontSize: size * 0.4 }}>{initials}</RNText>
-      )}
-      {!round ? <Notch corner="bottomRight" color={backdrop ?? t.colors.bg} size={Math.round(size * 0.25)} /> : null}
+    <View style={{ width: size, height: size }}>
+      <View style={box}>
+        {uri ? (
+          <Image source={{ uri }} style={{ width: size, height: size }} accessibilityIgnoresInvertColors />
+        ) : icon ? (
+          <Ionicons name={icon} size={size * 0.5} color={highlight ? t.colors.onPrimary : t.colors.text} />
+        ) : (
+          <RNText style={{ color: highlight ? t.colors.onPrimary : t.colors.text, fontFamily: t.fonts.heading, fontSize: size * 0.4 }}>{initials}</RNText>
+        )}
+        {!round ? <Notch corner="bottomRight" color={backdrop ?? t.colors.bg} size={Math.round(size * 0.25)} /> : null}
+      </View>
+      {online ? (
+        <View
+          accessibilityElementsHidden
+          importantForAccessibility="no-hide-descendants"
+          style={{
+            position: 'absolute',
+            right: round ? 0 : -2,
+            [round ? 'bottom' : 'top']: round ? 0 : -2,
+            width: dot,
+            height: dot,
+            borderRadius: round ? dot / 2 : 0,
+            backgroundColor: t.colors.accent,
+            borderWidth: 2,
+            borderColor: backdrop ?? t.colors.bg,
+          }}
+        />
+      ) : null}
     </View>
   );
 }
 
 // ── Chip (selectable tag) ───────────────────────────────────────────────────
+/**
+ * Tonal tag, no border. Selected: ink-on-paper in light themes (with a primary tick in
+ * Protocol), primary fill in dark themes. Pressable chips are ≥ 44pt tall to the touch.
+ */
 export function Chip({ label, selected, onPress, icon }: { label: string; selected?: boolean; onPress?: () => void; icon?: IconName }) {
   const t = useTheme();
-  const fg = selected ? t.colors.onPrimary : t.colors.textMuted;
+  const d = useDesign();
+  const fg = selected ? d.selected.fg : d.chip.fg;
   const content = (
     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
       {icon ? <Ionicons name={icon} size={14} color={fg} style={{ marginRight: 4 }} /> : null}
-      <RNText style={{ color: fg, fontSize: fontSize.sm, fontFamily: t.fonts.bodyMedium }}>{label}</RNText>
+      <RNText style={{ color: fg, fontSize: fontSize.sm, fontFamily: selected ? t.fonts.bodyBold : t.fonts.bodyMedium }}>{label}</RNText>
     </View>
   );
   const chipStyle: ViewStyle[] = [
@@ -550,16 +635,31 @@ export function Chip({ label, selected, onPress, icon }: { label: string; select
       minHeight: 36,
       justifyContent: 'center',
       borderRadius: t.radius.pill,
-      borderWidth: 1,
-      borderColor: t.colors.border,
-      backgroundColor: t.colors.surface,
+      backgroundColor: d.chip.bg,
+      overflow: 'hidden',
     },
-    selected ? { backgroundColor: t.colors.primary, borderColor: t.colors.primary } : {},
+    selected ? { backgroundColor: d.selected.bg } : {},
   ];
-  if (!onPress) return <View style={chipStyle}>{content}</View>;
+  const tick =
+    selected && d.lang.corner === 'cut' ? <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, backgroundColor: t.colors.primary }} /> : null;
+  if (!onPress) {
+    return (
+      <View style={chipStyle}>
+        {content}
+        {tick}
+      </View>
+    );
+  }
   return (
-    <Pressable accessibilityRole="button" accessibilityState={{ selected: !!selected }} onPress={onPress} style={chipStyle}>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: !!selected }}
+      onPress={onPress}
+      hitSlop={{ top: 4, bottom: 4 }}
+      style={({ pressed }) => [...chipStyle, pressed && !selected && { backgroundColor: mixHex(d.chip.bg, t.colors.text, 0.08) }]}
+    >
       {content}
+      {tick}
     </Pressable>
   );
 }
@@ -570,13 +670,26 @@ export function ChipRow({ children }: { children: ReactNode }) {
 }
 
 // ── Stat, segment bar, section title ────────────────────────────────────────
-/** A number with a small label underneath (squads joined, rating, clips). */
-export function Stat({ value, label, highlight }: { value: string; label: string; highlight?: boolean }) {
+/** A big display-font number over a small tracked label (squads joined, rating, clips). */
+export function Stat({
+  value,
+  label,
+  highlight,
+  size = 'md',
+  align = 'left',
+}: {
+  value: string;
+  label: string;
+  highlight?: boolean;
+  size?: 'md' | 'lg';
+  align?: 'left' | 'center';
+}) {
   const t = useTheme();
+  const px = size === 'lg' ? 40 : 28;
   return (
-    <View style={{ gap: 2 }}>
-      <RNText style={{ fontFamily: t.fonts.display, fontSize: 28, color: highlight ? t.colors.primary : t.colors.text }}>{value}</RNText>
-      <Text variant="caption">{label}</Text>
+    <View style={{ gap: 2, alignItems: align === 'center' ? 'center' : 'flex-start' }} accessible accessibilityLabel={`${value} ${label}`}>
+      <RNText style={{ fontFamily: t.fonts.display, fontSize: px, lineHeight: displayLineHeight(t, px), color: highlight ? t.colors.primary : t.colors.text }}>{value}</RNText>
+      <Text variant="kicker" style={{ fontSize: 11 }}>{label}</Text>
     </View>
   );
 }
@@ -651,39 +764,65 @@ export function Crest({ size = 40, color }: { size?: number; color?: string }) {
 export function LoadingState({ label }: { label?: string }) {
   const t = useTheme();
   return (
-    <View style={styles.center}>
+    <View style={styles.center} accessibilityRole="progressbar" accessibilityLabel={label ?? 'Loading'}>
       <ActivityIndicator color={t.colors.primary} size="large" />
-      {label ? <Text muted style={{ marginTop: spacing.md }}>{label}</Text> : null}
+      {label ? <Text variant="kicker" style={{ marginTop: spacing.lg }}>{label}</Text> : null}
     </View>
   );
 }
 
-export function EmptyState({ icon = 'game-controller-outline', title, message, action }: { icon?: IconName; title: string; message?: string; action?: ReactNode }) {
-  const t = useTheme();
+/**
+ * Empty screen / list. A large tonal glyph tile in the theme's shape, a heading, a sentence,
+ * and one action. `kicker` adds a small label above the title.
+ */
+export function EmptyState({
+  icon = 'game-controller-outline',
+  title,
+  message,
+  action,
+  kicker,
+}: {
+  icon?: IconName;
+  title: string;
+  message?: string;
+  action?: ReactNode;
+  kicker?: string;
+}) {
   return (
     <View style={styles.center}>
-      <Ionicons name={icon} size={44} color={t.colors.textFaint} />
-      <Text variant="heading" style={{ marginTop: spacing.md, textAlign: 'center' }}>{title}</Text>
-      {message ? <Text muted style={{ marginTop: spacing.sm, textAlign: 'center' }}>{message}</Text> : null}
-      {action ? <View style={{ marginTop: spacing.lg }}>{action}</View> : null}
+      <GlyphTile icon={icon} size={72} tone="primary" />
+      {kicker ? <Kicker style={{ marginTop: spacing.lg }}>{kicker}</Kicker> : null}
+      <Text variant="heading" style={{ marginTop: kicker ? spacing.xs : spacing.lg, textAlign: 'center', fontSize: fontSize.xl + 2 }} accessibilityRole="header">
+        {title}
+      </Text>
+      {message ? <Text muted style={{ marginTop: spacing.sm, textAlign: 'center', maxWidth: 320 }}>{message}</Text> : null}
+      {action ? <View style={{ marginTop: spacing.xl }}>{action}</View> : null}
     </View>
   );
 }
 
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
-    <EmptyState
-      icon="cloud-offline-outline"
-      title="Couldn't load this"
-      message={message}
-      action={onRetry ? <Button title="Try again" variant="secondary" onPress={onRetry} /> : undefined}
-    />
+    <View style={styles.center} accessibilityRole="alert">
+      <GlyphTile icon="cloud-offline-outline" size={72} tone="danger" />
+      <Text variant="heading" style={{ marginTop: spacing.lg, textAlign: 'center', fontSize: fontSize.xl + 2 }}>
+        Couldn&apos;t load this
+      </Text>
+      <Text muted style={{ marginTop: spacing.sm, textAlign: 'center', maxWidth: 320 }}>{message}</Text>
+      {onRetry ? (
+        <View style={{ marginTop: spacing.xl }}>
+          <Button title="Try again" icon="refresh" variant="secondary" onPress={onRetry} />
+        </View>
+      ) : null}
+    </View>
   );
 }
 
-export function Divider() {
-  const t = useTheme();
-  return <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: t.colors.border, marginVertical: spacing.md }} />;
+/** Hairline divider. `inset` indents it from the left; `accent` uses the theme's AccentRule. */
+export function Divider({ inset = 0, accent, spacing: gap = spacing.md }: { inset?: number; accent?: boolean; spacing?: number } = {}) {
+  const d = useDesign();
+  if (accent) return <AccentRule style={{ marginVertical: gap }} />;
+  return <View style={{ height: StyleSheet.hairlineWidth, backgroundColor: d.hairline, marginVertical: gap, marginLeft: inset }} />;
 }
 
 const styles = StyleSheet.create({

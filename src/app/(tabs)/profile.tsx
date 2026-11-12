@@ -1,7 +1,7 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Alert, StyleSheet, View } from 'react-native';
-import { Button, EmptyState, ErrorState, LoadingState, Screen, ScreenHeader, Text } from '../../components/ui';
+import { Button, EmptyState, ErrorState, LoadingState, Screen, ScreenHeader, SectionHeader } from '../../components/ui';
 import { unregisterPush } from '../../features/notifications/push';
 import { BannedBanner } from '../../features/moderation/BannedBanner';
 import { useMyStatus } from '../../features/moderation/useMyStatus';
@@ -115,7 +115,7 @@ export default function MyProfileScreen() {
 
   return (
     <Screen scroll>
-      <ScreenHeader title="Profile" />
+      <ScreenHeader title="Profile" index={5} kicker="Me" rule={false} />
       {/* Hidden when the tabs layout already shows it above every tab. */}
       <BannedBanner />
       <ProfileHeader profile={profile} gamesCount={games.length} own>
@@ -137,8 +137,8 @@ export default function MyProfileScreen() {
         ) : null}
       </View>
 
-      <Text variant="heading" style={styles.groupTitle}>Settings</Text>
-      <View style={styles.group}>
+      <SectionHeader index={2} kicker="Account" title="Settings" />
+      <View>
         <ActionRow icon="notifications-outline" label="Notifications" onPress={() => router.push('/notifications')} />
         <ActionRow icon="color-palette-outline" label="Theme" value={t.name} onPress={() => router.push('/settings/theme')} />
         <ActionRow icon="people-outline" label="Friends" onPress={() => router.push('/friends')} />
@@ -148,13 +148,14 @@ export default function MyProfileScreen() {
         {isModerator ? <ActionRow icon="hammer-outline" label="Moderation" onPress={() => router.push('/moderation')} last /> : null}
       </View>
 
-      <Text variant="heading" style={styles.groupTitle}>Feedback & community</Text>
-      <View style={styles.group}>
+      <SectionHeader index={3} kicker="Make Vinq better" title="Feedback & community" />
+      <View>
         <ActionRow icon="logo-discord" label="Join our Discord" value="Suggestions" onPress={() => void openDiscord()} />
         <ActionRow icon="chatbox-ellipses-outline" label="Send feedback" onPress={() => router.push('/feedback')} last />
       </View>
 
-      <View style={[styles.group, { marginTop: spacing.xl }]}>
+      <SectionHeader index={4} kicker="Session" title="Account" />
+      <View>
         <ActionRow icon="log-out-outline" label={signingOut ? 'Signing out…' : 'Sign out'} disabled={signingOut} onPress={confirmSignOut} />
         <ActionRow icon="trash-outline" label={deleting ? 'Deleting…' : 'Delete account'} danger disabled={deleting} onPress={confirmDelete} last />
       </View>
@@ -165,7 +166,5 @@ export default function MyProfileScreen() {
 const useStyles = makeStyles((t) =>
   StyleSheet.create({
     section: { marginTop: spacing.xl },
-    groupTitle: { marginTop: spacing.xl, marginBottom: spacing.sm },
-    group: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.colors.border },
   }),
 );

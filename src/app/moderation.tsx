@@ -1,7 +1,7 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
-import { EmptyState, ErrorState, LoadingState, Screen } from '../components/ui';
+import { Avatar, Button, Card, EmptyState, ErrorState, LoadingState, Screen, Text, TextField } from '../components/ui';
 import { UnderlineTabs } from '../features/community/UnderlineTabs';
 import { BetaStats } from '../features/moderation/BetaStats';
 import { ReportCard, type ReportCardAction } from '../features/moderation/ReportCard';
@@ -9,17 +9,20 @@ import { REPORTS_PAGE_SIZE, getBetaMetrics, listReports, resolveReport, unbanUse
 import { useMyStatus } from '../features/moderation/useMyStatus';
 import { fetchDisputedScrims, useLoader } from '../features/scrims/api';
 import { ScrimCard } from '../features/scrims/components';
+import { fetchPendingApplications, reviewApplication } from '../features/tournaments/api';
+import type { OrganiserApplication } from '../features/tournaments/types';
 import { useNow } from '../lib/hooks';
 import type { BetaMetrics, Report, ReportQueueItem } from '../lib/types';
 import { makeStyles, spacing, useTheme } from '../theme';
 
-type Tab = Report['status'] | 'scrims' | 'stats';
+type Tab = Report['status'] | 'scrims' | 'organisers' | 'stats';
 
 const TABS: readonly { value: Tab; label: string }[] = [
   { value: 'open', label: 'Open' },
   { value: 'reviewed', label: 'Reviewed' },
   { value: 'actioned', label: 'Actioned' },
   { value: 'scrims', label: 'Scrims' },
+  { value: 'organisers', label: 'Organisers' },
   { value: 'stats', label: 'Beta stats' },
 ];
 
@@ -216,6 +219,68 @@ function StatsTab() {
 }
 
 /** Scrims where the two captains reported different scores. Open one to set the result. */
+/** Days since a date, for "account age" on organiser applications. */
+function daysSince(iso: string | undefined): number | null {
+  if (!iso) return null;
+  return Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
+}
+
+function ApplicationCard({ app, onDone }: { app: OrganiserApplication; onDone: () => void }) {
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState<'approve' | 'reject' | null>(null);
+  const name = app.profile?.display_name || app.profile?.username || 'Player';
+  const age = daysSince(app.profile?.created_at);
+  const review = async (approve: boolean) => {
+    setBusy(approve ? 'approve' : 'reject');
+    try {
+      await reviewApplication(app.id, approve, note);
+      onDone();
+    } catch (e) {
+      Alert.alert("Couldn't review", (e as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  };
+  return (
+    <Card style={{ marginBottom: spacing.md, gap: spacing.sm }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: spacing.md }}>
+        <Avatar uri={app.profile?.avatar_url} name={name} size={40} />
+        <View style={{ flex: 1 }}>
+          <Text variant="strong">{app.org_name}</Text>
+          <Text variant="caption">{[`@${app.profile?.username ?? 'unknown'}`, age !== null ? `account ${age} days old` : null, app.discord].filter(Boolean).join(' · ')}</Text>
+        </View>
+      </View>
+      <Text>{app.about}</Text>
+      <TextField value={note} onChangeText={setNote} maxLength={300} placeholder="Note to the applicant (optional)" />
+      <View style={{ flexDirection: 'row', gap: spacing.sm }}>
+        <Button title="Approve" size="sm" style={{ flex: 1 }} loading={busy === 'approve'} disabled={busy !== null} onPress={() => void review(true)} />
+        <Button title="Reject" size="sm" variant="secondary" style={{ flex: 1 }} loading={busy === 'reject'} disabled={busy !== null} onPress={() => void review(false)} />
+      </View>
+      <Button title="View profile" size="sm" variant="ghost" onPress={() => router.push({ pathname: '/user/[id]', params: { id: app.profile_id } })} />
+    </Card>
+  );
+}
+
+/** Organiser applications waiting for a moderator. Approving gives the ✓ organiser badge. */
+function OrganisersTab() {
+  const t = useTheme();
+  const s = useStyles();
+  const q = useLoader(fetchPendingApplications, 'organiser-apps');
+  if (q.loading) return <LoadingState />;
+  if (q.error && !q.data) return <ErrorState message={q.error} onRetry={() => void q.reload()} />;
+  const items = q.data ?? [];
+  return (
+    <FlatList
+      data={items}
+      keyExtractor={(x) => x.id}
+      contentContainerStyle={[s.list, !items.length && { flexGrow: 1 }]}
+      renderItem={({ item }) => <ApplicationCard app={item} onDone={() => void q.reload()} />}
+      ListEmptyComponent={<EmptyState icon="ribbon-outline" title="No applications" message="Requests to become a verified tournament organiser show up here." />}
+      refreshControl={<RefreshControl refreshing={q.refreshing} tintColor={t.colors.primary} colors={[t.colors.primary]} onRefresh={() => void q.refresh()} />}
+    />
+  );
+}
+
 function DisputesTab() {
   const t = useTheme();
   const s = useStyles();
@@ -262,7 +327,7 @@ export default function ModerationScreen() {
       <View style={s.tabs}>
         <UnderlineTabs options={TABS} value={tab} onChange={setTab} />
       </View>
-      {tab === 'stats' ? <StatsTab /> : tab === 'scrims' ? <DisputesTab /> : <ReportList key={tab} status={tab} />}
+      {tab === 'stats' ? <StatsTab /> : tab === 'scrims' ? <DisputesTab /> : tab === 'organisers' ? <OrganisersTab /> : <ReportList key={tab} status={tab} />}
     </Screen>
   );
 }

@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text as RNText, View } from 'react-native';
-import { Button, Card, Chip, ChipRow, EmptyState, ErrorState, LoadingState, Screen, Text } from '../../components/ui';
+import { Button, Card, Chip, ChipRow, EmptyState, ErrorState, LoadingState, Screen, SegmentedControl, Text } from '../../components/ui';
 import { useGames } from '../../features/games/useGames';
 import { regionLabel } from '../../features/lfg/format';
 import { useMyStatus } from '../../features/moderation/useMyStatus';
@@ -292,15 +292,18 @@ export default function TournamentScreen() {
         </View>
 
         {/* ── Tabs ───────────────────────────────────────────────────── */}
-        <View style={s.tabs} accessibilityRole="tablist">
-          {(['overview', 'teams', 'bracket'] as Tab[]).map((k) => (
-            <Pressable key={k} onPress={() => setTab(k)} accessibilityRole="tab" accessibilityState={{ selected: tab === k }} style={[s.tab, tab === k && { borderBottomColor: t.colors.primary }]}>
-              <RNText style={[s.tabText, { color: tab === k ? t.colors.text : t.colors.textMuted }]}>
-                {k === 'overview' ? 'Overview' : k === 'teams' ? `Teams ${active.length}` : 'Bracket'}
-              </RNText>
-            </Pressable>
-          ))}
-        </View>
+        <SegmentedControl
+          variant="underline"
+          value={tab}
+          onChange={setTab}
+          accessibilityLabel="Tournament sections"
+          style={{ marginTop: spacing.xl, marginBottom: spacing.lg }}
+          options={[
+            { value: 'overview', label: 'Overview' },
+            { value: 'teams', label: 'Teams', badge: active.length },
+            { value: 'bracket', label: 'Bracket' },
+          ]}
+        />
 
         {tab === 'overview' ? (
           <View style={{ gap: spacing.lg }}>
@@ -398,9 +401,6 @@ const useStyles = makeStyles((t) =>
     actions: { gap: spacing.md, marginTop: spacing.lg },
     nextMatch: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
     notice: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-    tabs: { flexDirection: 'row', marginTop: spacing.xl, marginBottom: spacing.lg, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: t.colors.border },
-    tab: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderBottomWidth: 2, borderBottomColor: 'transparent' },
-    tabText: { fontFamily: t.fonts.heading, fontSize: fontSize.md, letterSpacing: 1, textTransform: 'uppercase' },
     sectionTitle: { fontFamily: t.fonts.heading, letterSpacing: 2, textTransform: 'uppercase', marginBottom: spacing.sm },
     entry: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm, minHeight: 56, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: t.colors.border },
     schedule: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.md },

@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 import { Pressable, StyleSheet, Text as RNText, View } from 'react-native';
-import { fontSize, makeStyles, useTheme } from '../../theme';
+import { designTokens, fontSize, makeStyles, useTheme } from '../../theme';
 import { useUnreadNotifications } from './unread';
 
 /** Header icon button → /notifications, with a small primary unread badge. */
@@ -44,10 +44,8 @@ const useStyles = makeStyles((t) =>
     button: {
       width: 44,
       height: 44,
-      borderRadius: t.radius.md,
-      borderWidth: 1,
-      borderColor: t.colors.border,
-      backgroundColor: t.colors.surface,
+      borderRadius: designTokens(t).lang.corner === 'soft' ? 22 : t.radius.md,
+      backgroundColor: designTokens(t).chip.bg,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -61,7 +59,7 @@ const useStyles = makeStyles((t) =>
       borderRadius: t.shape.round ? 9 : t.radius.sm,
       backgroundColor: t.colors.primary,
       borderWidth: 1.5,
-      borderColor: t.colors.surface,
+      borderColor: designTokens(t).chip.bg,
       alignItems: 'center',
       justifyContent: 'center',
     },

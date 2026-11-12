@@ -2,6 +2,8 @@
 // Every screen reads the active theme through useTheme() / makeStyles() — never
 // hard-code a colour, font family or radius.
 
+import type { DesignLanguage } from './design';
+
 export type BuiltInThemeId = 'protocol' | 'defuse' | 'ronin';
 /** Built-in themes, or a player's AI-generated theme (`custom:<custom_themes.id>`). */
 export type ThemeId = BuiltInThemeId | `custom:${string}`;
@@ -59,6 +61,11 @@ export interface AppTheme {
   panelStyle?: PanelStyle;
   /** Background texture behind screens. Defaults to 'none'. */
   texture?: TextureId;
+  /**
+   * Design personality (corner language, header treatment, rules, index numbers, hero angle).
+   * Optional: custom themes derive it from `shape` — see designLanguage() in ./design.
+   */
+  design?: DesignLanguage;
   /** Theme-flavoured words. Screens use these instead of hard-coded copy. */
   words: {
     gg: string; // what a like is called: "GGs" / "honours"
@@ -105,6 +112,7 @@ export const THEMES: Record<BuiltInThemeId, AppTheme> = {
     shape: { cut: 12, headingUppercase: true, headingLetterSpacing: 1.5 },
     panelStyle: 'bracket',
     texture: 'none',
+    design: { corner: 'cut', header: 'tactical', rule: 'tick', index: 'slash', heroAngle: 22 },
     words: { gg: 'GGs', squad: 'squad', squadUp: 'Squad up', lobbies: 'Lobbies', community: 'Community' },
   },
   defuse: {
@@ -142,6 +150,7 @@ export const THEMES: Record<BuiltInThemeId, AppTheme> = {
     shape: { cut: 0, headingUppercase: true, headingLetterSpacing: 1 },
     panelStyle: 'bracket',
     texture: 'grain',
+    design: { corner: 'square', header: 'hud', rule: 'dashed', index: 'bracket', heroAngle: 0 },
     words: { gg: 'GGs', squad: 'squad', squadUp: 'Squad up', lobbies: 'Lobbies', community: 'Community' },
   },
   ronin: {
@@ -180,6 +189,7 @@ export const THEMES: Record<BuiltInThemeId, AppTheme> = {
     shape: { cut: 0, headingUppercase: false, headingLetterSpacing: 0.5, round: true },
     panelStyle: 'frame',
     texture: 'none',
+    design: { corner: 'soft', header: 'ink', rule: 'brush', index: 'numero', heroAngle: 0 },
     words: { gg: 'honours', squad: 'clan', squadUp: 'Join clan', lobbies: 'Dojo', community: 'Scrolls' },
   },
 };

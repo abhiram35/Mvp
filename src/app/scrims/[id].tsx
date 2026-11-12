@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Alert, Linking, RefreshControl, ScrollView, StyleSheet, Switch, View } from 'react-native';
-import { Button, Card, Chip, ChipRow, EmptyState, ErrorState, LoadingState, Screen, Text, TextField } from '../../components/ui';
+import { Button, Card, Chip, ChipRow, EmptyState, ErrorState, LoadingState, Screen, SectionHeader, Text, TextField } from '../../components/ui';
 import { useGames } from '../../features/games/useGames';
 import { regionLabel } from '../../features/lfg/format';
 import { useMyStatus } from '../../features/moderation/useMyStatus';
@@ -58,9 +58,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   const s = useStyles();
   return (
     <View style={s.section}>
-      <Text variant="label" accessibilityRole="header" style={s.sectionTitle}>
-        {title}
-      </Text>
+      <SectionHeader title={title} rule={false} style={{ marginTop: 0, marginBottom: spacing.sm }} />
       {children}
     </View>
   );

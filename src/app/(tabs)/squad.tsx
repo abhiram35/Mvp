@@ -162,7 +162,7 @@ export default function DuoFinderScreen() {
           importantForAccessibility={overlayOpen ? 'no-hide-descendants' : 'auto'}
           accessibilityElementsHidden={overlayOpen}
         >
-          <ScreenHeader title="Find a duo" />
+          <ScreenHeader title="Find a duo" index={2} kicker="Matchmaking" />
           <View style={s.countRow}>
             {playerCount !== null && game ? <LiveDot label={`${playersLabel(playerCount)} play ${game.name} on Vinq`} /> : <Text variant="label">Pick a game, set your loadout, queue up.</Text>}
           </View>
@@ -226,7 +226,7 @@ export default function DuoFinderScreen() {
               contentContainerStyle={s.list}
               ListHeaderComponent={
                 <View style={{ marginBottom: spacing.md }}>
-                  <ScreenHeader title={`${visible.length} duos found`} subtitle={summary} />
+                  <ScreenHeader title={`${visible.length} duos found`} index={2} kicker="Your matches" subtitle={summary} />
                   <Button title="Back to reveal" variant="secondary" icon="arrow-back" size="sm" onPress={() => setShowAll(false)} />
                 </View>
               }

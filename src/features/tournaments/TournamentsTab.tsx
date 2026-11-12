@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useCallback, useMemo, type ReactElement } from 'react';
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
-import { Button, Card, EmptyState, ErrorState, LoadingState, Text } from '../../components/ui';
+import { Button, Card, EmptyState, ErrorState, LoadingState, SectionHeader, Text } from '../../components/ui';
 import { useNow } from '../../lib/hooks';
 import { useUserId } from '../../providers/AuthProvider';
 import { makeStyles, spacing, useTheme } from '../../theme';
@@ -12,7 +12,7 @@ import { TournamentCard } from './components';
 import { tournamentPhase } from './logic';
 import type { Tournament } from './types';
 
-type Row = { kind: 'header'; title: string; key: string } | { kind: 'item'; t: Tournament; key: string };
+type Row = { kind: 'header'; title: string; key: string; index: number } | { kind: 'item'; t: Tournament; key: string };
 
 /** The "Tournaments" half of the Scrims section. `header` is the shared filters/switch block. */
 export function TournamentsTab({ gameId, header }: { gameId: string | null; header: ReactElement }) {
@@ -49,7 +49,7 @@ export function TournamentsTab({ gameId, header }: { gameId: string | null; head
     const out: Row[] = [];
     for (const [title, g] of groups) {
       if (g.length === 0) continue;
-      out.push({ kind: 'header', title, key: `h-${title}` });
+      out.push({ kind: 'header', title, key: `h-${title}`, index: out.filter((r) => r.kind === 'header').length + 1 });
       g.forEach((x) => out.push({ kind: 'item', t: x, key: x.id }));
     }
     return out;
@@ -111,9 +111,7 @@ export function TournamentsTab({ gameId, header }: { gameId: string | null; head
       }
       renderItem={({ item }) =>
         item.kind === 'header' ? (
-          <Text variant="label" accessibilityRole="header" style={s.section}>
-            {item.title}
-          </Text>
+          <SectionHeader title={item.title} index={item.index} style={{ marginBottom: spacing.sm }} />
         ) : (
           <TournamentCard
             tournament={item.t}

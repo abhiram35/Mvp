@@ -53,10 +53,12 @@ describe('phase', () => {
     expect(canCheckIn(tour(), T0 + 11 * MIN)).toBe(false);
     expect(canCheckIn(tour({ status: 'live' }), T0)).toBe(false);
   });
-  it('start needs 2 checked-in teams and the check-in window', () => {
-    expect(canStart(tour(), 2, T0 - 31 * MIN)).toBe(false);
-    expect(canStart(tour(), 1, T0)).toBe(false);
-    expect(canStart(tour(), 2, T0 - 30 * MIN)).toBe(true);
+  it('start needs 2 checked-in teams and never drops teams while check-in is open', () => {
+    expect(canStart(tour(), 2, 2, T0 - 31 * MIN)).toBe(false);
+    expect(canStart(tour(), 1, 3, T0)).toBe(false);
+    expect(canStart(tour(), 2, 2, T0 - 30 * MIN)).toBe(true); // everyone checked in: early start OK
+    expect(canStart(tour(), 2, 5, T0 - 10 * MIN)).toBe(false); // 3 teams could still check in
+    expect(canStart(tour(), 2, 5, T0)).toBe(true);
   });
 });
 

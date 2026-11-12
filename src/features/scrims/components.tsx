@@ -3,7 +3,7 @@ import { memo } from 'react';
 import { StyleSheet, Text as RNText, View } from 'react-native';
 import { Card, Text } from '../../components/ui';
 import { regionLabel } from '../lfg/format';
-import { fontSize, makeStyles, spacing, useTheme } from '../../theme';
+import { ensureContrast, fontSize, makeStyles, spacing, useTheme } from '../../theme';
 import { displayStatus, FORMAT_LABELS, formatScrimTime, isStreamingNow, startsIn, STATUS_LABELS, streamPlatform, type DisplayStatus } from './logic';
 import type { Scrim, Team } from './types';
 
@@ -39,7 +39,7 @@ export function TeamTag({ team, size = 44, highlight }: { team: Pick<Team, 'tag'
 export function LivePill({ url }: { url: string }) {
   const t = useTheme();
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: t.colors.danger, borderRadius: t.radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 2 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: ensureContrast(t.colors.danger, ['#FFFFFF'], 4.5), borderRadius: t.radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 2 }}>
       <Ionicons name="radio" size={12} color="#FFFFFF" />
       <RNText style={{ fontFamily: t.fonts.bodyBold, fontSize: fontSize.xs, color: '#FFFFFF', letterSpacing: 0.5 }}>{`LIVE · ${streamPlatform(url)}`}</RNText>
     </View>

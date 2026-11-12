@@ -1,8 +1,8 @@
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { Avatar, Button, Card, EmptyState, ErrorState, LoadingState, Screen, Text, TextField } from '../components/ui';
-import { UnderlineTabs } from '../features/community/UnderlineTabs';
+import { HorizontalChips } from '../features/lfg/HorizontalChips';
 import { BetaStats } from '../features/moderation/BetaStats';
 import { ReportCard, type ReportCardAction } from '../features/moderation/ReportCard';
 import { REPORTS_PAGE_SIZE, getBetaMetrics, listReports, resolveReport, unbanUser } from '../features/moderation/api';
@@ -304,7 +304,9 @@ function DisputesTab() {
 export default function ModerationScreen() {
   const s = useStyles();
   const { isModerator, loaded } = useMyStatus();
-  const [tab, setTab] = useState<Tab>('open');
+  // Notifications can deep-link to a tab (e.g. organiser applications → ?tab=organisers).
+  const params = useLocalSearchParams<{ tab?: string }>();
+  const [tab, setTab] = useState<Tab>(TABS.some((x) => x.value === params.tab) ? (params.tab as Tab) : 'open');
 
   if (!loaded) {
     return (
@@ -325,7 +327,8 @@ export default function ModerationScreen() {
   return (
     <Screen edges={['bottom']} padded={false}>
       <View style={s.tabs}>
-        <UnderlineTabs options={TABS} value={tab} onChange={setTab} />
+        {/* Six queues don't fit as equal tabs on a phone: a scrollable chip row instead. */}
+        <HorizontalChips options={TABS} value={tab} onChange={(v) => v && setTab(v)} />
       </View>
       {tab === 'stats' ? <StatsTab /> : tab === 'scrims' ? <DisputesTab /> : tab === 'organisers' ? <OrganisersTab /> : <ReportList key={tab} status={tab} />}
     </Screen>

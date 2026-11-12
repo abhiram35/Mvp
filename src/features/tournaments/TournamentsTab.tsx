@@ -4,7 +4,7 @@ import { useCallback, useMemo, type ReactElement } from 'react';
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { Button, Card, EmptyState, ErrorState, LoadingState, SectionHeader, Text } from '../../components/ui';
 import { useNow } from '../../lib/hooks';
-import { useUserId } from '../../providers/AuthProvider';
+import { useAuth, useUserId } from '../../providers/AuthProvider';
 import { makeStyles, spacing, useTheme } from '../../theme';
 import { useGames } from '../games/useGames';
 import { fetchEntryCounts, fetchMyApplication, fetchOrganiser, fetchTournaments, useLoader } from './api';
@@ -19,6 +19,7 @@ export function TournamentsTab({ gameId, header }: { gameId: string | null; head
   const t = useTheme();
   const s = useStyles();
   const myId = useUserId();
+  const { profile } = useAuth();
   const now = useNow(30_000);
   const { byId } = useGames();
 
@@ -57,6 +58,12 @@ export function TournamentsTab({ gameId, header }: { gameId: string | null; head
 
   const isOrganiser = !!me.data?.organiser;
   const application = me.data?.application ?? null;
+  // Mirror the server's rules so we never offer an application it will refuse.
+  const DAY = 24 * 3600_000;
+  const reapplyAt = application?.status === 'rejected' && application.reviewed_at ? new Date(application.reviewed_at).getTime() + 7 * DAY : 0;
+  const accountReadyAt = profile?.created_at ? new Date(profile.created_at).getTime() + 30 * DAY : 0;
+  const waitUntil = Math.max(reapplyAt, accountReadyAt);
+  const waitLabel = new Date(waitUntil).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 
   const hostBlock = isOrganiser ? (
     <Button title="Host a tournament" icon="trophy" style={s.host} onPress={() => router.push('/tournaments/new')} />
@@ -66,6 +73,16 @@ export function TournamentsTab({ gameId, header }: { gameId: string | null; head
       <View style={{ flex: 1 }}>
         <Text variant="strong">Organiser application sent</Text>
         <Text variant="caption">A moderator will review it. You will get a notification.</Text>
+      </View>
+    </Card>
+  ) : waitUntil > now ? (
+    <Card style={s.notice}>
+      <Ionicons name="ribbon-outline" size={20} color={t.colors.textMuted} />
+      <View style={{ flex: 1 }}>
+        <Text variant="strong">Host tournaments</Text>
+        <Text variant="caption">
+          {reapplyAt > now ? `Your last application wasn't approved. You can apply again from ${waitLabel}.` : `Organisers need an account at least 30 days old. You can apply from ${waitLabel}.`}
+        </Text>
       </View>
     </Card>
   ) : (

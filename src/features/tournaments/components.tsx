@@ -5,7 +5,7 @@ import Svg, { Path } from 'react-native-svg';
 import { Card, Text } from '../../components/ui';
 import { regionLabel } from '../lfg/format';
 import { formatScrimTime } from '../scrims/logic';
-import { fontSize, makeStyles, spacing, useTheme } from '../../theme';
+import { ensureContrast, fontSize, makeStyles, spacing, useDesign, useTheme } from '../../theme';
 import { groupRounds, PHASE_LABELS, roundName, slotsLabel, tournamentPhase, type Phase } from './logic';
 import type { Tournament, TournamentMatch } from './types';
 
@@ -14,7 +14,8 @@ export function PhasePill({ phase }: { phase: Phase }) {
   const t = useTheme();
   const loud = phase === 'live' || phase === 'checkin';
   const strong = phase === 'registration' || phase === 'starting';
-  const bg = loud ? t.colors.danger : strong ? t.colors.primary : t.colors.surfaceRaised;
+  // Darken the danger red until white 12px text reads (≥ 4.5:1) in every theme.
+  const bg = loud ? ensureContrast(t.colors.danger, ['#FFFFFF'], 4.5) : strong ? t.colors.primary : t.colors.surfaceRaised;
   const fg = loud ? '#FFFFFF' : strong ? t.colors.onPrimary : t.colors.textMuted;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: bg, borderRadius: t.radius.sm, paddingHorizontal: spacing.sm, paddingVertical: 2 }}>
@@ -27,10 +28,11 @@ export function PhasePill({ phase }: { phase: Phase }) {
 /** "✓ Org name" verified-organiser byline. */
 export function OrganiserByline({ name, onPanel }: { name: string | null | undefined; onPanel?: boolean }) {
   const t = useTheme();
+  const d = useDesign();
   const color = onPanel ? t.colors.onPanel : t.colors.textMuted;
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }} accessible accessibilityLabel={`Hosted by ${name ?? 'a verified organiser'}, verified organiser`}>
-      <Ionicons name="checkmark-circle" size={14} color={t.colors.primary} />
+      <Ionicons name="checkmark-circle" size={14} color={onPanel ? d.primaryOnPanel : d.primaryText} />
       <RNText style={{ fontFamily: t.fonts.bodyMedium, fontSize: fontSize.sm, color }} numberOfLines={1}>
         {name ?? 'Verified organiser'}
       </RNText>

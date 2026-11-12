@@ -26,7 +26,7 @@ import { activeEntries, canCheckIn, canStart, nextMatchFor, roundCount, roundNam
 import type { EntryStatus, TournamentMatch } from '../../features/tournaments/types';
 import { useNow } from '../../lib/hooks';
 import { useUserId } from '../../providers/AuthProvider';
-import { fontSize, makeStyles, spacing, useTheme } from '../../theme';
+import { fontSize, makeStyles, spacing, useDesign, useTheme } from '../../theme';
 
 type Tab = 'overview' | 'teams' | 'bracket';
 
@@ -43,6 +43,7 @@ const ENTRY_LABELS: Record<EntryStatus, string> = {
 export default function TournamentScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const t = useTheme();
+  const dz = useDesign();
   const s = useStyles();
   const myId = useUserId();
   const now = useNow(15_000);
@@ -81,7 +82,8 @@ export default function TournamentScreen() {
     const wrongRegion = captained.length > 0 && eligible.length === 0;
     const active = activeEntries(entries);
     const checkedIn = entries.filter((e) => e.status === 'registered' && e.checked_in_at).length;
-    return { myEntry, myMembership, eligible, wrongRegion, active, checkedIn };
+    const registeredCount = entries.filter((e) => e.status === 'registered').length;
+    return { myEntry, myMembership, eligible, wrongRegion, active, checkedIn, registeredCount };
   }, [d]);
 
   const act = async (key: string, fn: () => Promise<unknown>, failTitle: string) => {
@@ -122,7 +124,7 @@ export default function TournamentScreen() {
   }
 
   const { tour, entries, matches } = d;
-  const { myEntry, myMembership, eligible, wrongRegion, active, checkedIn } = derived;
+  const { myEntry, myMembership, eligible, wrongRegion, active, checkedIn, registeredCount } = derived;
   const phase = tournamentPhase(tour, now);
   const isOrganiser = !!myId && tour.organiser_id === myId;
   const game = byId(tour.game_id);
@@ -165,7 +167,7 @@ export default function TournamentScreen() {
           </View>
           {tour.prize ? (
             <View style={s.prize}>
-              <Ionicons name="trophy" size={16} color={t.colors.primary} />
+              <Ionicons name="trophy" size={16} color={dz.primaryOnPanel} />
               <RNText style={{ flex: 1, color: t.colors.onPanel, fontFamily: t.fonts.bodyMedium }}>{tour.prize}</RNText>
             </View>
           ) : null}
@@ -275,7 +277,7 @@ export default function TournamentScreen() {
               <Button
                 title="Start tournament"
                 icon="play"
-                disabled={!canStart(tour, checkedIn, now)}
+                disabled={!canStart(tour, checkedIn, registeredCount, now)}
                 loading={busy === 'start'}
                 onPress={() =>
                   Alert.alert('Start the bracket?', `${checkedIn} checked-in teams will be seeded. Teams that didn't check in are dropped.`, [
@@ -284,8 +286,8 @@ export default function TournamentScreen() {
                   ])
                 }
               />
-              {!canStart(tour, checkedIn, now) ? (
-                <Text variant="caption">You can start from 30 minutes before the start time, once at least 2 teams have checked in.</Text>
+              {!canStart(tour, checkedIn, registeredCount, now) ? (
+                <Text variant="caption">You can start at the start time once at least 2 teams have checked in, or earlier (from 30 minutes before) if every registered team has checked in.</Text>
               ) : null}
             </Card>
           ) : null}

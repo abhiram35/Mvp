@@ -8,6 +8,7 @@ import { TeamTag } from '../../../features/scrims/components';
 import { FORMAT_LABELS, scoreOptions, streamPlatform } from '../../../features/scrims/logic';
 import {
   fetchMatch,
+  fetchMatches,
   fetchMatchLobby,
   fetchMatchReports,
   fetchTournament,
@@ -22,7 +23,7 @@ import { roundCount, roundName, sideOf, TOURNAMENT_RULES } from '../../../featur
 import type { Team } from '../../../features/scrims/types';
 import type { TournamentMatch } from '../../../features/tournaments/types';
 import { useUserId } from '../../../providers/AuthProvider';
-import { fontSize, makeStyles, spacing, useTheme } from '../../../theme';
+import { fontSize, makeStyles, spacing, useDesign, useTheme } from '../../../theme';
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   const s = useStyles();
@@ -60,13 +61,16 @@ export default function TournamentMatchScreen() {
     useCallback(async () => {
       const match = await fetchMatch(String(id));
       if (!match) return null;
-      const [tour, reports, lobby, myTeams] = await Promise.all([
+      const [tour, reports, lobby, myTeams, all] = await Promise.all([
         fetchTournament(match.tournament_id),
         fetchMatchReports(match.id),
         fetchMatchLobby(match.id),
         myId ? fetchMyTeams(myId) : Promise.resolve([]),
+        fetchMatches(match.tournament_id).catch(() => [] as TournamentMatch[]),
       ]);
-      return { match, tour, reports, lobby, myTeams };
+      // The bracket is sized from checked-in teams, not max_teams: count rounds from the matches.
+      const rounds = all.length ? Math.max(...all.map((x) => x.round)) : null;
+      return { match, tour, reports, lobby, myTeams, rounds };
     }, [id, myId]),
     `tmatch-${id}-${myId}`,
   );
@@ -125,13 +129,15 @@ export default function TournamentMatchScreen() {
   }
 
   const { match, tour, reports, lobby } = d;
+  const staff = isOrganiserOf(tour.organiser_id, myId) || isModerator;
   const { side, isCaptain, myReport, theirReport } = derived;
   const isOrganiser = !!myId && tour.organiser_id === myId;
   const canJudge = (isOrganiser || isModerator) && !side;
   const open = match.status === 'ready' || match.status === 'disputed';
-  const canEditLobby = open && (isCaptain || isOrganiser) && !banned;
+  // The server only lets lobby details change while the match is ready (not disputed).
+  const canEditLobby = match.status === 'ready' && (isCaptain || isOrganiser) && !banned;
   const featured = tour.featured_match_id === match.id;
-  const rounds = roundCount(tour.max_teams);
+  const rounds = d.rounds ?? roundCount(tour.max_teams);
 
   const submit = (fn: (a: number, b: number) => Promise<unknown>, key: string) => {
     if (!score) return;
@@ -175,7 +181,7 @@ export default function TournamentMatchScreen() {
           </Section>
         ) : null}
 
-        {open && side ? (
+        {open && (side || staff) ? (
           <>
             <Section title="Lobby">
               {lobbyDraft !== null ? (
@@ -216,6 +222,7 @@ export default function TournamentMatchScreen() {
               ) : null}
             </Section>
 
+            {side ? (
             <Section title="Result">
               {match.status === 'disputed' ? (
                 <Text style={{ marginBottom: spacing.sm }}>{"The captains reported different scores. The organiser will set the result. You can still correct yours."}</Text>
@@ -247,6 +254,7 @@ export default function TournamentMatchScreen() {
                 <Text muted>Your captain reports the result.</Text>
               )}
             </Section>
+            ) : null}
           </>
         ) : null}
 
@@ -286,15 +294,20 @@ export default function TournamentMatchScreen() {
   );
 }
 
+function isOrganiserOf(organiserId: string | null, myId: string | null): boolean {
+  return !!myId && organiserId === myId;
+}
+
 function TeamCol({ team, won }: { team: Team | null; won: boolean }) {
   const t = useTheme();
+  const d = useDesign();
   return (
     <View style={{ flex: 1, alignItems: 'center', gap: spacing.xs }}>
       <TeamTag team={team} size={60} highlight={won} />
       <RNText numberOfLines={2} style={{ fontFamily: t.fonts.heading, fontSize: fontSize.lg, color: t.colors.onPanel, textAlign: 'center' }}>
         {team?.name ?? 'TBD'}
       </RNText>
-      {won ? <RNText style={{ fontFamily: t.fonts.bodyBold, fontSize: fontSize.xs, color: t.colors.primary, letterSpacing: 1 }}>WINNER</RNText> : null}
+      {won ? <RNText style={{ fontFamily: t.fonts.bodyBold, fontSize: fontSize.xs, color: d.primaryOnPanel, letterSpacing: 1 }}>WINNER</RNText> : null}
     </View>
   );
 }

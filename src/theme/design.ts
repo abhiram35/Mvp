@@ -38,6 +38,8 @@ export interface DesignTokens {
   chip: { bg: string; fg: string };
   /** Segmented control track. */
   track: string;
+  /** The primary nudged to read as small text on panel / hero bands (≥ 4.5:1). */
+  primaryOnPanel: string;
   /** Hero band gradient (both stops keep onPanel ≥ 4.5:1). */
   hero: { from: string; to: string };
 }
@@ -133,8 +135,9 @@ function build(t: AppTheme): DesignTokens {
   const lang = designLanguage(t);
   const ink = t.dark ? '#000000' : c.text;
 
-  const primaryText = ensureContrast(c.primary, [c.bg, c.surface], 4.5);
   const primaryTint = mixHex(c.bg, c.primary, t.dark ? 0.16 : 0.1);
+  // Also readable on the tint, which is used behind primary text for active filters / unread rows.
+  const primaryText = ensureContrast(c.primary, [c.bg, c.surface, primaryTint], 4.5);
 
   // Chip: the raised tone when muted text still reads on it, else the plain surface.
   const chipBg = contrast(c.textMuted, c.surfaceRaised) >= 4.5 ? c.surfaceRaised : c.surface;
@@ -167,6 +170,7 @@ function build(t: AppTheme): DesignTokens {
     chip: { bg: chipBg, fg: c.textMuted },
     track: contrast(c.textMuted, track) >= 4.5 ? track : c.bg,
     hero: { from: c.panel, to },
+    primaryOnPanel: ensureContrast(c.primary, [c.panel, to], 4.5),
   };
 }
 

@@ -66,8 +66,15 @@ export function canCheckIn(t: Pick<Tournament, 'status' | 'starts_at'>, now: num
   return now >= s - TOURNAMENT_RULES.checkInOpensMin * MIN && now <= s + TOURNAMENT_RULES.checkInGraceMin * MIN;
 }
 
-export function canStart(t: Pick<Tournament, 'status' | 'starts_at'>, checkedIn: number, now: number = Date.now()): boolean {
-  return t.status === 'registration' && checkedIn >= 2 && now >= new Date(t.starts_at).getTime() - TOURNAMENT_RULES.checkInOpensMin * MIN;
+/**
+ * The organiser can start once ≥ 2 teams checked in and either the start time has come, or every
+ * registered team already checked in (so nobody is dropped while check-in is still open).
+ */
+export function canStart(t: Pick<Tournament, 'status' | 'starts_at'>, checkedIn: number, registered: number, now: number = Date.now()): boolean {
+  if (t.status !== 'registration' || checkedIn < 2) return false;
+  const s = new Date(t.starts_at).getTime();
+  if (now >= s) return true;
+  return now >= s - TOURNAMENT_RULES.checkInOpensMin * MIN && checkedIn >= registered;
 }
 
 // ── Bracket ─────────────────────────────────────────────────────────────────

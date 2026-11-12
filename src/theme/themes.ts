@@ -89,7 +89,7 @@ export const THEMES: Record<BuiltInThemeId, AppTheme> = {
       border: '#C9C2B6',
       text: '#111A22',
       textMuted: '#4A5059',
-      textFaint: '#6E6A62',
+      textFaint: '#66625A',
       primary: '#D63A2F',
       primaryPressed: '#B82E24',
       onPrimary: '#FFFFFF',

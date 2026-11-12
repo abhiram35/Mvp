@@ -578,7 +578,7 @@ begin
   for r in select m.profile_id from public.moderators m loop
     perform public.gg_notify(
       r.profile_id, 'organiser_application', 'New organiser application', v_name,
-      public.gg_route('/moderation'), me,
+      jsonb_build_object('pathname', '/moderation', 'params', jsonb_build_object('tab', 'organisers')), me,
       jsonb_build_object('application_id', v_id));
   end loop;
   return v_id;
@@ -1045,6 +1045,13 @@ begin
   where tt.tournament_id = p_tournament_id and tt.status = 'registered' and tt.checked_in_at is not null;
   if v_n < 2 then
     raise exception 'At least 2 teams must check in before you can start' using errcode = '22023';
+  end if;
+  -- Don't drop teams while check-in is still open: before the start time, everyone must be in.
+  if now() < v_t.starts_at and exists (
+    select 1 from public.tournament_teams tt
+    where tt.tournament_id = p_tournament_id and tt.status = 'registered' and tt.checked_in_at is null
+  ) then
+    raise exception 'Some teams haven''t checked in yet. Start at the start time, or once every team has checked in.' using errcode = '22023';
   end if;
 
   -- No-shows.

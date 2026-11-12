@@ -3,7 +3,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { ComponentProps } from 'react';
 import { Text as RNText, View, type TextProps, type TextStyle, type ViewStyle } from 'react-native';
-import Svg, { Polygon } from 'react-native-svg';
 import { fontSize, useTheme, type AppTheme } from '../../theme';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
@@ -77,24 +76,21 @@ export function Notch({ corner, color, size }: { corner: 'topRight' | 'bottomLef
   const t = useTheme();
   const s = size ?? t.shape.cut;
   if (!s) return null;
-  const pos: ViewStyle = { position: 'absolute', width: s, height: s };
-  const points = {
-    topRight: `0,0 ${s},0 ${s},${s}`,
-    bottomLeft: `0,0 0,${s} ${s},${s}`,
-    topLeft: `0,0 ${s},0 0,${s}`,
-    bottomRight: `${s},0 ${s},${s} 0,${s}`,
-  }[corner];
-  if (corner === 'topRight') Object.assign(pos, { top: 0, right: 0 });
-  if (corner === 'bottomLeft') Object.assign(pos, { bottom: 0, left: 0 });
-  if (corner === 'topLeft') Object.assign(pos, { top: 0, left: 0 });
-  if (corner === 'bottomRight') Object.assign(pos, { bottom: 0, right: 0 });
-  return (
-    <View pointerEvents="none" style={pos}>
-      <Svg width={s} height={s}>
-        <Polygon points={points} fill={color} />
-      </Svg>
-    </View>
-  );
+  // A border triangle (plain View, no SVG): cheap enough for every card in a long list.
+  const top = corner === 'topRight' || corner === 'topLeft';
+  const right = corner === 'topRight' || corner === 'bottomRight';
+  const style: ViewStyle = {
+    position: 'absolute',
+    width: 0,
+    height: 0,
+    [top ? 'top' : 'bottom']: 0,
+    [right ? 'right' : 'left']: 0,
+    [top ? 'borderTopWidth' : 'borderBottomWidth']: s,
+    [top ? 'borderTopColor' : 'borderBottomColor']: color,
+    [right ? 'borderLeftWidth' : 'borderRightWidth']: s,
+    [right ? 'borderLeftColor' : 'borderRightColor']: 'transparent',
+  };
+  return <View pointerEvents="none" style={style} />;
 }
 
 /**

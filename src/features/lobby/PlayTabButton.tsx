@@ -8,7 +8,6 @@ import { useDesign, useTheme } from '../../theme';
 const SIZE = 64;
 /** How far the hexagon's top rises above the tab bar. Exported: the tab bar reserves this space. */
 export const PLAY_RAISE = 24;
-const RAISE = PLAY_RAISE;
 /** Ring in the bar colour around the hexagon, so it reads as cut out of the bar. */
 const RING = 4;
 

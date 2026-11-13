@@ -20,6 +20,7 @@ Everything the app needs lives in `migrations/`. Run the files **in order**:
 | `0014_scrims.sql` | **Scrims** (VALORANT and CS2): teams, invites, scrim board, requests, group chat for both rosters, check-in, results, disputes, no-shows, team stats. See `docs/SCRIMS.md` |
 | `0015_scrim_streams.sql` | **Streaming scrims**: opt-in "OK to stream", YouTube/Twitch link per scrim, moderator-featured scrims |
 | `0016_tournaments.sql` | **Tournaments**: verified organisers (apply → moderator review), free single-elimination cups with registration, check-in, auto bracket with byes, match chats, results/disputes, streamed on YouTube/Twitch. See `docs/TOURNAMENTS.md` |
+| `0017_clips_party.sql` | **Clips + Party**: share YouTube/Twitch/Medal clip links (GGs, comments, Squad / For you / Cups feeds) and the Lobby's party (up to 5 players, invites expire after 1 hour, ready checks). See `docs/CLIPS_AND_PARTY.md` |
 
 All files are safe to run again. Re-running them will not create duplicates, and it will not undo your own edits
 to the game list.
@@ -38,8 +39,8 @@ to the game list.
 **Option A: SQL Editor (easiest)**
 1. In the dashboard open **SQL Editor → New query**.
 2. Open `migrations/0001_schema.sql`, copy the whole file, paste it, and click **Run**.
-3. Do the same for `0002`, `0003`, `0004`, `0005`, `0006`, `0007`, `0008`, `0009`, `0010`, `0011`, `0012`, `0013`, `0014`, `0015` and `0016`, in that order
-   (so the full run order is **0001 → 0016**). Already ran some of them earlier? Just run the newer ones, in order.
+3. Do the same for `0002`, `0003`, `0004`, `0005`, `0006`, `0007`, `0008`, `0009`, `0010`, `0011`, `0012`, `0013`, `0014`, `0015`, `0016` and `0017`, in that order
+   (so the full run order is **0001 → 0017**). Already ran some of them earlier? Just run the newer ones, in order.
 
 **Option B: Supabase CLI**
 ```bash
@@ -353,3 +354,15 @@ Notes:
   `select resolve_match('<match id>', 2, 1);` (team A score, team B score). Nobody on either team can resolve.
 - Starting builds the whole bracket at once: teams that didn't check in become `no_show`, seeds follow scrim
   reliability, top seeds get byes, and every match with two known teams gets a group chat (both rosters + organiser).
+
+## Clips and Party (`0017`)
+- Run `migrations/0017_clips_party.sql` (after `0016`) before shipping the app build with Clips and the Lobby.
+  Contract: `docs/CLIPS_AND_PARTY.md`.
+- Clips are links only (https YouTube videos/Shorts, Twitch clips/videos, Medal clips); Vinq stores no video.
+  Limits: 10 clips per player per 24 hours, 30 comments per hour, the same video only once per player.
+- All writes go through RPCs (`post_clip`, `toggle_clip_gg`, `add_clip_comment`, `invite_to_party`, …). Players
+  cannot insert or edit `clips`, `clip_ggs`, `clip_comments`, `parties`, `party_members` or `party_invites` directly.
+- Deleting a clip or comment (by the player or by a moderator's **Remove content**) only sets `removed_at`; the row stays
+  for moderation. Clips and clip comments can be reported (`target_type` `clip` / `clip_comment`).
+- Put a clip back: `update clips set removed_at = null where id = '<clip id>';`
+- A party leader who leaves hands the party to the longest-serving member; the last member leaving deletes it.

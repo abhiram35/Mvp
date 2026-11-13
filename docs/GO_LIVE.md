@@ -28,7 +28,7 @@ You can skip Firebase at first. The app works without it, except that phones won
 Follow **[supabase/README.md](../supabase/README.md)**. In short:
 
 1. Create a project (region: **Mumbai** if your players are in India).
-2. Run **every** file in `supabase/migrations/` **in order**: `0001` → `0002` → … → the last one (`0013` at the
+2. Run **every** file in `supabase/migrations/` **in order**: `0001` → `0002` → … → the last one (`0017` at the
    time of writing). Skipping or re-ordering breaks things. Running a file twice is safe.
    **Whenever the repo gets a new migration, run it before you publish a new build or update** — new app
    versions expect the new tables and columns and will fail (sign-up, Edit profile, game lists) without them.
@@ -141,7 +141,7 @@ Expo's guides: [push notifications setup](https://docs.expo.dev/push-notificatio
 and [FCM V1 credentials](https://docs.expo.dev/push-notifications/fcm-credentials/). Short version:
 
 1. **Firebase console → Add project** (any name, Analytics not needed).
-2. **Add app → Android**, package name **`com.abhiram35.gg`** (must match `app.json`). Download
+2. **Add app → Android**, package name **`com.abhiram35.vinq`** (must match `app.json`). Download
    **`google-services.json`** and put it in the project root.
 3. Tell the app about it: in `app.json`, inside `"android": { … }`, add
    `"googleServicesFile": "./google-services.json"`. Commit both files. Only add this line once the file is
@@ -206,6 +206,20 @@ keeps old builds from receiving updates that need the new native code.
    new link. They install it over the old app (same package name, their login stays).
 4. `eas update` alone will **not** reach phones that still have a `1.0.0` build: updates only go to builds with
    the same `version`. Friends on `1.0.0` keep the old app until they install the new build.
+
+### Releasing scrims, tournaments, clips and the new layout
+
+1. Run `0014_scrims.sql`, `0015_scrim_streams.sql`, `0016_tournaments.sql` and `0017_clips_party.sql` in
+   Supabase, in that order (step 2).
+2. These features added no native libraries, so phones that already have a `1.1.0` build get them with
+   `eas update` (step 10). If nobody has a build yet, just make the first build (step 9).
+
+### iPhone friends
+
+Installing a test build on an iPhone needs an **Apple Developer account (US$99 a year)**: then
+`npx eas-cli@latest build -p ios --profile preview` (each iPhone must be registered first with
+`npx eas-cli@latest device:create`) or TestFlight via `eas submit`. Until then, iPhone friends can try the app
+in **Expo Go** while you run `npx expo start` (same Wi-Fi, or `npx expo start --tunnel`).
 
 ### Release order (every time)
 
@@ -278,7 +292,7 @@ month by the server.
 
 ## Beta checklist
 
-- [ ] All migrations run in order `0001` → `0013` (including `0010_games_steam.sql`, `0011_review_fixes.sql`, `0012_rename_vinq.sql` and `0013_feedback.sql`),
+- [ ] All migrations run in order `0001` → `0017` (including `0014_scrims.sql`, `0015_scrim_streams.sql`, `0016_tournaments.sql` and `0017_clips_party.sql`),
       `games` table has rows
 - [ ] Email confirm + reset templates contain `{{ .Token }}`; redirect URLs `gg://**`, `exp://**` added
 - [ ] `.env` filled; app works in Expo Go (sign up, lobby, chat, community post)

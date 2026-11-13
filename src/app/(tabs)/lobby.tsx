@@ -44,6 +44,7 @@ import {
   memberCount,
   partyErrorMessage,
   partyHeadcount,
+  withoutExpiredInvites,
 } from '../../features/party/logic';
 import { PARTY_SIZE, type PartySlot } from '../../features/party/types';
 import { usePlayerStats } from '../../features/reputation/api';
@@ -68,7 +69,7 @@ export default function LobbyScreen() {
   // ── Data ──────────────────────────────────────────────────────────────────
   const { stats, reload: reloadStats } = usePlayerStats(myId);
   const partyState = useParty(myId);
-  const { party, incoming, patch } = partyState;
+  const { incoming, patch } = partyState;
   const { friends, loading: friendsLoading } = useFriends();
   const { conversations, load: loadChats } = useConversationList();
   const { count: requestCount, reload: reloadRequests } = useIncomingRequestCount();
@@ -90,6 +91,8 @@ export default function LobbyScreen() {
     setRefreshing(false);
   }, [partyState, counts, ticker, myGames, reloadStats, loadChats, reloadRequests]);
 
+  // Expired invites free their slot as soon as they expire (not only on the next reload).
+  const party = useMemo(() => withoutExpiredInvites(partyState.party, now), [partyState.party, now]);
   const me = useMemo(
     () => ({ id: myId, username: profile?.username ?? '', display_name: profile?.display_name ?? 'You', avatar_url: profile?.avatar_url ?? null }),
     [myId, profile],
@@ -100,7 +103,10 @@ export default function LobbyScreen() {
   const inParty = !!party && party.members.length > 0;
   const ready = isReady(party, myId);
   const invites = useMemo(() => activeIncomingInvites(incoming, party?.party_id ?? null, now), [incoming, party, now]);
-  const friendChoices = useMemo(() => invitableFriends(friends.map((f) => f.profile), party, myId), [friends, party, myId]);
+  // The sheet lists every friend not in the party; ones with a live invite show "Invited".
+  const memberOnly = useMemo(() => (party ? { ...party, invites: [] } : null), [party]);
+  const friendChoices = useMemo(() => invitableFriends(friends.map((f) => f.profile), memberOnly, myId), [friends, memberOnly, myId]);
+  const invitedIds = useMemo(() => new Set((party?.invites ?? []).map((i) => i.to_id)), [party]);
   const unreadChats = conversations.filter((c) => c.unread_count > 0).length + requestCount;
 
   const mainGame = pickMainGame(myGames.data ?? [], byId, isSquadable);
@@ -359,8 +365,10 @@ export default function LobbyScreen() {
         key={sheetOpen ? 'open' : 'closed'}
         visible={sheetOpen}
         friends={friendChoices}
+        invitedIds={invitedIds}
         loading={friendsLoading}
         slotsLeft={Math.max(0, PARTY_SIZE - partyHeadcount(party))}
+        reduced={reduced}
         onClose={() => setSheetOpen(false)}
         onInvite={onInvite}
       />

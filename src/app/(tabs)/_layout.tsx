@@ -3,7 +3,7 @@ import { Tabs } from 'expo-router/js-tabs';
 import { StyleSheet, View } from 'react-native';
 import type { IconName } from '../../components/ui';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { PLAY_RAISE, PlayTabButton } from '../../features/lobby/PlayTabButton';
+import { BAR_HEIGHT, BarTabButton, PLAY_RAISE, PlayTabButton } from '../../features/lobby/PlayTabButton';
 import { BannedBanner, BannedBannerHost } from '../../features/moderation/BannedBanner';
 import { ensureContrast, mixHex, useDesign, useTheme } from '../../theme';
 
@@ -50,8 +50,12 @@ export default function TabsLayout() {
             headerShown: false,
             // The bar is PLAY_RAISE taller than it looks: a transparent strip on top holds the
             // raised hexagon inside the bar's bounds (Android ignores touches outside them).
+            // It floats over the screens (position absolute) so the strip shows the screen
+            // behind it; each scene is padded by the visible bar height instead. Normal tabs
+            // use BarTabButton, which only takes touches in the visible part.
             tabBarStyle: {
-              height: 56 + insets.bottom + PLAY_RAISE,
+              position: 'absolute',
+              height: BAR_HEIGHT + insets.bottom + PLAY_RAISE,
               paddingBottom: insets.bottom,
               backgroundColor: 'transparent',
               borderTopWidth: 0,
@@ -73,7 +77,8 @@ export default function TabsLayout() {
                 }}
               />
             ),
-            tabBarItemStyle: { paddingTop: PLAY_RAISE },
+            sceneStyle: { paddingBottom: BAR_HEIGHT + insets.bottom },
+            tabBarButton: (props) => <BarTabButton {...props} />,
             tabBarActiveTintColor: active,
             tabBarInactiveTintColor: inactive,
             tabBarLabelStyle: { fontFamily: t.fonts.heading, fontSize: 12, letterSpacing: t.shape.headingLetterSpacing, marginTop: 2 },

@@ -2,7 +2,7 @@
 // Chrome (feed tabs, friends row, header buttons, sheets) uses the theme; the media stays dark.
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -15,7 +15,7 @@ import {
   type ListRenderItem,
   type ListViewToken,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button, EmptyState, ErrorState, LoadingState, SegmentedControl, Text, type IconName } from '../../components/ui';
 import { useClipFeed } from '../../features/clips/api';
 import { ClipPage, type ClipPageActions } from '../../features/clips/ClipPage';
@@ -53,7 +53,6 @@ function HeaderButton({ icon, label, onPress }: { icon: IconName; label: string;
 export default function ClipsScreen() {
   const t = useTheme();
   const s = useStyles();
-  const insets = useSafeAreaInsets();
   const myId = useUserId();
   const reduced = useReducedMotion();
   const now = useNow();
@@ -64,6 +63,17 @@ export default function ClipsScreen() {
   const { clips, loading, refreshing, loadingMore, hasMore, error, moreError, refresh, retry, loadMore } = useClipFeed(feed);
   const [pageHeight, setPageHeight] = useState(0);
   const [active, setActive] = useState(0);
+  const list = useRef<FlatList<Clip>>(null);
+  const activeRef = useRef(0);
+  useEffect(() => {
+    activeRef.current = active;
+  }, [active]);
+
+  // Pages are pageHeight tall: when it changes after render (banner shown/hidden, rotation,
+  // the friends row loading), re-align so the current clip still fills the screen.
+  useEffect(() => {
+    if (pageHeight > 0) list.current?.scrollToOffset({ offset: activeRef.current * pageHeight, animated: false });
+  }, [pageHeight]);
   const [commentsFor, setCommentsFor] = useState<Clip | null>(null);
 
   const { show: toast, node: toastNode } = useToast();
@@ -134,6 +144,7 @@ export default function ClipsScreen() {
     body = (
       <View style={{ flex: 1, backgroundColor: base }}>
         <FlatList
+          ref={list}
           key={feed}
           data={clips}
           keyExtractor={(c) => c.id}
@@ -173,7 +184,9 @@ export default function ClipsScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: t.colors.bg }}>
-      <View style={{ paddingTop: insets.top, backgroundColor: t.colors.bg }}>
+      {/* edges top like the other tabs' Screen: under the BannedBanner (which pads the top
+          inset itself) this only pads what still overlaps, instead of the raw inset. */}
+      <SafeAreaView edges={['top']} style={{ backgroundColor: t.colors.bg }}>
         <View style={s.header}>
           <View style={{ flex: 1 }}>
             <SegmentedControl variant="underline" value={feed} options={CLIP_FEEDS} onChange={changeFeed} />
@@ -182,7 +195,7 @@ export default function ClipsScreen() {
           <HeaderButton icon="chatbubbles-outline" label="Chats" onPress={() => router.push('/chats')} />
         </View>
         <FriendsRings />
-      </View>
+      </SafeAreaView>
       <View style={{ flex: 1 }} onLayout={onLayout}>
         {body}
         {toastNode}

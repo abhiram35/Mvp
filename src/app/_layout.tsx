@@ -8,6 +8,10 @@ import { GGErrorBoundary, installGlobalErrorHandlers, useAppOpenTracking } from 
 import { AuthProvider, useAuth } from '../providers/AuthProvider';
 import { ThemeProvider, useTheme, useThemeSwitcher } from '../theme';
 
+// Deep links that cold-start the app on a stack screen (/clips/[id], /chats, /lfg, …) get the
+// tabs underneath, so Back has somewhere to go (Expo Router reads `unstable_settings.anchor`).
+export const unstable_settings = { anchor: '(tabs)' };
+
 // Capture crashes and unhandled errors into Supabase (app_errors) from the very start.
 installGlobalErrorHandlers();
 
@@ -75,7 +79,8 @@ function RootNavigator() {
         {/* The board has its own editorial header (with a back link), so no stack header: avoids a doubled title. */}
         <Stack.Screen name="lfg/index" options={{ title: t.words.lobbies, headerShown: false }} />
         {/* Chats, moved out of the tab bar — opened from the Lobby / Clips headers */}
-        <Stack.Screen name="chats" options={{ title: 'Chats' }} />
+        {/* Own header with a "‹ Lobby" back link (like the LFG board), so no stack header. */}
+        <Stack.Screen name="chats" options={{ title: 'Chats', headerShown: false }} />
         {/* Clips (owned by the Clips engineer; screens may override these options) */}
         <Stack.Screen name="clips/[id]" options={{ title: 'Clip' }} />
         <Stack.Screen name="clips/new" options={{ title: 'Share a clip', presentation: 'modal' }} />

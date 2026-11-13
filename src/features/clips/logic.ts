@@ -208,3 +208,73 @@ export function artGradient(base: string, accents: readonly string[], key: strin
   }
   return { from, to: mixHex(base, '#000000', 0.35) };
 }
+
+// ── Feed paging ─────────────────────────────────────────────────────────────
+
+/** Pages fetched in one loadMore before giving up on a run of duplicates / hidden clips. */
+export const MAX_EMPTY_PAGES = 3;
+
+/**
+ * Appends one server page to the loaded feed. `added` counts clips that are new AND visible
+ * (not already loaded, not hidden: blocked / deleted here), so a page of only duplicates or
+ * hidden clips adds nothing visible and the caller keeps paging instead of stalling
+ * onEndReached. `serverEnd` is true when the server returned a short page.
+ */
+export function mergeFeedPage<T extends { id: string }>(
+  loaded: readonly T[],
+  page: readonly T[],
+  pageSize: number,
+  hidden: (item: T) => boolean = () => false,
+): { items: T[]; added: number; serverEnd: boolean } {
+  const seen = new Set(loaded.map((c) => c.id));
+  const fresh: T[] = [];
+  let added = 0;
+  for (const c of page) {
+    if (seen.has(c.id)) continue;
+    seen.add(c.id);
+    fresh.push(c);
+    if (!hidden(c)) added += 1;
+  }
+  return { items: fresh.length ? [...loaded, ...fresh] : [...loaded], added, serverEnd: page.length < pageSize };
+}
+
+/** After a page: stop (got something), keep paging (only duplicates/hidden), or the feed ended. */
+export function feedPageOutcome(r: { added: number; serverEnd: boolean }, emptyPagesInARow: number): 'done' | 'continue' | 'end' {
+  if (r.serverEnd) return 'end';
+  if (r.added > 0) return 'done';
+  return emptyPagesInARow + 1 >= MAX_EMPTY_PAGES ? 'end' : 'continue';
+}
+
+// ── Cup (tournament) picker ─────────────────────────────────────────────────
+
+/** Cups older than this (by start) aren't offered for new clips. */
+export const CUP_CLIP_WINDOW_MS = 30 * 24 * 3600_000;
+
+interface CupLike {
+  id: string;
+  game_id: string;
+  name: string;
+  status: string;
+  starts_at: string;
+}
+
+/**
+ * Tournaments offered in the "Share a clip" picker: not cancelled, started within the last 30
+ * days or upcoming, for the chosen game (all games when none is chosen). Live first, then the
+ * most recent start first.
+ */
+export function clipCupChoices<T extends CupLike>(cups: readonly T[], gameId: string | null, now: number): T[] {
+  const rank = (c: T) => (c.status === 'live' ? 0 : 1);
+  return cups
+    .filter((c) => c.status !== 'cancelled' && (!gameId || c.game_id === gameId))
+    .filter((c) => {
+      const start = Date.parse(c.starts_at);
+      return !Number.isFinite(start) || start >= now - CUP_CLIP_WINDOW_MS;
+    })
+    .sort((a, b) => rank(a) - rank(b) || b.starts_at.localeCompare(a.starts_at) || a.name.localeCompare(b.name));
+}
+
+/** Keeps the picked cup only while it's still on offer (e.g. after the game changes). */
+export function keepCupChoice(choice: string | null, offered: readonly { id: string }[]): string | null {
+  return choice && offered.some((c) => c.id === choice) ? choice : null;
+}

@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
@@ -28,11 +29,22 @@ export default function ChatsScreen() {
   );
 
   return (
-    <Screen padded={false} edges={['bottom']}>
+    // No stack header (headerShown false in _layout): the screen has its own editorial header
+    // with a back link, like the LFG board, so the title isn't doubled.
+    <Screen padded={false} edges={['top', 'bottom']}>
       <View style={s.header}>
+        <Pressable
+          onPress={() => (router.canGoBack() ? router.back() : router.replace('/lobby'))}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+          hitSlop={8}
+          style={s.back}
+        >
+          <Ionicons name="chevron-back" size={22} color={t.colors.text} />
+          <Text variant="label">Lobby</Text>
+        </Pressable>
         <ScreenHeader
           title="Chats"
-          index={4}
           kicker={unreadChats > 0 ? `${unreadChats} unread` : `${t.words.squad}s & DMs`}
           right={<FriendsButton count={requestCount} />}
         />
@@ -145,6 +157,7 @@ function ConversationRow({ item }: { item: ConversationSummary }) {
 const useStyles = makeStyles((t) =>
   StyleSheet.create({
     header: { paddingHorizontal: spacing.lg },
+    back: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 44, alignSelf: 'flex-start', marginBottom: 4 },
     row: {
       flexDirection: 'row',
       alignItems: 'center',

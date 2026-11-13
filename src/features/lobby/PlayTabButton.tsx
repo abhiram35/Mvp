@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import type { BottomTabBarButtonProps } from 'expo-router/js-tabs';
+import { PlatformPressable } from 'expo-router/react-navigation';
 import { Pressable, StyleSheet, Text as RNText, View } from 'react-native';
 import Svg, { Polygon } from 'react-native-svg';
 import { useDesign, useTheme } from '../../theme';
@@ -8,6 +9,8 @@ import { useDesign, useTheme } from '../../theme';
 const SIZE = 64;
 /** How far the hexagon's top rises above the tab bar. Exported: the tab bar reserves this space. */
 export const PLAY_RAISE = 24;
+/** Height of the visible part of the tab bar (above the bottom safe-area inset). */
+export const BAR_HEIGHT = 56;
 /** Ring in the bar colour around the hexagon, so it reads as cut out of the bar. */
 const RING = 4;
 
@@ -45,7 +48,7 @@ export function PlayTabButton({ onPress, onLongPress, accessibilityState, testID
         onPress={onPress}
         onLongPress={onLongPress}
         testID={testID}
-        accessibilityRole="button"
+        accessibilityRole="tab"
         accessibilityLabel="Play: find a duo"
         accessibilityState={{ selected: focused }}
         hitSlop={4}
@@ -79,7 +82,23 @@ export function PlayTabButton({ onPress, onLongPress, accessibilityState, testID
   );
 }
 
+/**
+ * Button for the normal tabs. The bar is PLAY_RAISE taller than it looks (the hexagon's strip);
+ * this wrapper ignores touches in that strip (box-none + top padding), so only the visible
+ * 56px part of the tab is pressable.
+ */
+export function BarTabButton({ style, ...props }: BottomTabBarButtonProps) {
+  const { flex } = StyleSheet.flatten(style) ?? {};
+  return (
+    <View style={[s.barSlot, flex !== undefined && { flex }]} pointerEvents="box-none">
+      <PlatformPressable {...props} style={[style, s.barButton]} />
+    </View>
+  );
+}
+
 const s = StyleSheet.create({
+  barSlot: { flex: 1, paddingTop: PLAY_RAISE },
+  barButton: { flex: 1 },
   slot: { flex: 1, alignItems: 'center', overflow: 'visible' },
   button: { position: 'absolute', alignItems: 'center', justifyContent: 'center' },
   label: { fontSize: 11, marginTop: -1 },

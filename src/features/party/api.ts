@@ -46,6 +46,9 @@ export const setPartyReady = (ready: boolean) => rpc<void>('set_party_ready', { 
 export const cancelPartyInvite = (inviteId: string) => rpc<void>('cancel_party_invite', { p_invite_id: inviteId });
 
 // ── Hook ────────────────────────────────────────────────────────────────────
+/** Realtime bursts (e.g. accept = invite update + member insert) collapse into one reload. */
+const RELOAD_DEBOUNCE_MS = 300;
+
 export interface PartyState {
   party: Party | null;
   incoming: IncomingPartyInvite[];
@@ -108,23 +111,36 @@ export function useParty(myId: string | null | undefined): PartyState {
     }, [load]),
   );
 
+  // Realtime, filtered to rows that concern me (DELETE events aren't checked against RLS, so an
+  // unfiltered channel would hear every party's deletes): my party's members and invites, my
+  // own membership row (being added to / removed from a party) and invites sent to me.
+  // Resubscribes when my party changes; bursts of events cause one reload.
+  const partyId = party?.party_id ?? null;
   useEffect(() => {
     if (!myId) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
     const bump = () => {
       if (timer) clearTimeout(timer);
-      timer = setTimeout(() => void load(), 250);
+      timer = setTimeout(() => {
+        timer = null;
+        void load();
+      }, RELOAD_DEBOUNCE_MS);
     };
-    const channel = supabase
-      .channel(`party:${myId}:${Math.random().toString(36).slice(2)}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'party_members' }, bump)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'party_invites' }, bump)
-      .subscribe();
+    let channel = supabase
+      .channel(`party:${myId}:${partyId ?? 'solo'}:${Math.random().toString(36).slice(2)}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'party_members', filter: `profile_id=eq.${myId}` }, bump)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'party_invites', filter: `to_id=eq.${myId}` }, bump);
+    if (partyId) {
+      channel = channel
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'party_members', filter: `party_id=eq.${partyId}` }, bump)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'party_invites', filter: `party_id=eq.${partyId}` }, bump);
+    }
+    channel.subscribe();
     return () => {
       if (timer) clearTimeout(timer);
       void supabase.removeChannel(channel);
     };
-  }, [myId, load]);
+  }, [myId, partyId, load]);
 
   const patch = useCallback((fn: (p: Party | null) => Party | null) => setParty((p) => fn(p)), []);
 

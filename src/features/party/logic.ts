@@ -50,6 +50,7 @@ function parseInvite(raw: unknown): PartyInvite | null {
     display_name: str(raw.display_name) || str(raw.username) || 'Player',
     avatar_url: strOrNull(raw.avatar_url),
     created_at: str(raw.created_at),
+    expires_at: str(raw.expires_at),
   };
 }
 
@@ -157,12 +158,29 @@ export function invitableFriends<T extends { id: string }>(friends: readonly T[]
   return friends.filter((f) => !taken.has(f.id));
 }
 
-/** Expiry of an incoming invite (expires_at, else created_at + 1 h). */
+/** Expiry of an invite (expires_at, else created_at + 1 h). */
 export function inviteExpiresAt(invite: Pick<IncomingPartyInvite, 'created_at' | 'expires_at'>): number {
   const at = Date.parse(invite.expires_at);
   if (Number.isFinite(at)) return at;
   const created = Date.parse(invite.created_at);
   return Number.isFinite(created) ? created + INVITE_TTL_MS : 0;
+}
+
+/**
+ * The party without invites that have expired by `now` (get_my_party only returns unexpired
+ * ones, but a loaded party ages): expired invites free their slot. Same object when nothing
+ * changed, so memoised consumers don't re-render.
+ */
+export function withoutExpiredInvites(party: Party | null, now: number): Party | null {
+  if (!party) return party;
+  const invites = party.invites.filter((i) => inviteExpiresAt(i) > now);
+  return invites.length === party.invites.length ? party : { ...party, invites };
+}
+
+/** When my party's pending invite to this player expires (ms), or null when there's none live. */
+export function pendingInviteExpiry(party: Party | null, profileId: string, now: number): number | null {
+  const inv = party?.invites.find((i) => i.to_id === profileId && inviteExpiresAt(i) > now);
+  return inv ? inviteExpiresAt(inv) : null;
 }
 
 /**
@@ -206,17 +224,70 @@ export function isPartyUnavailable(e: unknown): boolean {
   return code === 'PGRST202' || code === '42883' || code === '42P01' || /could not find the function|does not exist|schema cache/i.test(msg);
 }
 
+/**
+ * The party RPCs' own messages (supabase/migrations/0017_clips_party.sql), matched exactly
+ * (case-insensitive) → the copy the app shows. Unlisted server messages are shown as they are.
+ */
+const SERVER_MESSAGES: Record<string, string> = {
+  'your party is full (5 players, including pending invites)': 'Your party is full (5 players, including pending invites).',
+  'this party is full': 'That party is already full.',
+  "you can't invite this player": "You can't invite this player.",
+  "you can't invite yourself": "You can't invite yourself.",
+  'player not found': "We couldn't find that player.",
+  'this player is already in your party': "They're already in your party.",
+  'only the party leader can invite players': 'Only the party leader can invite players.',
+  'only the party leader can remove players': 'Only the party leader can remove players.',
+  'only the party leader or the sender can cancel this invite': 'Only the party leader can cancel this invite.',
+  'this invite has expired': 'That invite has expired.',
+  'this invite is no longer available': 'That invite is no longer available.',
+  'this invite is no longer pending': 'That invite was already answered or cancelled.',
+  'invite not found': 'That invite is no longer available.',
+  "you're not in a party": "You're not in a party.",
+  'your party changed. try again.': 'Your party changed. Try again.',
+  "this player isn't in your party": "That player isn't in your party anymore.",
+  'use leave party to leave': 'Use Leave to leave the party.',
+};
+
 /** Short, friendly text for party errors. */
 export function partyErrorMessage(e: unknown): string {
   const msg = messageOf(e);
   if (isPartyUnavailable(e)) return "Parties aren't available yet. Try again after the next update.";
+  const exact = SERVER_MESSAGES[msg.trim().replace(/[’]/g, "'").toLowerCase()];
+  if (exact) return exact;
   if (/network|fetch|timed? ?out|offline/i.test(msg)) return 'No connection. Check your internet and try again.';
   if (/banned|paused|suspend/i.test(msg)) return "Your account is paused, so you can't do that right now.";
-  if (/expired/i.test(msg)) return 'That invite has expired.';
-  if (/full|limit|5 players|too many/i.test(msg)) return 'Your party is full (5 players).';
-  if (/block/i.test(msg)) return "You can't invite this player.";
-  if (/already/i.test(msg)) return "They're already in your party or invited.";
-  if (/leader/i.test(msg)) return 'Only the party leader can do that.';
-  if (codeOf(e) === '42501' || /not allowed|permission|row-level/i.test(msg)) return "You can't do that in this party.";
+  if (codeOf(e) === '42501' && !msg) return "You can't do that in this party.";
+  if (/permission denied|row-level/i.test(msg)) return "You can't do that in this party.";
   return msg && msg.length <= 120 ? msg : 'Something went wrong. Please try again.';
+}
+
+/**
+ * "Invite sent" bookkeeping for clip pages: profile id → when that invite expires (ms).
+ * Drops entries that expired by `now`; when `party` is known (a fresh get_my_party read), also
+ * drops players with no live pending invite any more (accepted, declined, cancelled) and takes
+ * the server's expiry. Returns the same object when nothing changed.
+ */
+export function reconcileSentInvites(
+  sent: Readonly<Record<string, number>>,
+  party: Party | null | undefined,
+  now: number,
+): Readonly<Record<string, number>> {
+  let changed = false;
+  const next: Record<string, number> = {};
+  for (const [id, until] of Object.entries(sent)) {
+    const server = party === undefined ? until : pendingInviteExpiry(party, id, now);
+    if (server == null || server <= now) {
+      changed = true;
+      continue;
+    }
+    if (server !== until) changed = true;
+    next[id] = server;
+  }
+  return changed ? next : sent;
+}
+
+/** The soonest expiry in a sent-invites map (ms), or null when it's empty. */
+export function nextSentExpiry(sent: Readonly<Record<string, number>>): number | null {
+  const all = Object.values(sent);
+  return all.length ? Math.min(...all) : null;
 }

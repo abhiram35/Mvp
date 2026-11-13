@@ -133,3 +133,14 @@ export function pickMainGame<G extends { id: string }>(profileGameIds: readonly 
   const games = profileGameIds.map(byId).filter((g): g is G => !!g);
   return games.find(squadable) ?? games[0];
 }
+
+/**
+ * Free slots shown in the invite sheet. `serverSlotsLeft` already counts every invite the
+ * server knows about (`invitedIds`); invites sent from the sheet only count locally until the
+ * party reload shows them, so nothing is counted twice.
+ */
+export function sheetSlotsLeft(serverSlotsLeft: number, sentIds: Iterable<string>, invitedIds: ReadonlySet<string>): number {
+  let pending = 0;
+  for (const id of sentIds) if (!invitedIds.has(id)) pending += 1;
+  return Math.max(0, serverSlotsLeft - pending);
+}

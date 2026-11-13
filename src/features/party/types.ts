@@ -26,6 +26,8 @@ export interface PartyInvite {
   display_name: string;
   avatar_url: string | null;
   created_at: string;
+  /** created_at + 1 h on the server ('' from an older server: inviteExpiresAt falls back). */
+  expires_at: string;
 }
 
 /** get_my_party() → this, or null when I'm not in a party. */

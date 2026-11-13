@@ -1,7 +1,7 @@
 // Lobby tab pieces: avatar with reputation ring, header icon button, party slots, incoming
 // invite banner, invite sheet, mode tile and the live ticker. Colours come from the theme only.
 import { Ionicons } from '@expo/vector-icons';
-import { router } from 'expo-router';
+import { router, useIsFocused } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Animated, Modal, Pressable, ScrollView, StyleSheet, Text as RNText, View, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -9,10 +9,10 @@ import Svg, { Rect } from 'react-native-svg';
 import { Avatar, Badge, Button, Card, GlyphTile, ListRow, Text, type IconName } from '../../components/ui';
 import { designTokens, ensureContrast, fontSize, makeStyles, spacing, useDesign, useTheme } from '../../theme';
 import type { MemberProfile } from '../chat/useConversation';
-import { useLoop } from '../duo/motion';
+import { useLoop, usePausableLoop, useScreenReaderEnabled } from '../duo/motion';
 import { expiresInLabel, inviteExpiresAt, slotA11yLabel, slotLabel } from '../party/logic';
 import type { IncomingPartyInvite, PartySlot } from '../party/types';
-import { tickerA11yLabel, type TickerItem } from './logic';
+import { sheetSlotsLeft, tickerA11yLabel, type TickerItem } from './logic';
 
 // ── Avatar + reputation ring ────────────────────────────────────────────────
 /** Avatar inside a progress ring (XP into the current level). Ring shape follows the avatar's corners. */
@@ -198,18 +198,31 @@ export function InviteBanner({
 }
 
 // ── Invite sheet ────────────────────────────────────────────────────────────
+/**
+ * Pick friends to invite. `slotsLeft` and `invitedIds` come from the server's party (the lobby
+ * reloads it after each invite), so an invite only counts against the slots locally until the
+ * reload shows it: no double counting, and a solo player can fill all 4 free slots.
+ */
 export function InviteSheet({
   visible,
   friends,
+  invitedIds,
   loading,
   slotsLeft,
+  reduced,
   onClose,
   onInvite,
 }: {
   visible: boolean;
+  /** Friends who aren't in the party (already-invited ones show as "Invited"). */
   friends: MemberProfile[];
+  /** Players with a live pending invite from my party, per the last server read. */
+  invitedIds: ReadonlySet<string>;
   loading: boolean;
+  /** Free slots per the last server read (expired invites already freed). */
   slotsLeft: number;
+  /** Reduce Motion: fade instead of sliding up. */
+  reduced: boolean;
   onClose: () => void;
   /** Resolves on success; rejects with a friendly message. */
   onInvite: (friend: MemberProfile) => Promise<void>;
@@ -218,9 +231,9 @@ export function InviteSheet({
   const s = useStyles();
   const insets = useSafeAreaInsets();
   const [busyId, setBusyId] = useState<string | null>(null);
-  const [sent, setSent] = useState<Set<string>>(() => new Set());
+  const [sent, setSent] = useState<ReadonlySet<string>>(() => new Set());
   const [rowError, setRowError] = useState<{ id: string; message: string } | null>(null);
-  const left = Math.max(0, slotsLeft - sent.size);
+  const left = sheetSlotsLeft(slotsLeft, sent, invitedIds);
 
   const invite = async (f: MemberProfile) => {
     setBusyId(f.id);
@@ -242,7 +255,7 @@ export function InviteSheet({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={close} statusBarTranslucent navigationBarTranslucent>
+    <Modal visible={visible} transparent animationType={reduced ? 'fade' : 'slide'} onRequestClose={close} statusBarTranslucent navigationBarTranslucent>
       <View style={s.sheetRoot}>
         <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityRole="button" accessibilityLabel="Close" />
         <View style={[s.sheet, { paddingBottom: Math.max(insets.bottom, spacing.md) }]} accessibilityViewIsModal>
@@ -290,7 +303,7 @@ export function InviteSheet({
               </View>
             ) : (
               friends.map((f) => {
-                const done = sent.has(f.id);
+                const done = sent.has(f.id) || invitedIds.has(f.id);
                 return (
                   <View key={f.id}>
                     <ListRow
@@ -373,42 +386,53 @@ function TickerChip({ item }: { item: TickerItem }) {
   );
 }
 
-/** Scrolling strip of live items. Static, swipeable row under Reduce Motion. Renders nothing when empty. */
+/**
+ * Scrolling strip of live items. A static, swipeable row under Reduce Motion or while a screen
+ * reader is on (moving targets can't be focused). The marquee pauses while it's touched and
+ * while its screen isn't focused. Renders nothing when empty.
+ */
 export function LiveTicker({ items, reduced }: { items: TickerItem[]; reduced: boolean }) {
   const t = useTheme();
   const s = useStyles();
+  const screenReader = useScreenReaderEnabled();
+  const focused = useIsFocused();
+  const [held, setHeld] = useState(false);
   const [width, setWidth] = useState(0);
   const [boxWidth, setBoxWidth] = useState(0);
+  const still = reduced || screenReader;
   // Only scroll when the content doesn't fit.
-  const moving = !reduced && width > 0 && boxWidth > 0 && width > boxWidth - 80;
-  const loop = useLoop(Math.max(6000, Math.round((width / TICKER_SPEED) * 1000)), { reduced, enabled: moving });
+  const scrolls = !still && width > 0 && boxWidth > 0 && width > boxWidth - 80;
+  const loop = usePausableLoop(Math.max(6000, Math.round((width / TICKER_SPEED) * 1000)), scrolls && focused && !held);
   const translateX = useMemo(() => loop.interpolate({ inputRange: [0, 1], outputRange: [0, -Math.max(1, width)] }), [loop, width]);
   const label = tickerA11yLabel(items);
   if (items.length === 0) return null;
 
   const onRow = (e: LayoutChangeEvent) => setWidth(Math.round(e.nativeEvent.layout.width));
+  const hold = () => setHeld(true);
+  const release = () => setHeld(false);
   const tag = t.shape.headingUppercase ? 'LIVE' : 'Live';
   return (
     <View style={s.ticker} onLayout={(e) => setBoxWidth(Math.round(e.nativeEvent.layout.width))} accessibilityLabel={label}>
       <View style={[s.tickTag, { backgroundColor: t.colors.primary }]}>
         <RNText style={[s.tickTagText, { color: t.colors.onPrimary }]}>{tag}</RNText>
       </View>
-      {reduced ? (
+      {still ? (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.tickRow}>
           {items.map((i) => (
             <TickerChip key={i.key} item={i} />
           ))}
         </ScrollView>
       ) : (
-        <View style={s.tickClip}>
-          <Animated.View style={[s.tickTrack, moving ? { transform: [{ translateX }] } : null]}>
+        // Touch events bubble here from the chips: hold the marquee still while pressed.
+        <View style={s.tickClip} onTouchStart={hold} onTouchEnd={release} onTouchCancel={release}>
+          <Animated.View style={[s.tickTrack, scrolls ? { transform: [{ translateX }] } : null]}>
             <View style={s.tickRow} onLayout={onRow}>
               {items.map((i) => (
                 <TickerChip key={i.key} item={i} />
               ))}
             </View>
             {/* Second copy so the loop is seamless (hidden from screen readers). */}
-            {moving ? (
+            {scrolls ? (
               <View style={s.tickRow} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
                 {items.map((i) => (
                   <TickerChip key={`dup-${i.key}`} item={i} />

@@ -1,10 +1,13 @@
 // Shared actions for clip pages (feed + single clip): play, GG, share, squad up, delete.
-import { router } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, Linking } from 'react-native';
 import { useLatestRef } from '../../lib/hooks';
 import { PAUSED_MESSAGE } from '../../lib/supabase';
 import { useMyStatus } from '../moderation/useMyStatus';
+import { fetchMyParty } from '../party/api';
+import { nextSentExpiry, reconcileSentInvites } from '../party/logic';
+import { INVITE_TTL_MS } from '../party/types';
 import { useTheme } from '../../theme';
 import { clipErrorMessage, deleteClip, inviteToParty, shareClip, toggleClipGg } from './api';
 import { firstName, PLATFORM_LABELS } from './logic';
@@ -16,10 +19,47 @@ export type SquadUpState = 'sending' | 'sent';
 export function useClipActions(toast: (m: ToastMessage) => void, opts: { onDeleted?: (clip: Clip) => void } = {}) {
   const t = useTheme();
   const { banned } = useMyStatus();
+  /** Invites in flight, per author id. */
+  const [sending, setSending] = useState<ReadonlySet<string>>(() => new Set());
+  /** Sent invites: author id → expiry (ms). "Invite sent" shows until then, or until it's gone. */
+  const [sent, setSent] = useState<Readonly<Record<string, number>>>({});
   /** Invite state per author id (so every clip by the same player shows "Invite sent"). */
-  const [squad, setSquad] = useState<Record<string, SquadUpState>>({});
+  const squad = useMemo(() => {
+    const out: Record<string, SquadUpState> = {};
+    for (const id of Object.keys(sent)) out[id] = 'sent';
+    for (const id of sending) out[id] = 'sending';
+    return out;
+  }, [sent, sending]);
   const squadRef = useLatestRef(squad);
   const { onDeleted } = opts;
+
+  // Clear "Invite sent" when the invite expires (1 h after sending).
+  const nextExpiry = nextSentExpiry(sent);
+  useEffect(() => {
+    if (nextExpiry == null) return;
+    const timer = setTimeout(() => setSent((s) => reconcileSentInvites(s, undefined, Date.now())), Math.max(0, nextExpiry - Date.now()) + 50);
+    return () => clearTimeout(timer);
+  }, [nextExpiry]);
+
+  // …or when it no longer appears in my party (accepted, declined, cancelled): check on focus.
+  const hasSent = nextExpiry != null;
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasSent) return;
+      let live = true;
+      fetchMyParty().then(
+        (party) => {
+          if (live) setSent((s) => reconcileSentInvites(s, party, Date.now()));
+        },
+        () => {
+          // Offline: keep the badges until they expire.
+        },
+      );
+      return () => {
+        live = false;
+      };
+    }, [hasSent]),
+  );
 
   const play = useCallback(
     async (clip: Clip) => {
@@ -66,17 +106,21 @@ export function useClipActions(toast: (m: ToastMessage) => void, opts: { onDelet
         toast({ text: PAUSED_MESSAGE, tone: 'error' });
         return;
       }
-      setSquad((s) => ({ ...s, [authorId]: 'sending' }));
-      try {
-        await inviteToParty(authorId);
-        setSquad((s) => ({ ...s, [authorId]: 'sent' }));
-        toast({ text: `Invite sent to ${firstName(clip.author.display_name, 24)}. They'll find it in their Lobby.`, icon: 'people' });
-      } catch (e) {
-        setSquad((s) => {
-          const next = { ...s };
-          delete next[authorId];
+      const setSendingFor = (on: boolean) =>
+        setSending((prev) => {
+          const next = new Set(prev);
+          if (on) next.add(authorId);
+          else next.delete(authorId);
           return next;
         });
+      setSendingFor(true);
+      try {
+        await inviteToParty(authorId);
+        setSent((s) => ({ ...s, [authorId]: Date.now() + INVITE_TTL_MS }));
+        setSendingFor(false);
+        toast({ text: `Invite sent to ${firstName(clip.author.display_name, 24)}. They'll find it in their Lobby.`, icon: 'people' });
+      } catch (e) {
+        setSendingFor(false);
         toast({ text: clipErrorMessage(e), tone: 'error' });
       }
     },

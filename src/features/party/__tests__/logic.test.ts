@@ -12,6 +12,10 @@ import {
   normaliseParty,
   partyErrorMessage,
   partyHeadcount,
+  nextSentExpiry,
+  pendingInviteExpiry,
+  reconcileSentInvites,
+  withoutExpiredInvites,
   slotA11yLabel,
   slotLabel,
 } from '../logic';
@@ -32,7 +36,7 @@ const party = (over: Partial<Party> = {}): Party => ({
   party_id: 'p1',
   leader_id: 'lead',
   members: [member('b', '2026-01-01T10:02:00Z'), member('me', '2026-01-01T10:01:00Z'), member('lead', '2026-01-01T10:00:00Z', true)],
-  invites: [{ id: 'i1', to_id: 'c', username: 'c', display_name: 'C', avatar_url: null, created_at: '2026-01-01T10:05:00Z' }],
+  invites: [{ id: 'i1', to_id: 'c', username: 'c', display_name: 'C', avatar_url: null, created_at: '2026-01-01T10:05:00Z', expires_at: '2026-01-01T11:05:00Z' }],
   ...over,
 });
 
@@ -71,7 +75,7 @@ describe('permissions and counts', () => {
   it('only the leader invites, and only while under 5', () => {
     expect(canInvite(party(), 'me')).toBe(false);
     expect(canInvite(party(), 'lead')).toBe(true);
-    const full = party({ invites: [...party().invites, { id: 'i2', to_id: 'd', username: 'd', display_name: 'D', avatar_url: null, created_at: '' }] });
+    const full = party({ invites: [...party().invites, { id: 'i2', to_id: 'd', username: 'd', display_name: 'D', avatar_url: null, created_at: '', expires_at: '' }] });
     expect(partyHeadcount(full)).toBe(5);
     expect(canInvite(full, 'lead')).toBe(false);
     expect(memberCount(full)).toBe(3);
@@ -108,7 +112,7 @@ describe('buildSlots', () => {
   it('marks ready members READY and never exceeds 5 slots', () => {
     const p = party({
       members: [member('lead', '1'), member('me', '2', true), member('b', '3'), member('c', '4'), member('d', '5')],
-      invites: [{ id: 'x', to_id: 'e', username: 'e', display_name: 'E', avatar_url: null, created_at: '' }],
+      invites: [{ id: 'x', to_id: 'e', username: 'e', display_name: 'E', avatar_url: null, created_at: '', expires_at: '' }],
     });
     const slots = buildSlots(p, me);
     expect(slots).toHaveLength(5);
@@ -172,11 +176,84 @@ describe('errors', () => {
     expect(partyErrorMessage({ code: 'PGRST202' })).toMatch(/aren't available/);
   });
 
-  it('maps server wording to friendly text', () => {
+  it('maps the exact server messages from 0017', () => {
     expect(partyErrorMessage(new Error('Failed to fetch'))).toMatch(/No connection/);
-    expect(partyErrorMessage(new Error('invite expired'))).toMatch(/expired/);
-    expect(partyErrorMessage(new Error('party is full'))).toMatch(/full/);
-    expect(partyErrorMessage(new Error('only the leader can invite'))).toMatch(/leader/);
+    expect(partyErrorMessage({ code: '22023', message: 'This invite has expired' })).toBe('That invite has expired.');
+    expect(partyErrorMessage({ code: '22023', message: 'Your party is full (5 players, including pending invites)' })).toBe(
+      'Your party is full (5 players, including pending invites).',
+    );
+    // Joining someone else's full party is not "your party is full".
+    expect(partyErrorMessage({ code: '22023', message: 'This party is full' })).toBe('That party is already full.');
+    expect(partyErrorMessage({ code: '42501', message: 'Only the party leader can invite players' })).toBe('Only the party leader can invite players.');
+    expect(partyErrorMessage({ code: '42501', message: "You can't invite this player" })).toBe("You can't invite this player.");
+    expect(partyErrorMessage({ code: '22023', message: 'This player is already in your party' })).toBe("They're already in your party.");
+    expect(partyErrorMessage({ code: '42501', message: "Your account is paused, so you can't do this right now" })).toMatch(/paused/);
     expect(partyErrorMessage({})).toMatch(/Something went wrong/);
+  });
+
+  it('shows unknown server messages as they are, without guessing from keywords', () => {
+    expect(partyErrorMessage(new Error('Rate limit: slow down'))).toBe('Rate limit: slow down');
+    expect(partyErrorMessage(new Error('Your team is full'))).toBe('Your team is full');
+  });
+});
+
+describe('expired invites', () => {
+  const at = Date.parse('2026-01-01T10:30:00Z');
+  const p = party({
+    invites: [
+      { id: 'old', to_id: 'x', username: 'x', display_name: 'X', avatar_url: null, created_at: '2026-01-01T09:00:00Z', expires_at: '2026-01-01T10:00:00Z' },
+      { id: 'new', to_id: 'y', username: 'y', display_name: 'Y', avatar_url: null, created_at: '2026-01-01T10:10:00Z', expires_at: '2026-01-01T11:10:00Z' },
+    ],
+  });
+
+  it('parses expires_at from get_my_party', () => {
+    const parsed = normaliseParty({ party_id: 'p', leader_id: 'a', members: [], invites: [{ id: 'i', to_id: 't', created_at: 'c', expires_at: '2026-01-01T11:00:00Z' }] });
+    expect(parsed?.invites[0].expires_at).toBe('2026-01-01T11:00:00Z');
+  });
+
+  it('drops expired invites so their slots are free again', () => {
+    const live = withoutExpiredInvites(p, at);
+    expect(live?.invites.map((i) => i.id)).toEqual(['new']);
+    expect(partyHeadcount(live)).toBe(4);
+    expect(canInvite(live, 'lead')).toBe(true);
+    expect(buildSlots(live, me).filter((sl) => sl.kind === 'empty')).toHaveLength(1);
+    // Nothing expired → same object.
+    expect(withoutExpiredInvites(live, at)).toBe(live);
+    expect(withoutExpiredInvites(null, at)).toBeNull();
+  });
+
+  it('falls back to created_at + 1 h when expires_at is missing', () => {
+    const legacy = party({ invites: [{ id: 'l', to_id: 'z', username: 'z', display_name: 'Z', avatar_url: null, created_at: '2026-01-01T10:00:00Z', expires_at: '' }] });
+    expect(withoutExpiredInvites(legacy, at)?.invites).toHaveLength(1);
+    expect(withoutExpiredInvites(legacy, Date.parse('2026-01-01T11:00:01Z'))?.invites).toHaveLength(0);
+  });
+
+  it('finds the live pending invite to a player', () => {
+    expect(pendingInviteExpiry(p, 'y', at)).toBe(Date.parse('2026-01-01T11:10:00Z'));
+    expect(pendingInviteExpiry(p, 'x', at)).toBeNull();
+    expect(pendingInviteExpiry(null, 'y', at)).toBeNull();
+  });
+});
+
+describe('reconcileSentInvites', () => {
+  const at = Date.parse('2026-01-01T10:30:00Z');
+  const inviteTo = (to: string, expires: string) => ({ id: `i-${to}`, to_id: to, username: to, display_name: to, avatar_url: null, created_at: '', expires_at: expires });
+
+  it('drops "Invite sent" once the hour is up', () => {
+    const sent = { a: at + 1000, b: at - 1 };
+    expect(reconcileSentInvites(sent, undefined, at)).toEqual({ a: at + 1000 });
+    const same = { a: at + 1000 };
+    expect(reconcileSentInvites(same, undefined, at)).toBe(same);
+  });
+
+  it('drops players whose invite no longer appears, and takes the server expiry', () => {
+    const p = party({ invites: [inviteTo('a', '2026-01-01T11:00:00Z')] });
+    expect(reconcileSentInvites({ a: at + 5, b: at + 5 }, p, at)).toEqual({ a: Date.parse('2026-01-01T11:00:00Z') });
+    expect(reconcileSentInvites({ a: at + 5 }, null, at)).toEqual({});
+  });
+
+  it('finds the next expiry', () => {
+    expect(nextSentExpiry({})).toBeNull();
+    expect(nextSentExpiry({ a: 5, b: 3 })).toBe(3);
   });
 });

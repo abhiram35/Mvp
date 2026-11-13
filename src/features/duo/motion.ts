@@ -18,6 +18,53 @@ export function useReducedMotion(): boolean {
   return reduced;
 }
 
+/** True while a screen reader (VoiceOver / TalkBack) is on. */
+export function useScreenReaderEnabled(): boolean {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    let active = true;
+    AccessibilityInfo.isScreenReaderEnabled()
+      .then((v) => active && setOn(v))
+      .catch(() => undefined);
+    const sub = AccessibilityInfo.addEventListener('screenReaderChanged', (v: boolean) => setOn(v));
+    return () => {
+      active = false;
+      sub.remove();
+    };
+  }, []);
+  return on;
+}
+
+/**
+ * A 0→1 value that loops linearly while `running`, and PAUSES in place (instead of resetting)
+ * when it stops, resuming from where it was. For marquees that pause on touch / blur.
+ */
+export function usePausableLoop(duration: number, running: boolean) {
+  const v = useState(() => new Animated.Value(0))[0];
+  useEffect(() => {
+    if (!running) {
+      v.stopAnimation();
+      return;
+    }
+    let cancelled = false;
+    let anim: Animated.CompositeAnimation | null = null;
+    const run = (from: number) => {
+      if (cancelled) return;
+      v.setValue(from);
+      anim = Animated.timing(v, { toValue: 1, duration: Math.max(1, Math.round((1 - from) * duration)), easing: Easing.linear, useNativeDriver: true });
+      anim.start(({ finished }) => {
+        if (finished) run(0);
+      });
+    };
+    v.stopAnimation((value) => run(value >= 1 || !Number.isFinite(value) ? 0 : value));
+    return () => {
+      cancelled = true;
+      anim?.stop();
+    };
+  }, [v, duration, running]);
+  return v;
+}
+
 /** Springy settle used for selections (slight overshoot, ~350 ms). */
 export const SPRING = { friction: 6, tension: 90, useNativeDriver: true } as const;
 

@@ -408,6 +408,21 @@ begin
   if p_tournament_id is not null and not exists (select 1 from public.tournaments where id = p_tournament_id) then
     raise exception 'Tournament not found' using errcode = 'P0002';
   end if;
+  -- Cup clips: only the organiser, or a player on a team entered in that tournament (a current
+  -- team member, or on the roster snapshot taken at the start), may tag it.
+  if p_tournament_id is not null
+     and not exists (select 1 from public.tournaments t
+                     where t.id = p_tournament_id and t.organiser_id = me)
+     and not exists (select 1 from public.tournament_teams tt
+                     join public.team_members tm on tm.team_id = tt.team_id
+                     where tt.tournament_id = p_tournament_id and tt.status <> 'withdrawn'
+                       and tm.profile_id = me)
+     and not exists (select 1 from public.tournament_rosters r
+                     join public.tournament_teams tt on tt.tournament_id = r.tournament_id and tt.team_id = r.team_id
+                     where r.tournament_id = p_tournament_id and tt.status <> 'withdrawn'
+                       and r.profile_id = me) then
+    raise exception 'You can only link a tournament your team entered' using errcode = '42501';
+  end if;
 
   -- Serialise this player's posts so the daily limit and duplicate check hold.
   perform pg_advisory_xact_lock(hashtextextended('gg_post_clip:' || me::text, 0));
@@ -564,13 +579,18 @@ begin
 end;
 $$;
 
--- ── get_clip_feed(p_feed, p_game_id, p_limit, p_offset) → setof jsonb ───────
+-- ── get_clip_feed(p_feed, p_game_id, p_limit, p_offset, p_as_of) → setof jsonb
 -- Row: clip columns + author {id, username, display_name, avatar_url} + my_gg.
+-- p_as_of (default now()) is the feed's snapshot time: only clips created at or before it, and
+-- the for_you decay is measured from it, so offset pages taken with the same snapshot stay
+-- stable. The old 4-argument version is dropped so 4-argument calls resolve to this one.
+drop function if exists public.get_clip_feed(text, text, integer, integer);
 create or replace function public.get_clip_feed(
   p_feed     text,
   p_game_id  text,
   p_limit    integer default 20,
-  p_offset   integer default 0
+  p_offset   integer default 0,
+  p_as_of    timestamptz default now()
 )
 returns setof jsonb
 language plpgsql
@@ -583,6 +603,7 @@ declare
   v_game  text := nullif(btrim(coalesce(p_game_id, '')), '');
   v_lim   integer := least(greatest(coalesce(p_limit, 20), 1), 50);
   v_off   integer := greatest(coalesce(p_offset, 0), 0);
+  v_as_of timestamptz := coalesce(p_as_of, now());
 begin
   if p_feed is null or p_feed not in ('for_you','squad','cups') then
     raise exception 'Unknown feed: %', coalesce(p_feed, 'null') using errcode = '22023';
@@ -592,12 +613,13 @@ begin
   select public.gg_clip_json(c, me)
   from public.clips c
   where c.removed_at is null
+    and c.created_at <= v_as_of
     and (v_game is null or c.game_id = v_game)
     and not exists (select 1 from public.blocks b
                     where (b.blocker_id = me and b.blocked_id = c.author_id)
                        or (b.blocker_id = c.author_id and b.blocked_id = me))
     and case p_feed
-          when 'for_you' then c.created_at > now() - interval '30 days'
+          when 'for_you' then c.created_at > v_as_of - interval '30 days'
           when 'cups'    then c.tournament_id is not null
           when 'squad'   then c.author_id <> me and (
                  exists (select 1 from public.friendships f
@@ -611,7 +633,7 @@ begin
   order by
     case when p_feed = 'for_you' then
       (c.gg_count + 2 * c.comment_count + 1)::double precision
-        / power(extract(epoch from (now() - c.created_at)) / 3600.0 + 2, 1.5)
+        / power(greatest(extract(epoch from (v_as_of - c.created_at)), 0) / 3600.0 + 2, 1.5)
     end desc nulls last,
     c.created_at desc, c.id
   limit v_lim offset v_off;
@@ -653,7 +675,7 @@ begin
     'invites', coalesce((
        select jsonb_agg(jsonb_build_object(
                 'id', i.id, 'to_id', i.to_id, 'username', pr.username, 'display_name', pr.display_name,
-                'avatar_url', pr.avatar_url, 'created_at', i.created_at)
+                'avatar_url', pr.avatar_url, 'created_at', i.created_at, 'expires_at', i.expires_at)
               order by i.created_at, i.id)
        from public.party_invites i join public.profiles pr on pr.id = i.to_id
        where i.party_id = v_party.id and i.status = 'pending' and i.expires_at > now()), '[]'::jsonb));
@@ -1055,7 +1077,7 @@ begin
     'public.toggle_clip_gg(uuid)',
     'public.add_clip_comment(uuid, text)',
     'public.delete_clip_comment(uuid)',
-    'public.get_clip_feed(text, text, integer, integer)',
+    'public.get_clip_feed(text, text, integer, integer, timestamptz)',
     'public.get_my_party()',
     'public.invite_to_party(uuid)',
     'public.respond_party_invite(uuid, boolean)',

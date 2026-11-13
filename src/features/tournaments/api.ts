@@ -3,6 +3,8 @@ import type { Region } from '../../lib/types';
 import type { ScrimFormat } from '../scrims/types';
 import type { MatchReport, Organiser, OrganiserApplication, Tournament, TournamentEntry, TournamentMatch, TournamentStatus } from './types';
 
+import { fetchMyTeams } from '../scrims/api';
+
 export { useLoader } from '../scrims/api';
 
 const TEAM_FIELDS = 'id, game_id, name, tag, region, captain_id, created_at';
@@ -79,6 +81,34 @@ export async function fetchTournament(id: string): Promise<Tournament | null> {
   if (error) throw error;
   if (!data) return null;
   return (await withOrganisers([data as Tournament]))[0];
+}
+
+/**
+ * Tournaments a player may link a clip to (post_clip's rule in 0017): ones a team of theirs is
+ * entered in (any status but withdrawn), plus ones they organise. Not cancelled; the picker
+ * narrows them further with clipCupChoices.
+ */
+export async function fetchMyClipTournaments(myId: string): Promise<Tournament[]> {
+  const teams = await fetchMyTeams(myId);
+  const teamIds = teams.map((m) => m.team.id);
+  const [entries, organised] = await Promise.all([
+    teamIds.length
+      ? supabase.from('tournament_teams').select('tournament_id').in('team_id', teamIds).neq('status', 'withdrawn')
+      : Promise.resolve({ data: [] as { tournament_id: string }[], error: null }),
+    supabase.from('tournaments').select('id').eq('organiser_id', myId).neq('status', 'cancelled').limit(50),
+  ]);
+  if (entries.error) throw entries.error;
+  if (organised.error) throw organised.error;
+  const ids = [
+    ...new Set([
+      ...((entries.data ?? []) as { tournament_id: string }[]).map((r) => r.tournament_id),
+      ...((organised.data ?? []) as { id: string }[]).map((r) => r.id),
+    ]),
+  ];
+  if (ids.length === 0) return [];
+  const { data, error } = await supabase.from('tournaments').select(TOURNAMENT_FIELDS).in('id', ids.slice(0, 100)).neq('status', 'cancelled');
+  if (error) throw error;
+  return (data ?? []) as Tournament[];
 }
 
 /** Registered-team counts per tournament (for the list). */

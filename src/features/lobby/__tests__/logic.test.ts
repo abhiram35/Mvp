@@ -1,4 +1,4 @@
-import { buildTicker, levelProgress, modeSubtitles, pickMainGame, reputationLine, tickerA11yLabel, type TickerInput } from '../logic';
+import { buildTicker, levelProgress, modeSubtitles, pickMainGame, reputationLine, sheetSlotsLeft, tickerA11yLabel, type TickerInput } from '../logic';
 
 const now = Date.parse('2026-11-13T18:00:00Z');
 const iso = (offsetMin: number) => new Date(now + offsetMin * 60_000).toISOString();
@@ -71,5 +71,27 @@ describe('pickMainGame', () => {
     expect(pickMainGame(['story', 'val'], byId, (g) => g.squadable)?.id).toBe('val');
     expect(pickMainGame(['story', 'missing'], byId, (g) => g.squadable)?.id).toBe('story');
     expect(pickMainGame([], byId, (g) => g.squadable)).toBeUndefined();
+  });
+});
+
+describe('sheetSlotsLeft', () => {
+  it('lets a solo player invite 4 even though the party reloads after each invite', () => {
+    const sent = new Set<string>();
+    let invited = new Set<string>();
+    let server = 4; // solo: 5 - 1
+    for (const id of ['a', 'b', 'c', 'd']) {
+      expect(sheetSlotsLeft(server, sent, invited)).toBeGreaterThan(0);
+      sent.add(id); // invite succeeded
+      expect(sheetSlotsLeft(server, sent, invited)).toBe(server - 1); // before the reload
+      invited = new Set([...invited, id]); // reload shows it…
+      server -= 1; // …and the server count includes it
+      expect(sheetSlotsLeft(server, sent, invited)).toBe(server); // counted once
+    }
+    expect(sheetSlotsLeft(server, sent, invited)).toBe(0);
+  });
+
+  it('ignores ids the server already counts and never goes below 0', () => {
+    expect(sheetSlotsLeft(2, ['b'], new Set(['b']))).toBe(2);
+    expect(sheetSlotsLeft(0, ['x'], new Set())).toBe(0);
   });
 });

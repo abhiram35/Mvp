@@ -6,7 +6,7 @@ import { useLatestRef } from '../../lib/hooks';
 import { errorMessage, supabase } from '../../lib/supabase';
 import { useUserId } from '../../providers/AuthProvider';
 import { useBlockedIds } from '../safety/blocks';
-import { friendlyClipError, PLATFORM_LABELS } from './logic';
+import { feedPageOutcome, friendlyClipError, mergeFeedPage, PLATFORM_LABELS } from './logic';
 import type { Clip, ClipAuthor, ClipComment, ClipFeed, ClipGgResult, ClipPlatform } from './types';
 
 export const CLIP_PAGE_SIZE = 10;
@@ -212,8 +212,21 @@ export async function toggleClipGg(clip: Pick<Clip, 'id' | 'my_gg' | 'gg_count'>
 
 // ── Feed ────────────────────────────────────────────────────────────────────
 
-export async function fetchClipFeed(feed: ClipFeed, offset: number, gameId: string | null = null, limit = CLIP_PAGE_SIZE): Promise<Clip[]> {
-  const { data, error } = await supabase.rpc('get_clip_feed', { p_feed: feed, p_game_id: gameId, p_limit: limit, p_offset: offset });
+/**
+ * One page of a feed. `asOf` is the feed's snapshot (ISO time of the last refresh): the server
+ * only returns clips created by then and ranks For you relative to it, so offset pages stay
+ * consistent while the feed is scrolled.
+ */
+export async function fetchClipFeed(
+  feed: ClipFeed,
+  offset: number,
+  gameId: string | null = null,
+  limit = CLIP_PAGE_SIZE,
+  asOf?: string,
+): Promise<Clip[]> {
+  const args: Record<string, unknown> = { p_feed: feed, p_game_id: gameId, p_limit: limit, p_offset: offset };
+  if (asOf) args.p_as_of = asOf;
+  const { data, error } = await supabase.rpc('get_clip_feed', args);
   if (error) throw error;
   const rows = Array.isArray(data) ? data : data == null ? [] : [data];
   return rows.map((r) => normaliseClip(r)).filter((c): c is Clip => !!c);
@@ -228,30 +241,47 @@ interface FeedState {
   error: string | null;
   /** A load-more failure (the list stays; shown as a small notice). */
   moreError: string | null;
+  /** Snapshot time sent as p_as_of (taken at the last initial load / refresh). */
+  asOf: string;
+  /** Server rows consumed so far (the next p_offset; not clips.length, which is deduped). */
+  offset: number;
 }
 
-const INITIAL: FeedState = { clips: [], loading: true, refreshing: false, loadingMore: false, hasMore: true, error: null, moreError: null };
+const INITIAL: FeedState = { clips: [], loading: true, refreshing: false, loadingMore: false, hasMore: true, error: null, moreError: null, asOf: '', offset: 0 };
 
-/** One feed tab, paged by offset. Blocked authors and clips deleted here are filtered out. */
+/**
+ * One feed tab, paged by offset against a fixed snapshot (see fetchClipFeed). Blocked authors
+ * and clips deleted here are filtered out; pages that add nothing visible are skipped over.
+ */
 export function useClipFeed(feed: ClipFeed, gameId: string | null = null) {
   const [state, setState] = useState<FeedState>(INITIAL);
   const { blockedIds } = useBlockedIds();
   const deleted = useDeletedClipIds();
   const requestId = useRef(0);
   const stateRef = useLatestRef(state);
+  const hiddenRef = useLatestRef((c: Clip) => blockedIds.has(c.author_id) || deleted.has(c.id));
 
   const loadFirst = useCallback(
     async (mode: 'initial' | 'refresh') => {
       const id = ++requestId.current;
-      setState((s) => (mode === 'refresh' ? { ...s, refreshing: true, moreError: null } : { ...INITIAL }));
+      const asOf = new Date().toISOString();
+      // A load-more in flight is superseded (its result is dropped), so clear its spinner.
+      setState((s) => (mode === 'refresh' ? { ...s, refreshing: true, loadingMore: false, moreError: null } : { ...INITIAL }));
       try {
-        const page = await fetchClipFeed(feed, 0, gameId);
+        const page = await fetchClipFeed(feed, 0, gameId, CLIP_PAGE_SIZE, asOf);
         if (id !== requestId.current) return;
         clearOverrides(page.map((c) => c.id));
-        setState({ ...INITIAL, loading: false, clips: page, hasMore: page.length >= CLIP_PAGE_SIZE });
+        setState({ ...INITIAL, loading: false, clips: page, hasMore: page.length >= CLIP_PAGE_SIZE, asOf, offset: page.length });
       } catch (e) {
         if (id !== requestId.current) return;
-        setState((s) => ({ ...s, loading: false, refreshing: false, error: s.clips.length ? null : clipErrorMessage(e), moreError: s.clips.length ? clipErrorMessage(e) : null }));
+        setState((s) => ({
+          ...s,
+          loading: false,
+          refreshing: false,
+          loadingMore: false,
+          error: s.clips.length ? null : clipErrorMessage(e),
+          moreError: s.clips.length ? clipErrorMessage(e) : null,
+        }));
       }
     },
     [feed, gameId],
@@ -266,19 +296,27 @@ export function useClipFeed(feed: ClipFeed, gameId: string | null = null) {
     if (s.loading || s.refreshing || s.loadingMore || !s.hasMore || s.error) return;
     const id = requestId.current;
     setState((p) => ({ ...p, loadingMore: true, moreError: null }));
+    let items = s.clips;
+    let offset = s.offset;
     try {
-      const page = await fetchClipFeed(feed, s.clips.length, gameId);
-      if (id !== requestId.current) return;
-      setState((p) => {
-        const seen = new Set(p.clips.map((c) => c.id));
-        const fresh = page.filter((c) => !seen.has(c.id));
-        return { ...p, loadingMore: false, clips: [...p.clips, ...fresh], hasMore: page.length >= CLIP_PAGE_SIZE };
-      });
+      for (let empty = 0; ; empty++) {
+        const page = await fetchClipFeed(feed, offset, gameId, CLIP_PAGE_SIZE, s.asOf || undefined);
+        if (id !== requestId.current) return;
+        const merged = mergeFeedPage(items, page, CLIP_PAGE_SIZE, hiddenRef.current);
+        items = merged.items;
+        offset += page.length;
+        const outcome = feedPageOutcome(merged, empty);
+        if (outcome !== 'continue') {
+          setState((p) => ({ ...p, loadingMore: false, clips: items, offset, hasMore: outcome === 'done' }));
+          return;
+        }
+      }
     } catch (e) {
       if (id !== requestId.current) return;
-      setState((p) => ({ ...p, loadingMore: false, moreError: clipErrorMessage(e) }));
+      // Keep what the skipped-over pages brought, so a retry continues from there.
+      setState((p) => ({ ...p, loadingMore: false, clips: items, offset, moreError: clipErrorMessage(e) }));
     }
-  }, [feed, gameId, stateRef]);
+  }, [feed, gameId, stateRef, hiddenRef]);
 
   const clips = useMemo(
     () => state.clips.filter((c) => !blockedIds.has(c.author_id) && !deleted.has(c.id)),

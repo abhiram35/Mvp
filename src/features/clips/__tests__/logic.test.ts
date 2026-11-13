@@ -2,7 +2,12 @@ import { contrast } from '../../../theme/design';
 import {
   artGradient,
   CLIP_FEEDS,
+  clipCupChoices,
   emptyFeedCopy,
+  keepCupChoice,
+  feedPageOutcome,
+  MAX_EMPTY_PAGES,
+  mergeFeedPage,
   feedLabel,
   firstName,
   formatCount,
@@ -202,5 +207,56 @@ describe('media colours', () => {
       expect(contrast('#FFFFFF', g.from)).toBeGreaterThanOrEqual(4.5);
       expect(contrast('#FFFFFF', g.to)).toBeGreaterThanOrEqual(4.5);
     }
+  });
+});
+
+describe('feed paging', () => {
+  const c = (id: string) => ({ id });
+  const ids = (xs: { id: string }[]) => xs.map((x) => x.id).join(',');
+
+  it('appends only new clips and counts the visible ones', () => {
+    const r = mergeFeedPage([c('a'), c('b')], [c('b'), c('c'), c('d'), c('c')], 4, (x) => x.id === 'd');
+    expect(ids(r.items)).toBe('a,b,c,d');
+    expect(r.added).toBe(1);
+    expect(r.serverEnd).toBe(false);
+  });
+
+  it('a full page of duplicates keeps paging instead of stalling', () => {
+    const r = mergeFeedPage([c('a'), c('b')], [c('a'), c('b')], 2);
+    expect(r.added).toBe(0);
+    expect(feedPageOutcome(r, 0)).toBe('continue');
+    expect(feedPageOutcome(r, MAX_EMPTY_PAGES - 1)).toBe('end');
+  });
+
+  it('stops when something new arrived, ends on a short page', () => {
+    expect(feedPageOutcome({ added: 2, serverEnd: false }, 0)).toBe('done');
+    expect(feedPageOutcome({ added: 2, serverEnd: true }, 0)).toBe('end');
+    expect(feedPageOutcome({ added: 0, serverEnd: true }, 0)).toBe('end');
+  });
+});
+
+describe('cup picker', () => {
+  const now = Date.parse('2026-11-13T12:00:00Z');
+  const cup = (id: string, game: string, status: string, startsAt: string) => ({ id, game_id: game, name: `Cup ${id}`, status, starts_at: startsAt });
+  const cups = [
+    cup('old', 'valorant', 'completed', '2026-09-01T10:00:00Z'),
+    cup('done', 'valorant', 'completed', '2026-11-01T10:00:00Z'),
+    cup('live', 'valorant', 'live', '2026-11-12T10:00:00Z'),
+    cup('soon', 'valorant', 'registration', '2026-11-20T10:00:00Z'),
+    cup('cs', 'cs2', 'registration', '2026-11-15T10:00:00Z'),
+    cup('off', 'valorant', 'cancelled', '2026-11-14T10:00:00Z'),
+  ];
+
+  it('offers recent, uncancelled cups for the game, live first', () => {
+    expect(clipCupChoices(cups, 'valorant', now).map((c) => c.id)).toEqual(['live', 'soon', 'done']);
+    expect(clipCupChoices(cups, null, now).map((c) => c.id)).toEqual(['live', 'soon', 'cs', 'done']);
+    expect(clipCupChoices([], 'valorant', now)).toEqual([]);
+  });
+
+  it('drops a picked cup that is no longer offered', () => {
+    const offered = clipCupChoices(cups, 'cs2', now);
+    expect(keepCupChoice('live', offered)).toBeNull();
+    expect(keepCupChoice('cs', offered)).toBe('cs');
+    expect(keepCupChoice(null, offered)).toBeNull();
   });
 });

@@ -11,12 +11,20 @@ import { firstName } from './logic';
 
 const RING = 56;
 const AVATAR = 46;
+/** Caps the name's font scaling so it fits the fixed row. */
+const NAME_SCALE = 1.4;
+const NAME_LINE = 16;
+/**
+ * Fixed row height (ring + name + bottom padding), shared by the placeholder and the loaded
+ * row so the feed below doesn't jump (and its page height doesn't change) when friends load.
+ */
+export const FRIENDS_ROW_HEIGHT = RING + 4 + Math.ceil(NAME_LINE * NAME_SCALE) + spacing.sm;
 
 export const FriendsRings = memo(function FriendsRings({ onlineIds }: { onlineIds?: ReadonlySet<string> }) {
   const t = useTheme();
   const d = useDesign();
   const { friends, loading } = useFriends();
-  if (loading && friends.length === 0) return <View style={{ height: RING + 26 }} />;
+  if (loading && friends.length === 0) return <View style={styles.row} />;
 
   const round = !!t.shape.round || d.lang.corner === 'soft';
   const ringRadius = round ? RING / 2 : t.radius.md + 2;
@@ -27,6 +35,7 @@ export const FriendsRings = memo(function FriendsRings({ onlineIds }: { onlineId
 
   return (
     <FlatList<FriendshipWithProfile | 'add'>
+      style={styles.row}
       horizontal
       data={['add', ...sorted]}
       keyExtractor={(i) => (i === 'add' ? 'add' : i.profile.id)}
@@ -45,7 +54,7 @@ export const FriendsRings = memo(function FriendsRings({ onlineIds }: { onlineId
               <View style={[styles.ring, { borderRadius: ringRadius, borderColor: t.colors.border, borderStyle: 'dashed' }]}>
                 <Ionicons name={friends.length ? 'people-outline' : 'person-add-outline'} size={22} color={t.colors.textMuted} />
               </View>
-              <RNText style={[styles.name, { color: t.colors.textMuted, fontFamily: t.fonts.bodyMedium }]} numberOfLines={1}>
+              <RNText style={[styles.name, { color: t.colors.textMuted, fontFamily: t.fonts.bodyMedium }]} numberOfLines={1} maxFontSizeMultiplier={NAME_SCALE}>
                 {friends.length ? 'Friends' : 'Add'}
               </RNText>
             </Pressable>
@@ -63,7 +72,7 @@ export const FriendsRings = memo(function FriendsRings({ onlineIds }: { onlineId
             <View style={[styles.ring, { borderRadius: ringRadius, borderColor: online ? t.colors.accent : d.hairline }]}>
               <Avatar uri={p.avatar_url} name={p.display_name} size={AVATAR} online={online} />
             </View>
-            <RNText style={[styles.name, { color: t.colors.text, fontFamily: t.fonts.bodyMedium }]} numberOfLines={1}>
+            <RNText style={[styles.name, { color: t.colors.text, fontFamily: t.fonts.bodyMedium }]} numberOfLines={1} maxFontSizeMultiplier={NAME_SCALE}>
               {firstName(p.display_name, 9)}
             </RNText>
           </Pressable>
@@ -74,8 +83,9 @@ export const FriendsRings = memo(function FriendsRings({ onlineIds }: { onlineId
 });
 
 const styles = StyleSheet.create({
+  row: { height: FRIENDS_ROW_HEIGHT, flexGrow: 0 },
   content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.sm, gap: spacing.md },
   item: { alignItems: 'center', width: RING + 8 },
   ring: { width: RING, height: RING, borderWidth: 2, alignItems: 'center', justifyContent: 'center' },
-  name: { fontSize: 12, marginTop: 4, maxWidth: RING + 8 },
+  name: { fontSize: 12, lineHeight: NAME_LINE, marginTop: 4, maxWidth: RING + 8 },
 });

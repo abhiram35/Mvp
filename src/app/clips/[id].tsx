@@ -1,7 +1,7 @@
 // One clip + its comments (target of `clip_comment` notifications, route /clips/[id]).
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useCallback, useContext, useMemo, useRef } from 'react';
-import { KeyboardAvoidingView, Platform, useWindowDimensions, View } from 'react-native';
+import { KeyboardAvoidingView, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { HeaderHeightContext } from 'expo-router/react-navigation';
 import { Button, EmptyState, ErrorState, LoadingState, Screen } from '../../components/ui';
@@ -84,7 +84,9 @@ export default function ClipScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: t.colors.surface }}>
       {header}
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={headerHeight}>
+      {/* Android is edge-to-edge (the window no longer resizes for the keyboard), so pad on
+          both platforms, like Screen and the chat screen do. */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding" keyboardVerticalOffset={headerHeight}>
         <CommentsPanel
           ref={panel}
           clip={clip}

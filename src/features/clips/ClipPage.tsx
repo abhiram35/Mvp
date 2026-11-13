@@ -83,7 +83,13 @@ export const ClipPage = memo(function ClipPage({
         <RailButton icon="arrow-redo-outline" label="Share" onPress={() => actions.share(clip)} accessibilityLabel="Share clip" />
         {mine ? (
           <RailButton icon="ellipsis-horizontal" onPress={() => actions.more(clip)} accessibilityLabel="More options" accessibilityHint="Delete your clip" />
-        ) : null}
+        ) : (
+          <RailButton
+            icon="flag-outline"
+            onPress={() => router.push({ pathname: '/report', params: { type: 'clip', id: clip.id } })}
+            accessibilityLabel="Report clip"
+          />
+        )}
       </View>
 
       {/* Caption block */}

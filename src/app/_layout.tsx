@@ -72,7 +72,8 @@ function RootNavigator() {
       <Stack.Protected guard={onboarded} redirectTo={home}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         {/* LFG board ("Lobbies"), moved out of the tab bar — opened from the Lobby tab */}
-        <Stack.Screen name="lfg/index" options={{ title: t.words.lobbies }} />
+        {/* The board has its own editorial header (with a back link), so no stack header: avoids a doubled title. */}
+        <Stack.Screen name="lfg/index" options={{ title: t.words.lobbies, headerShown: false }} />
         {/* Chats, moved out of the tab bar — opened from the Lobby / Clips headers */}
         <Stack.Screen name="chats" options={{ title: 'Chats' }} />
         {/* Clips (owned by the Clips engineer; screens may override these options) */}

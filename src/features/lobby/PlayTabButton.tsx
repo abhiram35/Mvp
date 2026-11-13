@@ -6,8 +6,9 @@ import { useDesign, useTheme } from '../../theme';
 
 /** Hexagon height (pointy top). */
 const SIZE = 64;
-/** How far the hexagon's top rises above the tab bar. */
-const RAISE = 24;
+/** How far the hexagon's top rises above the tab bar. Exported: the tab bar reserves this space. */
+export const PLAY_RAISE = 24;
+const RAISE = PLAY_RAISE;
 /** Ring in the bar colour around the hexagon, so it reads as cut out of the bar. */
 const RING = 4;
 
@@ -49,7 +50,9 @@ export function PlayTabButton({ onPress, onLongPress, accessibilityState, testID
         accessibilityLabel="Play: find a duo"
         accessibilityState={{ selected: focused }}
         hitSlop={4}
-        style={({ pressed }) => [s.button, { top: -RAISE - RING, width: box, height: box }, pressed && { transform: [{ scale: 0.95 }] }]}
+        // The tab bar is RAISE taller than it looks (transparent strip on top), so the whole
+        // hexagon sits inside the bar's bounds and is tappable on Android too.
+        style={({ pressed }) => [s.button, { top: -RING + 2, width: box, height: box }, pressed && { transform: [{ scale: 0.95 }] }]}
       >
         {({ pressed }) => (
           <>

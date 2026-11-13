@@ -33,11 +33,14 @@ export interface CommentsPanelHandle {
 const CommentRow = memo(function CommentRow({
   comment,
   canDelete,
+  mine,
   onDelete,
   now,
 }: {
   comment: ClipComment;
   canDelete: boolean;
+  /** My own comment (no Report button). */
+  mine: boolean;
   onDelete: (c: ClipComment) => void;
   now: number;
 }) {
@@ -64,6 +67,17 @@ const CommentRow = memo(function CommentRow({
         </View>
         <Text style={{ marginTop: 2 }}>{comment.body}</Text>
       </View>
+      {!mine ? (
+        <Pressable
+          onPress={() => router.push({ pathname: '/report', params: { type: 'clip_comment', id: comment.id } })}
+          accessibilityRole="button"
+          accessibilityLabel="Report comment"
+          hitSlop={4}
+          style={({ pressed }) => [s.iconBtn, pressed && { backgroundColor: t.colors.surfaceRaised }]}
+        >
+          <Ionicons name="flag-outline" size={18} color={t.colors.textMuted} />
+        </Pressable>
+      ) : null}
       {canDelete ? (
         <Pressable
           onPress={() => onDelete(comment)}
@@ -147,7 +161,7 @@ export const CommentsPanel = forwardRef<
         data={comments}
         keyExtractor={(c) => c.id}
         renderItem={({ item }) => (
-          <CommentRow comment={item} canDelete={item.author_id === myId || mineClip} onDelete={onDelete} now={now} />
+          <CommentRow comment={item} canDelete={item.author_id === myId || mineClip} mine={item.author_id === myId} onDelete={onDelete} now={now} />
         )}
         ListHeaderComponent={header}
         ListEmptyComponent={

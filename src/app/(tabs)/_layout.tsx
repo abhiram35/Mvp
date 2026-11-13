@@ -2,7 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router/js-tabs';
 import { StyleSheet, View } from 'react-native';
 import type { IconName } from '../../components/ui';
-import { PlayTabButton } from '../../features/lobby/PlayTabButton';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { PLAY_RAISE, PlayTabButton } from '../../features/lobby/PlayTabButton';
 import { BannedBanner, BannedBannerHost } from '../../features/moderation/BannedBanner';
 import { ensureContrast, mixHex, useDesign, useTheme } from '../../theme';
 
@@ -31,6 +32,7 @@ function TabIcon({ name, focused, color }: { name: string; focused: boolean; col
 export default function TabsLayout() {
   const t = useTheme();
   const d = useDesign();
+  const insets = useSafeAreaInsets();
   // Protocol keeps its navy command bar; other themes sit the bar one tone below the page.
   const onPanelBar = t.id === 'protocol';
   const barBg = onPanelBar ? t.colors.panel : t.dark ? d.surface.sunken : d.surface.raised;
@@ -46,13 +48,32 @@ export default function TabsLayout() {
         <Tabs
           screenOptions={{
             headerShown: false,
+            // The bar is PLAY_RAISE taller than it looks: a transparent strip on top holds the
+            // raised hexagon inside the bar's bounds (Android ignores touches outside them).
             tabBarStyle: {
-              backgroundColor: barBg,
-              borderTopColor: onPanelBar ? t.colors.panel : d.hairline,
-              borderTopWidth: StyleSheet.hairlineWidth,
+              height: 56 + insets.bottom + PLAY_RAISE,
+              paddingBottom: insets.bottom,
+              backgroundColor: 'transparent',
+              borderTopWidth: 0,
               elevation: 0,
               overflow: 'visible',
             },
+            tabBarBackground: () => (
+              <View
+                pointerEvents="none"
+                style={{
+                  position: 'absolute',
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  top: PLAY_RAISE,
+                  backgroundColor: barBg,
+                  borderTopColor: onPanelBar ? t.colors.panel : d.hairline,
+                  borderTopWidth: StyleSheet.hairlineWidth,
+                }}
+              />
+            ),
+            tabBarItemStyle: { paddingTop: PLAY_RAISE },
             tabBarActiveTintColor: active,
             tabBarInactiveTintColor: inactive,
             tabBarLabelStyle: { fontFamily: t.fonts.heading, fontSize: 12, letterSpacing: t.shape.headingLetterSpacing, marginTop: 2 },

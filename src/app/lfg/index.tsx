@@ -96,8 +96,18 @@ export default function LfgBoardScreen() {
   }
 
   return (
-    <Screen padded={false} edges={['bottom']}>
+    <Screen padded={false} edges={['top', 'bottom']}>
       <View style={styles.header}>
+        <Pressable
+          onPress={() => (router.canGoBack() ? router.back() : router.replace('/lobby'))}
+          accessibilityRole="button"
+          accessibilityLabel="Back"
+          hitSlop={8}
+          style={styles.back}
+        >
+          <Ionicons name="chevron-back" size={22} color={t.colors.text} />
+          <Text variant="label">Lobby</Text>
+        </Pressable>
         <ScreenHeader
           title={t.words.lobbies}
           kicker={loading && posts.length === 0 ? 'Live board' : `Live now · ${visible.length} open`}
@@ -185,6 +195,7 @@ export default function LfgBoardScreen() {
 
 const useStyles = makeStyles((t) =>
   StyleSheet.create({
+    back: { flexDirection: 'row', alignItems: 'center', gap: 2, minHeight: 44, alignSelf: 'flex-start', marginBottom: 4 },
     scrimHero: { marginBottom: spacing.md, paddingVertical: spacing.lg, paddingBottom: spacing.lg + designPad(t) },
     scrimRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
     scrimTitle: {

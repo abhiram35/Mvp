@@ -10,6 +10,8 @@ export const REPORT_TARGET_LABELS: Record<ReportTarget, string> = {
   lfg_post: 'Lobby',
   community_post: 'Community post',
   community_reply: 'Community reply',
+  clip: 'Clip',
+  clip_comment: 'Clip comment',
 };
 
 /** Turns RPC errors into short copy a moderator can act on. */

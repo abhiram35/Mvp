@@ -7,7 +7,7 @@ import { REPORT_REASON_LABELS, type ReportReason, type ReportTarget } from '../l
 import { useUserId } from '../providers/AuthProvider';
 import { makeStyles, spacing, useTheme } from '../theme';
 
-const TARGETS: ReportTarget[] = ['profile', 'message', 'lfg_post', 'community_post', 'community_reply'];
+const TARGETS: ReportTarget[] = ['profile', 'message', 'lfg_post', 'community_post', 'community_reply', 'clip', 'clip_comment'];
 const DETAILS_MAX = 1000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -22,7 +22,7 @@ export default function ReportScreen() {
   const me = useUserId();
   const t = useTheme();
   const styles = useStyles();
-  const TARGET_LABELS: Record<ReportTarget, string> = { profile: 'player', message: 'message', lfg_post: `${t.words.squad} post`, community_post: 'post', community_reply: 'reply' };
+  const TARGET_LABELS: Record<ReportTarget, string> = { profile: 'player', message: 'message', lfg_post: `${t.words.squad} post`, community_post: 'post', community_reply: 'reply', clip: 'clip', clip_comment: 'comment' };
   const [reason, setReason] = useState<ReportReason | null>(null);
   const [details, setDetails] = useState('');
   const [error, setError] = useState<string | null>(null);

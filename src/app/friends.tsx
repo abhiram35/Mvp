@@ -107,7 +107,7 @@ export default function FriendsScreen() {
         icon="people-outline"
         title="No friends yet"
         message={`Find players in the ${t.words.squad} finder and add them as friends.`}
-        action={<Button title={`Find a ${t.words.squad}`} icon="people" onPress={() => router.push('/(tabs)/squad')} />}
+        action={<Button title={`Find a ${t.words.squad}`} icon="people" onPress={() => router.push('/squad')} />}
       />
     ) : segment === 'requests' ? (
       <EmptyState icon="mail-open-outline" title="No friend requests" message="When someone adds you, it shows up here." />

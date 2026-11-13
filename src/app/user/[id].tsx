@@ -26,7 +26,7 @@ export default function UserProfileScreen() {
   const [busy, setBusy] = useState(false);
   const [messaging, setMessaging] = useState(false);
 
-  if (id && id === me) return <Redirect href="/(tabs)/profile" />;
+  if (id && id === me) return <Redirect href="/profile" />;
 
   const name = profile?.display_name ?? 'this player';
   const isBlocked = !!id && blockedIds.has(id);

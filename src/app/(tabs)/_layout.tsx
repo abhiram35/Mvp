@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router/js-tabs';
 import { StyleSheet, View } from 'react-native';
 import type { IconName } from '../../components/ui';
-import { useIncomingRequestCount } from '../../features/friends/hooks';
+import { PlayTabButton } from '../../features/lobby/PlayTabButton';
 import { BannedBanner, BannedBannerHost } from '../../features/moderation/BannedBanner';
 import { ensureContrast, mixHex, useDesign, useTheme } from '../../theme';
 
@@ -36,7 +36,6 @@ export default function TabsLayout() {
   const barBg = onPanelBar ? t.colors.panel : t.dark ? d.surface.sunken : d.surface.raised;
   const active = onPanelBar ? t.colors.onPanel : t.colors.text;
   const inactive = onPanelBar ? ensureContrast(mixHex(t.colors.onPanel, t.colors.panel, 0.4), [t.colors.panel], 4.5) : ensureContrast(t.colors.textMuted, [barBg], 4.5);
-  const { count: friendRequests } = useIncomingRequestCount();
   const label = (text: string) => (t.shape.headingUppercase ? text.toUpperCase() : text);
   return (
     <View style={{ flex: 1, backgroundColor: t.colors.bg }}>
@@ -52,6 +51,7 @@ export default function TabsLayout() {
               borderTopColor: onPanelBar ? t.colors.panel : d.hairline,
               borderTopWidth: StyleSheet.hairlineWidth,
               elevation: 0,
+              overflow: 'visible',
             },
             tabBarActiveTintColor: active,
             tabBarInactiveTintColor: inactive,
@@ -59,29 +59,29 @@ export default function TabsLayout() {
             tabBarIconStyle: { marginTop: 2 },
           }}
         >
-          {/* Live "looking for group" board — called Lobbies (or Dojo in Ronin) */}
+          {/* Clips feed (opens first) — owned by the Clips engineer */}
           <Tabs.Screen
             name="index"
-            options={{ title: label(t.words.lobbies), tabBarIcon: ({ color, focused }) => <TabIcon name="flash" focused={focused} color={String(color)} /> }}
+            options={{ title: label('Clips'), tabBarIcon: ({ color, focused }) => <TabIcon name="film" focused={focused} color={String(color)} /> }}
           />
-          {/* Squad finder (player matching) */}
+          {/* Game Lobby: player bar, party slots, find a duo, modes, live ticker */}
+          <Tabs.Screen
+            name="lobby"
+            options={{ title: label('Lobby'), tabBarIcon: ({ color, focused }) => <TabIcon name="game-controller" focused={focused} color={String(color)} /> }}
+          />
+          {/* PLAY: the duo finder, behind a raised hexagon button */}
           <Tabs.Screen
             name="squad"
-            options={{ title: label('Duo'), tabBarIcon: ({ color, focused }) => <TabIcon name="people" focused={focused} color={String(color)} /> }}
+            options={{
+              title: label('Play'),
+              tabBarAccessibilityLabel: 'Play: find a duo',
+              tabBarButton: (props) => <PlayTabButton {...props} barBg={barBg} />,
+            }}
           />
-          {/* Community: takes (opinions) and questions — "Scrolls" in Ronin */}
+          {/* Community: takes (opinions) and questions — "Hub" in the bar */}
           <Tabs.Screen
             name="community"
-            options={{ title: label(t.words.community), tabBarIcon: ({ color, focused }) => <TabIcon name="newspaper" focused={focused} color={String(color)} /> }}
-          />
-          <Tabs.Screen
-            name="chats"
-            options={{
-              title: label('Chats'),
-              tabBarBadge: friendRequests > 0 ? friendRequests : undefined,
-              tabBarBadgeStyle: { backgroundColor: t.colors.primary, color: t.colors.onPrimary },
-              tabBarIcon: ({ color, focused }) => <TabIcon name="chatbubbles" focused={focused} color={String(color)} />,
-            }}
+            options={{ title: label('Hub'), tabBarIcon: ({ color, focused }) => <TabIcon name="newspaper" focused={focused} color={String(color)} /> }}
           />
           <Tabs.Screen
             name="profile"

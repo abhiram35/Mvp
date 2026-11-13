@@ -26,6 +26,8 @@ const TYPE_ICONS: Record<NotificationType, IconName> = {
   scrim_update: 'trophy-outline',
   tournament_update: 'podium-outline',
   organiser_application: 'ribbon-outline',
+  clip_comment: 'film-outline',
+  party_invite: 'people-circle-outline',
 };
 
 const MINUTE = 60_000;

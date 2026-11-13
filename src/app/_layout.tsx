@@ -71,6 +71,13 @@ function RootNavigator() {
       {/* Fully set up: the main app */}
       <Stack.Protected guard={onboarded} redirectTo={home}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        {/* LFG board ("Lobbies"), moved out of the tab bar — opened from the Lobby tab */}
+        <Stack.Screen name="lfg/index" options={{ title: t.words.lobbies }} />
+        {/* Chats, moved out of the tab bar — opened from the Lobby / Clips headers */}
+        <Stack.Screen name="chats" options={{ title: 'Chats' }} />
+        {/* Clips (owned by the Clips engineer; screens may override these options) */}
+        <Stack.Screen name="clips/[id]" options={{ title: 'Clip' }} />
+        <Stack.Screen name="clips/new" options={{ title: 'Share a clip', presentation: 'modal' }} />
         {/* LFG agent */}
         <Stack.Screen name="lfg/new" options={{ title: 'Host lobby', presentation: 'modal' }} />
         <Stack.Screen name="lfg/[id]" options={{ title: 'Lobby' }} />

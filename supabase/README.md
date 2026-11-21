@@ -21,6 +21,7 @@ Everything the app needs lives in `migrations/`. Run the files **in order**:
 | `0015_scrim_streams.sql` | **Streaming scrims**: opt-in "OK to stream", YouTube/Twitch link per scrim, moderator-featured scrims |
 | `0016_tournaments.sql` | **Tournaments**: verified organisers (apply → moderator review), free single-elimination cups with registration, check-in, auto bracket with byes, match chats, results/disputes, streamed on YouTube/Twitch. See `docs/TOURNAMENTS.md` |
 | `0017_clips_party.sql` | **Clips + Party**: share YouTube/Twitch/Medal clip links (GGs, comments, Squad / For you / Cups feeds) and the Lobby's party (up to 5 players, invites expire after 1 hour, ready checks). See `docs/CLIPS_AND_PARTY.md` |
+| `0018_now_playing.sql` | **Currently playing**: marking a game "Playing now" clears it on your other games, so the live status badge shows one game. (If you already ran this as `0014_now_playing.sql`, running it again is harmless.) |
 
 All files are safe to run again. Re-running them will not create duplicates, and it will not undo your own edits
 to the game list.
@@ -39,8 +40,8 @@ to the game list.
 **Option A: SQL Editor (easiest)**
 1. In the dashboard open **SQL Editor → New query**.
 2. Open `migrations/0001_schema.sql`, copy the whole file, paste it, and click **Run**.
-3. Do the same for `0002`, `0003`, `0004`, `0005`, `0006`, `0007`, `0008`, `0009`, `0010`, `0011`, `0012`, `0013`, `0014`, `0015`, `0016` and `0017`, in that order
-   (so the full run order is **0001 → 0017**). Already ran some of them earlier? Just run the newer ones, in order.
+3. Do the same for `0002`, `0003`, `0004`, `0005`, `0006`, `0007`, `0008`, `0009`, `0010`, `0011`, `0012`, `0013`, `0014`, `0015`, `0016`, `0017` and `0018`, in that order
+   (so the full run order is **0001 → 0018**). Already ran some of them earlier? Just run the newer ones, in order.
 
 **Option B: Supabase CLI**
 ```bash

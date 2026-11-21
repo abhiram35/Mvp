@@ -43,6 +43,19 @@ function profileRow(userId: string, v: ProfileFormValues, avatarUrl: string | nu
 }
 
 /**
+ * Marks a game as the one you're currently playing (or clears it). At most one game can be
+ * 'playing' at a time — the server clears it on every other game (0014_now_playing.sql).
+ */
+export async function setNowPlaying(profileId: string, gameId: string, playing: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('profile_games')
+    .update({ play_status: playing ? 'playing' : null })
+    .eq('profile_id', profileId)
+    .eq('game_id', gameId);
+  if (error) throw error;
+}
+
+/**
  * Replaces my games and in-game IDs in one transaction (RPC `save_profile_games`).
  * With keepInGameIds every in_game_id is sent as null, meaning "keep what's stored".
  */

@@ -28,7 +28,7 @@ You can skip Firebase at first. The app works without it, except that phones won
 Follow **[supabase/README.md](../supabase/README.md)**. In short:
 
 1. Create a project (region: **Mumbai** if your players are in India).
-2. Run **every** file in `supabase/migrations/` **in order**: `0001` → `0002` → … → the last one (`0017` at the
+2. Run **every** file in `supabase/migrations/` **in order**: `0001` → `0002` → … → the last one (`0018` at the
    time of writing). Skipping or re-ordering breaks things. Running a file twice is safe.
    **Whenever the repo gets a new migration, run it before you publish a new build or update** — new app
    versions expect the new tables and columns and will fail (sign-up, Edit profile, game lists) without them.
@@ -209,7 +209,7 @@ keeps old builds from receiving updates that need the new native code.
 
 ### Releasing scrims, tournaments, clips and the new layout
 
-1. Run `0014_scrims.sql`, `0015_scrim_streams.sql`, `0016_tournaments.sql` and `0017_clips_party.sql` in
+1. Run `0014_scrims.sql`, `0015_scrim_streams.sql`, `0016_tournaments.sql`, `0017_clips_party.sql` and `0018_now_playing.sql` in
    Supabase, in that order (step 2).
 2. These features added no native libraries, so phones that already have a `1.1.0` build get them with
    `eas update` (step 10). If nobody has a build yet, just make the first build (step 9).
@@ -292,7 +292,7 @@ month by the server.
 
 ## Beta checklist
 
-- [ ] All migrations run in order `0001` → `0017` (including `0014_scrims.sql`, `0015_scrim_streams.sql`, `0016_tournaments.sql` and `0017_clips_party.sql`),
+- [ ] All migrations run in order `0001` → `0018` (including `0014_scrims.sql`, `0015_scrim_streams.sql`, `0016_tournaments.sql`, `0017_clips_party.sql` and `0018_now_playing.sql`),
       `games` table has rows
 - [ ] Email confirm + reset templates contain `{{ .Token }}`; redirect URLs `gg://**`, `exp://**` added
 - [ ] `.env` filled; app works in Expo Go (sign up, lobby, chat, community post)

@@ -8,6 +8,10 @@ import { GGErrorBoundary, installGlobalErrorHandlers, useAppOpenTracking } from 
 import { AuthProvider, useAuth } from '../providers/AuthProvider';
 import { ThemeProvider, useTheme, useThemeSwitcher } from '../theme';
 
+// Deep links that cold-start the app on a stack screen (/clips/[id], /chats, /lfg, …) get the
+// tabs underneath, so Back has somewhere to go (Expo Router reads `unstable_settings.anchor`).
+export const unstable_settings = { anchor: '(tabs)' };
+
 // Capture crashes and unhandled errors into Supabase (app_errors) from the very start.
 installGlobalErrorHandlers();
 
@@ -71,6 +75,15 @@ function RootNavigator() {
       {/* Fully set up: the main app */}
       <Stack.Protected guard={onboarded} redirectTo={home}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        {/* LFG board ("Lobbies"), moved out of the tab bar — opened from the Lobby tab */}
+        {/* The board has its own editorial header (with a back link), so no stack header: avoids a doubled title. */}
+        <Stack.Screen name="lfg/index" options={{ title: t.words.lobbies, headerShown: false }} />
+        {/* Chats, moved out of the tab bar — opened from the Lobby / Clips headers */}
+        {/* Own header with a "‹ Lobby" back link (like the LFG board), so no stack header. */}
+        <Stack.Screen name="chats" options={{ title: 'Chats', headerShown: false }} />
+        {/* Clips (owned by the Clips engineer; screens may override these options) */}
+        <Stack.Screen name="clips/[id]" options={{ title: 'Clip' }} />
+        <Stack.Screen name="clips/new" options={{ title: 'Share a clip', presentation: 'modal' }} />
         {/* LFG agent */}
         <Stack.Screen name="lfg/new" options={{ title: 'Host lobby', presentation: 'modal' }} />
         <Stack.Screen name="lfg/[id]" options={{ title: 'Lobby' }} />
@@ -93,6 +106,18 @@ function RootNavigator() {
         {/* Community agent */}
         <Stack.Screen name="community/new" options={{ title: 'New post', presentation: 'modal' }} />
         <Stack.Screen name="community/[id]" options={{ title: 'Post' }} />
+        {/* Scrims (Phase 1) */}
+        <Stack.Screen name="scrims/index" options={{ title: 'Scrims' }} />
+        <Stack.Screen name="scrims/new" options={{ title: 'Post a scrim', presentation: 'modal' }} />
+        <Stack.Screen name="scrims/[id]" options={{ title: 'Scrim' }} />
+        <Stack.Screen name="teams/index" options={{ title: 'My teams' }} />
+        <Stack.Screen name="teams/new" options={{ title: 'Create a team', presentation: 'modal' }} />
+        <Stack.Screen name="teams/[id]" options={{ title: 'Team' }} />
+        {/* Tournaments (Phase 2) */}
+        <Stack.Screen name="tournaments/new" options={{ title: 'Host a tournament', presentation: 'modal' }} />
+        <Stack.Screen name="tournaments/[id]" options={{ title: 'Tournament' }} />
+        <Stack.Screen name="tournaments/match/[id]" options={{ title: 'Match' }} />
+        <Stack.Screen name="organisers/apply" options={{ title: 'Apply to host', presentation: 'modal' }} />
       </Stack.Protected>
     </Stack>
   );

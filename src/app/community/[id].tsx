@@ -104,7 +104,7 @@ export default function CommunityThreadScreen() {
                     try {
                       await deletePost(post.id);
                       if (router.canGoBack()) router.back();
-                      else router.replace('/(tabs)/community');
+                      else router.replace('/community');
                     } catch (e) {
                       Alert.alert("Couldn't delete", communityErrorMessage(e));
                     }
@@ -228,7 +228,7 @@ export default function CommunityThreadScreen() {
             <Button
               title={`Back to ${t.words.community.toLowerCase()}`}
               variant="secondary"
-              onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/community'))}
+              onPress={() => (router.canGoBack() ? router.back() : router.replace('/community'))}
             />
           }
         />

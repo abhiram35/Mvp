@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { isSupabaseConfigured, supabase } from '../lib/supabase';
 import { logThemeChanged } from '../features/telemetry/events';
 import type { CustomTheme } from '../lib/types';
+import { designTokens, type DesignTokens } from './design';
 import { customThemeId, specToAppTheme, validateSpec } from './custom';
 import { DEFAULT_THEME, THEMES, THEME_FONTS, isBuiltInThemeId, isCustomThemeId, type AppTheme, type ThemeId } from './themes';
 
@@ -204,6 +205,11 @@ function useThemeState(): ThemeState {
 /** The active theme: colours, fonts, radius, shape and theme words. */
 export function useTheme(): AppTheme {
   return useThemeState().theme;
+}
+
+/** Design tokens + personality of the active theme (tonal surfaces, readable primary, hero gradient…). */
+export function useDesign(): DesignTokens {
+  return designTokens(useThemeState().theme);
 }
 
 /** Read and change the active theme (for the theme picker). */

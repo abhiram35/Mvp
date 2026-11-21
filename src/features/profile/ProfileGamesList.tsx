@@ -2,10 +2,10 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
-import { Text } from '../../components/ui';
+import { SectionHeader, Text } from '../../components/ui';
 import { errorMessage } from '../../lib/supabase';
 import { GAME_CATEGORY_LABELS, PLAY_STATUS_LABELS, type Game, type ProfileGame } from '../../lib/types';
-import { makeStyles, spacing, useTheme } from '../../theme';
+import { designTokens, makeStyles, mixHex, spacing, useTheme } from '../../theme';
 import { CATEGORY_ORDER, gameCategory } from '../games/art';
 import { GameLogo } from '../games/GameLogo';
 import { useGames } from '../games/useGames';
@@ -44,7 +44,7 @@ export function ProfileGamesList({
 
   return (
     <View>
-      <Text variant="heading" style={{ marginBottom: spacing.sm }}>Games</Text>
+      <SectionHeader index={1} kicker="Loadout" title="Games" style={{ marginTop: 0 }} />
       {games.length === 0 ? (
         <Text muted>No games added yet.</Text>
       ) : (
@@ -212,8 +212,8 @@ function GameRow({
       {own && profileId ? (
         <PlayingToggle profileId={profileId} gameId={pg.game_id} playing={pg.play_status === 'playing'} onChanged={onChanged} />
       ) : status ? (
-        <View style={[s.badge, pg.play_status === 'playing' && { borderColor: t.colors.accent }]}>
-          <Text variant="caption" style={{ color: pg.play_status === 'playing' ? t.colors.accent : t.colors.textMuted }}>
+        <View style={[s.badge, pg.play_status === 'playing' && s.badgePlaying]}>
+          <Text variant="caption" style={{ color: pg.play_status === 'playing' ? t.colors.text : t.colors.textMuted, fontFamily: t.fonts.bodyBold }}>
             {status}
           </Text>
         </View>
@@ -225,8 +225,8 @@ function GameRow({
 const useStyles = makeStyles((t) =>
   StyleSheet.create({
     group: { marginBottom: spacing.md },
-    groupLabel: { marginBottom: spacing.xs, color: t.colors.textMuted },
-    list: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.colors.border },
+    groupLabel: { marginBottom: spacing.xs, color: t.colors.textMuted, fontFamily: t.fonts.bodyBold, letterSpacing: 1.4, textTransform: 'uppercase' },
+    list: {},
     row: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -235,7 +235,7 @@ const useStyles = makeStyles((t) =>
       paddingHorizontal: spacing.xs,
       paddingVertical: spacing.xs,
       borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: t.colors.border,
+      borderBottomColor: designTokens(t).hairline,
     },
     text: { flexShrink: 1, flexGrow: 1 },
     name: { flexShrink: 1 },
@@ -256,11 +256,12 @@ const useStyles = makeStyles((t) =>
       flexDirection: 'row',
       alignItems: 'center',
       marginLeft: 'auto',
-      borderWidth: 1,
-      borderColor: t.colors.border,
+      backgroundColor: designTokens(t).chip.bg,
       borderRadius: t.radius.sm,
       paddingHorizontal: spacing.sm,
       paddingVertical: 6,
     },
+    // "Playing now": accent-tinted fill with the plain text colour (always readable).
+    badgePlaying: { backgroundColor: mixHex(t.colors.bg, t.colors.accent, t.dark ? 0.28 : 0.22) },
   }),
 );

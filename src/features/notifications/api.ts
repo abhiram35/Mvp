@@ -16,6 +16,13 @@ const TYPES: NotificationType[] = [
   'community_solution',
   'rating_received',
   'moderation',
+  'team_invite',
+  'scrim_request',
+  'scrim_update',
+  'tournament_update',
+  'organiser_application',
+  'clip_comment',
+  'party_invite',
 ];
 
 function channelName(base: string): string {

@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Alert, Pressable, StyleSheet } from 'react-native';
 import { Notch, Text } from '../../components/ui';
-import { fontSize, makeStyles, spacing, useTheme } from '../../theme';
+import { designTokens, fontSize, makeStyles, mixHex, spacing, useTheme } from '../../theme';
 import { communityErrorMessage, isOwnGgError, toggleGg, useGgState, type GgState, type GgTarget } from './api';
 import { compactCount } from './format';
 
@@ -61,8 +61,8 @@ export function GgButton({
         s.button,
         compact && s.compact,
         active
-          ? { backgroundColor: pressed ? t.colors.primaryPressed : t.colors.primary, borderColor: t.colors.primary }
-          : pressed && { backgroundColor: t.colors.surfaceRaised },
+          ? { backgroundColor: pressed ? t.colors.primaryPressed : t.colors.primary }
+          : pressed && { backgroundColor: mixHex(designTokens(t).chip.bg, t.colors.text, 0.08) },
       ]}
     >
       <Ionicons name={active ? 'ribbon' : 'ribbon-outline'} size={compact ? 14 : 16} color={fg} />
@@ -82,9 +82,8 @@ const useStyles = makeStyles((t) =>
       gap: spacing.xs + 2,
       minHeight: 44,
       paddingHorizontal: spacing.md,
-      borderWidth: 1,
-      borderColor: t.colors.border,
-      borderRadius: t.radius.md,
+      backgroundColor: designTokens(t).chip.bg,
+      borderRadius: designTokens(t).lang.corner === 'soft' ? 22 : t.radius.md,
       overflow: 'hidden',
     },
     compact: { minHeight: 32, paddingHorizontal: spacing.sm },

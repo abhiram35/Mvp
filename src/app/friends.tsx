@@ -1,13 +1,13 @@
 import { router } from 'expo-router';
 import { useMemo, useState, type ReactNode } from 'react';
 import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
-import { Avatar, Button, EmptyState, ErrorState, LiveDot, LoadingState, Screen, Text } from '../components/ui';
+import { Avatar, Button, EmptyState, ErrorState, LiveDot, LoadingState, Screen, SegmentedControl, Text } from '../components/ui';
 import { openDm } from '../lib/actions';
 import { errorMessage } from '../lib/supabase';
 import { acceptFriendRequest, deleteFriendship } from '../features/friends/api';
 import { useFriendships, type FriendshipWithProfile } from '../features/friends/hooks';
 import { useNowPlaying } from '../features/profile/nowPlaying';
-import { fontSize, makeStyles, spacing, useTheme } from '../theme';
+import { designTokens, fontSize, makeStyles, spacing, useTheme } from '../theme';
 
 type Segment = 'friends' | 'requests' | 'sent';
 
@@ -114,7 +114,7 @@ export default function FriendsScreen() {
         icon="people-outline"
         title="No friends yet"
         message={`Find players in the ${t.words.squad} finder and add them as friends.`}
-        action={<Button title={`Find a ${t.words.squad}`} icon="people" onPress={() => router.push('/(tabs)/squad')} />}
+        action={<Button title={`Find a ${t.words.squad}`} icon="people" onPress={() => router.push('/squad')} />}
       />
     ) : segment === 'requests' ? (
       <EmptyState icon="mail-open-outline" title="No friend requests" message="When someone adds you, it shows up here." />
@@ -124,15 +124,17 @@ export default function FriendsScreen() {
 
   return (
     <Screen edges={['bottom']} padded={false}>
-      <View style={styles.segments} accessibilityRole="tablist">
-        <SegmentButton label="Friends" active={segment === 'friends'} onPress={() => setSegment('friends')} />
-        <SegmentButton
-          label={incoming.length > 0 ? `Requests (${incoming.length})` : 'Requests'}
-          active={segment === 'requests'}
-          onPress={() => setSegment('requests')}
-        />
-        <SegmentButton label="Sent" active={segment === 'sent'} onPress={() => setSegment('sent')} />
-      </View>
+      <SegmentedControl
+        accessibilityLabel="Friends lists"
+        value={segment}
+        onChange={setSegment}
+        options={[
+          { value: 'friends', label: 'Friends' },
+          { value: 'requests', label: 'Requests', badge: incoming.length },
+          { value: 'sent', label: 'Sent' },
+        ]}
+        style={styles.segments}
+      />
 
       {loading && items.length === 0 ? (
         <LoadingState />
@@ -165,45 +167,9 @@ export default function FriendsScreen() {
   );
 }
 
-function SegmentButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  const t = useTheme();
-  const styles = useStyles();
-  return (
-    <Pressable
-      accessibilityRole="tab"
-      accessibilityLabel={label}
-      accessibilityState={{ selected: active }}
-      onPress={onPress}
-      style={({ pressed }) => [styles.segment, pressed && { backgroundColor: t.colors.surfaceRaised }]}
-    >
-      <Text style={[styles.segmentText, { color: active ? t.colors.text : t.colors.textMuted }]} numberOfLines={1}>
-        {label}
-      </Text>
-      <View style={[styles.segmentBar, active && { backgroundColor: t.colors.primary }]} />
-    </Pressable>
-  );
-}
-
 const useStyles = makeStyles((t) =>
   StyleSheet.create({
-    segments: {
-      flexDirection: 'row',
-      marginHorizontal: spacing.lg,
-      marginTop: spacing.sm,
-      marginBottom: spacing.xs,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: t.colors.border,
-    },
-    segment: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'flex-end' },
-    segmentText: {
-      fontFamily: t.fonts.heading,
-      fontSize: fontSize.md,
-      letterSpacing: t.shape.headingLetterSpacing,
-      textTransform: t.shape.headingUppercase ? 'uppercase' : 'none',
-      paddingBottom: spacing.sm,
-    },
-    // Selected segment: 2px primary bar sitting on the hairline rule.
-    segmentBar: { alignSelf: 'stretch', height: 2, marginBottom: -StyleSheet.hairlineWidth, backgroundColor: 'transparent' },
+    segments: { marginHorizontal: spacing.lg, marginTop: spacing.md, marginBottom: spacing.sm },
     row: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -213,11 +179,17 @@ const useStyles = makeStyles((t) =>
     },
     person: { flex: 1, flexDirection: 'row', alignItems: 'center', minHeight: 44 },
     names: { flex: 1, marginLeft: spacing.md },
-    name: { fontFamily: t.fonts.bodyBold, fontSize: fontSize.md, color: t.colors.text },
+    name: {
+      fontFamily: t.fonts.heading,
+      fontSize: fontSize.lg,
+      color: t.colors.text,
+      letterSpacing: t.shape.headingLetterSpacing * 0.6,
+      textTransform: t.shape.headingUppercase ? 'uppercase' : 'none',
+    },
     actions: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
     separator: {
       height: StyleSheet.hairlineWidth,
-      backgroundColor: t.colors.border,
+      backgroundColor: designTokens(t).hairline,
       marginLeft: spacing.lg + 44 + spacing.md,
       marginRight: spacing.lg,
     },

@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { Notch, Text } from '../../components/ui';
-import { fontSize, makeStyles, spacing, useTheme } from '../../theme';
+import { designTokens, fontSize, makeStyles, spacing, useTheme } from '../../theme';
 import { COMMUNITY_LIMITS } from './format';
 
 /** Reply box pinned under a thread. `onSend` should throw on failure (the draft is restored). */
@@ -88,9 +88,7 @@ const useStyles = makeStyles((t) =>
       flex: 1,
       minHeight: 44,
       maxHeight: 160,
-      backgroundColor: t.colors.surface,
-      borderWidth: 1,
-      borderColor: t.colors.border,
+      backgroundColor: designTokens(t).chip.bg,
       borderRadius: t.radius.md,
       paddingHorizontal: spacing.lg,
       paddingTop: spacing.md,

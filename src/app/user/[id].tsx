@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Redirect, Stack, router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, View } from 'react-native';
-import { Button, EmptyState, ErrorState, LoadingState, Screen, Text } from '../../components/ui';
+import { Button, EmptyState, ErrorState, LoadingState, Screen, SectionHeader } from '../../components/ui';
 import { ActionRow } from '../../features/profile/ActionRow';
 import { FriendButton } from '../../features/friends/FriendButton';
 import { useGames } from '../../features/games/useGames';
@@ -29,7 +29,7 @@ export default function UserProfileScreen() {
   const [busy, setBusy] = useState(false);
   const [messaging, setMessaging] = useState(false);
 
-  if (id && id === me) return <Redirect href="/(tabs)/profile" />;
+  if (id && id === me) return <Redirect href="/profile" />;
 
   const name = profile?.display_name ?? 'this player';
   const isBlocked = !!id && blockedIds.has(id);
@@ -160,8 +160,8 @@ export default function UserProfileScreen() {
         <SteamCard account={steam} profileId={id} />
       </View>
 
-      <Text variant="heading" style={styles.groupTitle}>Safety</Text>
-      <View style={styles.group}>
+      <SectionHeader index={2} kicker="Keep it clean" title="Safety" />
+      <View>
         <ActionRow icon="flag-outline" label="Report player" onPress={() => openReport('profile', id)} />
         <ActionRow icon="ban-outline" label={busy ? 'Blocking…' : 'Block player'} danger disabled={busy} onPress={confirmBlock} last />
       </View>
@@ -174,7 +174,5 @@ const useStyles = makeStyles((t) =>
     actions: { flexDirection: 'row', gap: spacing.md },
     menuBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
     section: { marginTop: spacing.xl },
-    groupTitle: { marginTop: spacing.xl, marginBottom: spacing.sm },
-    group: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.colors.border },
   }),
 );

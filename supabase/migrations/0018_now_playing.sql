@@ -1,4 +1,4 @@
--- 0014: "currently playing" becomes exclusive, so it can be shown as a live status badge
+-- 0018 (was 0014_now_playing on main; renumbered so it runs after 0014_scrims…0017): "currently playing" becomes exclusive, so it can be shown as a live status badge
 -- (friends list, squad finder, chat header, profile) instead of just a per-game progress
 -- flag on story games. Marking a game 'playing' now clears 'playing' on every other game for
 -- that player, so profile_games.play_status = 'playing' identifies at most one "current" game

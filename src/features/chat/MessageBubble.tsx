@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '../../components/ui';
-import { fontSize, makeStyles, spacing, useTheme } from '../../theme';
+import { designTokens, fontSize, makeStyles, spacing, useTheme } from '../../theme';
 import { formatDayLabel, formatMessageTime } from './format';
 import type { ChatMessage } from './useMessages';
 
@@ -96,10 +96,8 @@ const useStyles = makeStyles((t) => {
     bubble: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: t.radius.lg },
     bubbleMine: { backgroundColor: t.colors.primary, borderBottomRightRadius: tail },
     bubbleTheirs: {
-      backgroundColor: t.colors.surface,
+      backgroundColor: designTokens(t).chip.bg,
       borderBottomLeftRadius: tail,
-      borderWidth: 1,
-      borderColor: t.colors.border,
     },
     bodyMine: { fontFamily: t.fonts.body, fontSize: fontSize.md, lineHeight: 22, color: t.colors.onPrimary },
     bodyTheirs: { fontFamily: t.fonts.body, fontSize: fontSize.md, lineHeight: 22, color: t.colors.text },

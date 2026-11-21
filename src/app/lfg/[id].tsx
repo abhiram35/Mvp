@@ -362,7 +362,7 @@ function AuthorPanel({ post, joinable, onChanged }: { post: LfgPostWithAuthor; j
           try {
             await deleteLfgPost(post.id);
             if (router.canGoBack()) router.back();
-            else router.replace('/');
+            else router.replace('/lfg');
           } catch (e) {
             Alert.alert("Couldn't delete", errorMessage(e));
             setPostBusy(false);
@@ -463,7 +463,7 @@ export default function LfgPostScreen() {
         icon="search"
         title="Post not found"
         message="It may have been deleted by its author."
-        action={<Button title={`Back to ${t.words.lobbies}`} variant="secondary" onPress={() => router.replace('/')} />}
+        action={<Button title={`Back to ${t.words.lobbies}`} variant="secondary" onPress={() => router.replace('/lfg')} />}
       />
     );
   } else {
